@@ -1,64 +1,102 @@
-import fetch from "node-fetch";
-import crypto from "crypto";
-import { FormData, Blob } from "formdata-node";
-import { fileTypeFromBuffer } from "file-type";
+import axios from 'axios';
 
-let handler = async (m, { conn }) => {
-  let q = m.quoted ? m.quoted : m;
-  let mime = (q.msg || q).mimetype || '';
-  if (!mime) return conn.reply(m.chat, `${emoji} Por favor, responda a un archivo válido (imagen, video, etc.).`, m);
-  
-  await m.react(rwait);
-  
+let handler = async (m, { conn, text, usedPrefix, command }) => {
+  if (!text) return m.reply(`${emoji} Por favor, ingresa un enlace de *Terabox*.`);
+  await m.react('🕓');
+
   try {
-    let media = await q.download();
-    let isTele = /image\/(png|jpe?g|gif)|video\/mp4/.test(mime);
-    let link = await catbox(media);
-    
-    let txt = `*乂 C A T B O X - U P L O A D E R 乂*\n\n`;
-    txt += `*» Enlace* : ${link}\n`;
-    txt += `*» Tamaño* : ${formatBytes(media.length)}\n`;
-    txt += `*» Expiración* : ${isTele ? 'No expira' : 'Desconocido'}\n\n`;
-    txt += `> *${dev}*`;
-    
-    await conn.sendFile(m.chat, media, 'thumbnail.jpg', txt, m, fkontak);
-    
-    await m.react(done);
-  } catch {
-    await m.react(error);
+    const result = await terabox(text);
+    if (!result.length) return m.reply(`${emoji2} ingresa una URL válida.`);
+
+    for (let i = 0; i < result.length; i++) {
+      const { fileName, type, thumb, url } = result[i];
+      if (!fileName || !url) {
+        console.error('Error: Datos del archivo incompletos', { fileName, url });
+        continue;
+      }
+
+      const caption = `📄 *Nombre File:* ${fileName}\n📂 *Formato:* ${type}\n🔗 URL: ${url}`;
+      console.log(`Enviando archivo: ${fileName}, URL: ${url}`);
+
+      try {
+        await conn.sendFile(m.chat, url, fileName, caption, m, false, {
+          thumbnail: thumb ? await getBuffer(thumb) : null
+        });
+        await m.react('✅');
+      } catch (error) {
+        console.error('Error al enviar el archivo:', error);
+        m.reply(`${msm} Error al enviar el archivo: ${fileName}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error general:', err);
+    m.reply('Error al descargar el archivo.');
   }
 };
 
-handler.help = ['tourl2'];
-handler.tags = ['transformador'];
-handler.command = ['catbox', 'tourl2'];
+handler.help = ["terabox *<url>*"];
+handler.tags = ["descargas"];
+handler.command = ['terabox', 'tb'];
+handler.group = true;
+handler.register = true;
+handler.coin = 5;
+
 export default handler;
 
-function formatBytes(bytes) {
-  if (bytes === 0) {
-    return '0 B';
-  }
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / 1024 ** i).toFixed(2)} ${sizes[i]}`;
+async function terabox(url) {
+  return new Promise(async (resolve, reject) => {
+    await axios
+      .post('https://teradl-api.dapuntaratya.com/generate_file', {
+        mode: 1,
+        url: url
+      })
+      .then(async (a) => {
+        const array = [];
+        for (let x of a.data.list) {
+          let dl = await axios
+            .post('https://teradl-api.dapuntaratya.com/generate_link', {
+              js_token: a.data.js_token,
+              cookie: a.data.cookie,
+              sign: a.data.sign,
+              timestamp: a.data.timestamp,
+              shareid: a.data.shareid,
+              uk: a.data.uk,
+              fs_id: x.fs_id
+            })
+            .then((i) => i.data)
+            .catch((e) => e.response);
+
+          if (!dl.download_link || !dl.download_link.url_1) {
+            console.error('Error: Enlace de descarga no encontrado', dl);
+            continue;
+          }
+
+          array.push({
+            fileName: x.name,
+            type: x.type,
+            thumb: x.image,
+            url: dl.download_link.url_1
+          });
+        }
+        resolve(array);
+      })
+      .catch((e) => {
+        console.error('Error en la API Terabox:', e.response.data);
+        reject(e.response.data);
+      });
+  });
 }
 
-async function catbox(content) {
-  const { ext, mime } = (await fileTypeFromBuffer(content)) || {};
-  const blob = new Blob([content.toArrayBuffer()], { type: mime });
-  const formData = new FormData();
-  const randomBytes = crypto.randomBytes(5).toString("hex");
-  formData.append("reqtype", "fileupload");
-  formData.append("fileToUpload", blob, randomBytes + "." + ext);
-
-  const response = await fetch("https://catbox.moe/user/api.php", {
-    method: "POST",
-    body: formData,
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36",
-    },
-  });
-
-  return await response.text();
+async function getBuffer(url) {
+  try {
+    const res = await axios({
+      method: 'get',
+      url,
+      responseType: 'arraybuffer'
+    });
+    return res.data;
+  } catch (err) {
+    console.error('Error al obtener el buffer:', err);
+    return null;
+  }
 }

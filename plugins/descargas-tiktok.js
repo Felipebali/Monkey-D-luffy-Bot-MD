@@ -1,297 +1,70 @@
 import fetch from 'node-fetch';
 
 var handler = async (m, { conn, args, usedPrefix, command }) => {
-    if (!args[0]) {
-        // 👒 Mensaje de bienvenida/instrucción con sombrero de paja
-        return conn.reply(m.chat, `👒 Por favor, ingresa un enlace de TikTok, ¡por el tesoro de los videos!\n\n📝 *Ejemplo:* ${usedPrefix}${command} https://www.tiktok.com/@usuario/video/1234567890`, m);
+  if (!args[0]) {
+    return conn.reply(
+      m.chat,
+      `${emoji} 𝙿𝚘𝚛 𝚏𝚊𝚟𝚘𝚛, 𝚒𝚗𝚐𝚛𝚎𝚜𝚊 𝚞𝚗 𝚎𝚗𝚕𝚊𝚌𝚎 𝚍𝚎 𝚃𝚒𝚔𝚃𝚘𝚔.\n\n📌 *Ejemplo:* ${usedPrefix + command} https://vm.tiktok.com/...`,
+      m
+    );
+  }
+
+  try {
+    await conn.reply(m.chat, `${emoji} 𝙴𝚜𝚙𝚎𝚛𝚎 𝚞𝚗 𝚖𝚘𝚖𝚎𝚗𝚝𝚘, 𝚘𝚋𝚝𝚎𝚗𝚒𝚎𝚗𝚍𝚘 𝚎𝚕 𝚟𝚒𝚍𝚎𝚘...`, m);
+
+    const tiktokData = await tiktokdl(args[0]);
+    const result = tiktokData?.data;
+
+    if (!result?.play) {
+      return conn.reply(m.chat, "❌ 𝙴𝚛𝚛𝚘𝚛: 𝙽𝚘 𝚜𝚎 𝚙𝚞𝚍𝚘 𝚘𝚋𝚝𝚎𝚗𝚎𝚛 𝚎𝚕 𝚟𝚒𝚍𝚎𝚘.", m);
     }
 
+    const caption = `
+  *T I K T O K  -  D O W N L O A D*
 
-    const tiktokUrl = validateTikTokUrl(args[0]);
-    if (!tiktokUrl) {
-        // ❌ Error de URL con calavera pirata
-        return conn.reply(m.chat, `🏴‍☠️ URL de TikTok inválida. ¡No encontrarás el One Piece con ese enlace!\n\n✅ *URLs válidas:*\n• https://www.tiktok.com/@usuario/video/...\n• https://vm.tiktok.com/...\n• https://vt.tiktok.com/...`, m);
-    }
+\`${result.title || 'Sin título'}\`
 
-    try {
-        // ⚙️ Mensaje de espera
-        await conn.reply(m.chat, `⚙️ Usando mi Gomu Gomu no mi... Descargando video de TikTok... Por favor espera.`, m);
+01:43 ━━━━●───── 04:40
+⇆ㅤ ◁ㅤ ❚❚ ㅤ▷ ㅤ ↻
+               ılıılıılıılıılıılı
+𝚅𝙾𝙻𝚄𝙼𝙴 : ▮▮▮▮▮▮▮▮▮▮
 
+❐  *Autor* : ${result.author?.nickname || 'Desconocido'}
+❐  *Duración* : ${result.duration || 0} segundos
+❐  *Vistas* : ${result.play_count || 0}
+❐  *Likes* : ${result.digg_count || 0}
+❐  *Comentarios* : ${result.comment_count || 0}
+❐  *Compartidos* : ${result.share_count || 0}
+❐  *Publicado* : ${formatDate(result.create_time)}
+❐  *Descargas* : ${result.download_count || 0}
+`.trim();
 
-        const result = await downloadFromMultipleAPIs(tiktokUrl);
-
-        if (!result) {
-            // ❌ Error de descarga
-            return conn.reply(m.chat, `🏴‍☠️ No se pudo descargar el video. ¡Podría ser un video del Gobierno Mundial!`, m);
-        }
-
-        const { videoUrl, title, author, thumbnail } = result;
-
-        if (videoUrl) {
-        // 🔥 Caption final con puño de fuego y Luffy Bot
-        const caption = `🔥 *Video de TikTok, ¡Misión Cumplida!*\n\n` +
-                          `👤 *Autor:* ${author || 'Desconocido'}\n` +
-                          `📹 *Título:* ${title || 'Sin título'}\n\n` +
-                          `🏴‍☠️ *Descargado por Luffy Bot* - ¡Seré el Rey de los Piratas!`;
-
-            await conn.sendMessage(m.chat, {
-                video: { url: videoUrl },
-                mimetype: 'video/mp4',
-                fileName: 'tiktok.mp4',
-                caption: caption
-            }, { quoted: m });
-        } else {
-            return conn.reply(m.chat, `❌ No se pudo obtener el video. ¡Intenta con un enlace que tenga más carne!`, m);
-        }
-    } catch (error) {
-        console.error('Error en TikTok download:', error);
-        // 💡 Consejos con icono de bandera pirata
-        return conn.reply(m.chat, `🏴‍☠️ Error al procesar la descarga: ${error.message}\n\n💡 *Consejos de un pirata:*\n• Verifica que el video sea público\n• Intenta con un enlace diferente\n• El video podría estar restringido por el Almirante de la Flota`, m);
-    }
+    await conn.sendFile(m.chat, result.play, 'tiktok.mp4', caption, m);
+    await m.react('✅');
+  } catch (error) {
+    console.error(error);
+    return conn.reply(m.chat, `❌ 𝙴𝚛𝚛𝚘𝚛 𝚊𝚕 𝚍𝚎𝚜𝚌𝚊𝚛𝚐𝚊𝚛: ${error.message}`, m);
+  }
 };
 
-handler.help = ['tiktok'].map((v) => v + ' *<link>*');
+handler.help = ['tiktok', 'tt'].map(v => v + ' *<link>*');
 handler.tags = ['descargas'];
-handler.command = ['tiktok', 'tt'];
-handler.group = false;
+handler.command = ['tiktok', 'tt', 'tiktokdl', 'ttdl'];
+handler.group = true;
 handler.register = true;
 handler.coin = 2;
 handler.limit = true;
 
 export default handler;
 
-
-// --- Funciones auxiliares (no requieren cambios temáticos) ---
-
-function validateTikTokUrl(url) {
-    try {
-
-        url = url.trim().replace(/[^\x00-\x7F]/g, "");
-
-
-        const patterns = [
-            /(?:https?:\/\/)?(?:www\.)?tiktok\.com\/@([^\/]+)\/video\/(\d+)/,
-            /(?:https?:\/\/)?vm\.tiktok\.com\/([A-Za-z0-9]+)/,
-            /(?:https?:\/\/)?vt\.tiktok\.com\/([A-Za-z0-9]+)/,
-            /(?:https?:\/\/)?m\.tiktok\.com\/v\/(\d+)/,
-            /(?:https?:\/\/)?www\.tiktok\.com\/t\/([A-Za-z0-9]+)/
-        ];
-
-
-        for (const pattern of patterns) {
-            if (pattern.test(url)) {
-
-                if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                    url = 'https://' + url;
-                }
-                return url;
-            }
-        }
-
-        return null;
-    } catch (error) {
-        console.error('Error validating TikTok URL:', error);
-        return null;
-    }
+async function tiktokdl(url) {
+  const api = `https://www.tikwm.com/api/?url=${url}&hd=1`;
+  const res = await fetch(api);
+  const json = await res.json();
+  return json;
 }
 
-
-async function downloadFromMultipleAPIs(url) {
-    const apis = [
-        {
-            name: 'TikWM',
-            func: () => tiktokTikWM(url)
-        },
-        {
-            name: 'Eliasar',
-            func: () => tiktokEliasar(url)
-        },
-        {
-            name: 'SSSTik',
-            func: () => tiktokSSSTik(url)
-        },
-        {
-            name: 'TikDown',
-            func: () => tiktokTikDown(url)
-        }
-    ];
-
-    for (const api of apis) {
-        try {
-            console.log(`🔍 Intentando con ${api.name}...`);
-            const result = await api.func();
-
-            if (result && result.videoUrl) {
-                console.log(`✅ ${api.name} exitoso`);
-                return result;
-            }
-        } catch (error) {
-            console.log(`❌ ${api.name} falló: ${error.message}`);
-            continue;
-        }
-    }
-
-    return null;
-}
-
-
-async function tiktokTikWM(url) {
-    try {
-        const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`;
-
-        const response = await fetch(apiUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/json, text/plain, */*',
-                'Referer': 'https://www.tikwm.com/',
-                'Origin': 'https://www.tikwm.com'
-            },
-            timeout: 15000
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.code === 0 && data.data && data.data.play) {
-            return {
-                videoUrl: data.data.play,
-                title: data.data.title || 'Sin título',
-                author: data.data.author?.unique_id || 'Desconocido',
-                thumbnail: data.data.cover || data.data.origin_cover
-            };
-        }
-
-        throw new Error('No video data found');
-    } catch (error) {
-        throw new Error(`TikWM API error: ${error.message}`);
-    }
-}
-
-
-async function tiktokEliasar(url) {
-    try {
-        const apiUrl = `https://eliasar-yt-api.vercel.app/api/search/tiktok?query=${encodeURIComponent(url)}`;
-
-        const response = await fetch(apiUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            timeout: 15000
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.results && data.results.video) {
-            return {
-                videoUrl: data.results.video,
-                title: data.results.title || 'Sin título',
-                author: data.results.author || 'Desconocido',
-                thumbnail: data.results.thumbnail
-            };
-        }
-
-        throw new Error('No video data found');
-    } catch (error) {
-        throw new Error(`Eliasar API error: ${error.message}`);
-    }
-}
-
-
-async function tiktokSSSTik(url) {
-    try {
-        const apiUrl = `https://ssstik.io/abc?url=dl`;
-
-        const formData = new URLSearchParams();
-        formData.append('id', url);
-        formData.append('locale', 'en');
-        formData.append('tt', 'RFBiZ3Bi');
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Origin': 'https://ssstik.io',
-                'Referer': 'https://ssstik.io/'
-            },
-            body: formData.toString(),
-            timeout: 15000
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const html = await response.text();
-
-
-        const videoMatch = html.match(/href="([^"]*\.mp4[^"]*)"/);
-        const titleMatch = html.match(/<p class="maintext">([^<]+)</);
-
-        if (videoMatch && videoMatch[1]) {
-            return {
-                videoUrl: videoMatch[1],
-                title: titleMatch ? titleMatch[1] : 'Sin título',
-                author: 'Desconocido',
-                thumbnail: null
-            };
-        }
-
-        throw new Error('No video URL found in response');
-    } catch (error) {
-        throw new Error(`SSSTik API error: ${error.message}`);
-    }
-}
-
-
-async function tiktokTikDown(url) {
-    try {
-        const apiUrl = `https://tikdown.org/api/ajaxSearch`;
-
-        const formData = new URLSearchParams();
-        formData.append('q', url);
-        formData.append('lang', 'en');
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Origin': 'https://tikdown.org',
-                'Referer': 'https://tikdown.org/'
-            },
-            body: formData.toString(),
-            timeout: 15000
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.status === 'ok' && data.data) {
-            const videoMatch = data.data.match(/href="([^"]*\.mp4[^"]*)"/);
-
-            if (videoMatch && videoMatch[1]) {
-                return {
-                    videoUrl: videoMatch[1],
-                    title: 'Video de TikTok',
-                    author: 'Desconocido',
-                    thumbnail: null
-                };
-            }
-        }
-
-        throw new Error('No video data found');
-    } catch (error) {
-        throw new Error(`TikDown API error: ${error.message}`);
-    }
+function formatDate(timestamp) {
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleString('es-ES', { timeZone: 'America/Mexico_City' });
 }

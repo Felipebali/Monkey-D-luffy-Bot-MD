@@ -1,19 +1,26 @@
-let handler = async (m, { conn, usedPrefix, command }) => {
+import os from 'os';
 
+let handler = async (m, { conn }) => {
     try {
-        m.reply('「❀」 Reiniciando El Bot....')
-        setTimeout(() => {
-            process.exit(0)
-        }, 3000) 
+        const start = Date.now();
+
+        const info = `
+*sᴇ ʜᴀ ᴀᴘʟɪᴄᴀᴅᴏ ᴜɴ ʀᴇɪɴɪᴄɪᴏ ᴅᴇʟ ʙᴏᴛ ᴜɴ ᴍᴏᴍᴇɴᴛᴏ....🔄*
+        `.trim();
+
+        await conn.reply(m.chat, info, m);
+
+        setTimeout(() => process.exit(0), 3000);
+
     } catch (error) {
-        console.log(error)
-        conn.reply(m.chat, `${error}`, m)
+        console.error('[ERROR][REINICIO]', error);
+        await conn.reply(m.chat, `❌ Error\n${error.message || error}`, m);
     }
-}
+};
 
-handler.help = ['restart']
-handler.tags = ['owner']
-handler.command = ['restart', 'reiniciar'] 
-handler.rowner = true
+handler.help = ['restart'];
+handler.tags = ['owner'];
+handler.command = ['restart', 'reiniciar'];
+handler.rowner = true;
 
-export default handler
+export default handler;

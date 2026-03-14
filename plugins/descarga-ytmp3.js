@@ -1,9 +1,7 @@
 import fetch from 'node-fetch';
 
-// --- Constantes y Configuración de Transmisión ---
-const CAUSA_API_KEY = 'causa-f8289f3a4ffa44bb'; // Tu clave de Causa API
-const newsletterJid  = '120363420846835529@newsletter';
-const newsletterName = '⏤͟͞ू⃪፝͜⁞⟡『 𝐓͢ᴇ𝙖፝ᴍ⃨ 𝘾𝒉꯭𝐚𝑛𝑛𝒆𝑙:🏴‍☠️MONKEY • D • L U F F Y🏴‍☠️』࿐⟡';
+const newsletterJid  = '120363335626706839@newsletter';
+const newsletterName = '⏤͟͞ू⃪፝͜⁞⟡『 𝐓͢ᴇ𝙖፝ᴍ⃨ 𝘾𝒉꯭𝐚𝑛𝑛𝒆𝑙: 𝑹ᴜ⃜ɓ𝑦-𝑯ᴏ𝒔𝑯𝙞꯭𝑛𝒐 』࿐⟡';
 
 var handler = async (m, { conn, args, usedPrefix, command }) => {
   const emoji = '🎵';
@@ -17,10 +15,10 @@ var handler = async (m, { conn, args, usedPrefix, command }) => {
       serverMessageId: -1
     },
     externalAdReply: {
-      title: wm, 
-      body: dev, 
-      thumbnail: icons, 
-      sourceUrl: redes, 
+      title: wm,
+      body: dev,
+      thumbnail: icons,
+      sourceUrl: redes,
       mediaType: 1,
       renderLargerThumbnail: false
     }
@@ -38,66 +36,46 @@ var handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
     await conn.reply(
       m.chat,
-      `📌 *Procesando tu petición...*\nUn momento, senpai~ 🎧`,
+      `🌸 *Procesando tu petición...*\nUn momento, senpai~ 🎧`,
       m,
       { contextInfo, quoted: m }
     );
 
     const url = args[0];
+    const apiUrl = `https://dark-core-api.vercel.app/api/download/YTMP3?key=api&url=${encodeURIComponent(url)}`;
+    const res = await fetch(apiUrl);
+    const json = await res.json();
 
-    // --- CAMBIO: Usando la API de Causa (Apicausas) ---
-    // Endpoint: /api/v1/descargas/youtube
-    // Parámetros: url, type (audio), apikey
-    const causaApiUrl = `https://rest.apicausas.xyz/api/v1/descargas/youtube?url=${encodeURIComponent(url)}&type=audio&apikey=${CAUSA_API_KEY}`;
-
-    const res = await fetch(causaApiUrl);
-    const json = await res.json().catch(e => {
-        console.error(`[ERROR] No se pudo parsear la respuesta JSON: ${e.message}`);
-        return null;
-    });
-
-    // Causa API devuelve { status: true, data: { title, download: { url } } }
-    if (!json || !json.status || !json.data) {
-        return conn.reply(
-            m.chat,
-            `❌ *¡Error!* La API de Causa no respondió correctamente o el enlace es inválido.`,
-            m,
-            { contextInfo, quoted: m }
-        );
-    }
-
-    const data = json.data;
-    const title = data.title || 'Audio de YouTube';
-    const downloadURL = data.download?.url; 
-    
-    // Causa API a veces no devuelve thumbnail directamente en el objeto de descarga, 
-    // usamos la constante 'icons' como respaldo.
-    const thumb = icons;
-
-    if (downloadURL) {
-      // Enviar el archivo de audio
-      await conn.sendMessage(
+    if (!json.status || !json.download) {
+      return conn.reply(
         m.chat,
-        {
-          audio: { url: downloadURL },
-          mimetype: 'audio/mpeg',
-          fileName: `${title}.mp3`,
-          ptt: false,
-          contextInfo: {
-            ...contextInfo,
-            externalAdReply: {
-               ...contextInfo.externalAdReply,
-               title: title,
-               body: 'Descarga Completada via Causa API',
-               thumbnail: thumb ? await (await fetch(thumb)).buffer() : null
-            }
-          }
-        },
-        { quoted: m }
+        `❌ *No pude descargar el audio.*\nRazón: ${json.message || 'Respuesta inválida de la API.'}`,
+        m,
+        { contextInfo, quoted: m }
       );
-    } else {
-      throw new Error('No se encontró un enlace de descarga válido en la respuesta de Causa.');
     }
+
+    const audioRes = await fetch(json.download);
+    const audioBuffer = await audioRes.buffer();
+
+    const caption = `
+╭───[ 𝚈𝚃𝙼𝙿𝟹 • 🎶 ]───⬣
+📌 *Título:* ${json.title}
+📁 *Formato:* ${json.format}
+📎 *Fuente:* ${url}
+╰────────────────⬣`;
+
+    await conn.sendMessage(
+      m.chat,
+      {
+        audio: audioBuffer,
+        mimetype: 'audio/mpeg',
+        fileName: `${json.title}.mp3`,
+        ptt: false,
+        caption
+      },
+      { contextInfo, quoted: m }
+    );
 
   } catch (e) {
     console.error(e);
@@ -113,8 +91,6 @@ var handler = async (m, { conn, args, usedPrefix, command }) => {
 handler.help = ['ytmp3'].map(v => v + ' <link>');
 handler.tags = ['descargas'];
 handler.command = ['ytmp3', 'ytaudio', 'mp3'];
-handler.register = true;
 handler.limit = true;
-handler.coin = 2;
 
 export default handler;

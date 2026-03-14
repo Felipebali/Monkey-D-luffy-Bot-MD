@@ -1,33 +1,106 @@
-const handler = async (m, { conn, text }) => {
-    const numberPattern = /\d+/g;
-    let user = '';
-    const numberMatches = text.match(numberPattern);
-    if (numberMatches) {
-        const number = numberMatches.join('');
-        user = number + '@s.whatsapp.net';
-    } else if (m.quoted && m.quoted.sender) {
-        const quotedNumberMatches = m.quoted.sender.match(numberPattern);
-        if (quotedNumberMatches) {
-            const number = quotedNumberMatches.join('');
-            user = number + '@s.whatsapp.net';
-        } else {
-        return conn.sendMessage(m.chat, {text: `${emoji} Formato de usuario no reconocido. Responda a un mensaje, etiquete a un usuario o escriba su número de usuario.`}, {quoted: fkontak});
-    }
-    } else {
-        return conn.sendMessage(m.chat, {text: `${emoji} Formato de usuario no reconocido. Responda a un mensaje, etiquete a un usuario o escriba su número de usuario.`}, {quoted: fkontak});
-    }        
-        const groupMetadata = m.isGroup ? await conn.groupMetadata(m.chat) : {};
-        const participants = m.isGroup ? groupMetadata.participants : [];
-        const users = m.isGroup ? participants.find(u => u.jid == user) : {};
-        const userNumber = user.split('@')[0];
-        if (!global.global.db.data.users[user] || global.global.db.data.users[user] == '') {
-            return conn.sendMessage(m.chat, {text: `${emoji4} El usuario @${userNumber} no se encuentra en mi base de datos.*`, mentions: [user]}, {quoted: fkontak});
-         }
-        delete global.global.db.data.users[user];
-        conn.sendMessage(m.chat, {text: `${done} Éxito Todos Los Datos Del User: @${userNumber} Ya Fuerón Eliminados De Mi Base De Datos.`, mentions: [user]}, {quoted: fkontak});
-};
-handler.tags = ['owner'];
-handler.command = ['restablecerdatos','deletedatauser','resetuser','borrardatos'];
-handler.rowner = true;
+import fs from 'fs'
 
-export default handler;
+const WARN_FILE = './data/warns.json'
+
+// =================== UTILIDADES ===================
+
+function normalizeJid(jid = '') {
+  return jid
+    .toString()
+    .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+    .replace(/@c\.us$/, '@s.whatsapp.net')
+}
+
+function extractNumber(jid = '') {
+  return jid.replace(/[^\d]/g, '')
+}
+
+// =================== HANDLER ===================
+
+const handler = async (m, { conn, text, mentionedJid }) => {
+  const emoji = '♻️'
+  const done = '✅'
+  let user = ''
+
+  // 1️⃣ Detectar usuario
+  if (mentionedJid?.length) user = mentionedJid[0]
+  else if (text?.match(/\d+/)) user = text.match(/\d+/)[0] + '@s.whatsapp.net'
+  else if (m.quoted?.sender) user = m.quoted.sender
+  else return conn.reply(m.chat, `${emoji} Menciona, responde o escribe el número.`, m)
+
+  const userJid = normalizeJid(user)
+  if (!userJid) return conn.reply(m.chat, '⚠️ JID inválido.', m)
+
+  const number = extractNumber(userJid)
+  const who = number + '@s.whatsapp.net'
+
+  // =================== CARGAR WARNS ===================
+
+  let warns = {}
+  if (fs.existsSync(WARN_FILE)) {
+    warns = JSON.parse(fs.readFileSync(WARN_FILE))
+  }
+
+  let removed = false
+
+  // 🧨 BORRADO REAL DE WARNS.JSON
+  for (const chatId in warns) {
+    const chat = warns[chatId]
+    if (!chat || typeof chat !== 'object') continue
+
+    for (const key in chat) {
+      const cleanKey = key.replace(/[^\d]/g, '')
+      if (cleanKey === number) {
+        delete chat[key]
+        removed = true
+      }
+    }
+  }
+
+  fs.writeFileSync(WARN_FILE, JSON.stringify(warns, null, 2))
+
+  // =================== LIMPIAR GLOBAL.DB ===================
+
+  if (!global.db.data.users) global.db.data.users = {}
+  if (!global.db.data.chats) global.db.data.chats = {}
+
+  if (global.db.data.users[who]) {
+    delete global.db.data.users[who]
+    removed = true
+  }
+
+  for (const chat of Object.values(global.db.data.chats)) {
+    if (!chat?.warns) continue
+
+    for (const key in chat.warns) {
+      const cleanKey = key.replace(/[^\d]/g, '')
+      if (cleanKey === number) {
+        delete chat.warns[key]
+        removed = true
+      }
+    }
+  }
+
+  if (global.db.write) await global.db.write()
+
+  if (!removed) {
+    return conn.reply(m.chat, `⚠️ El usuario no se encuentra en la base de datos.`, m)
+  }
+
+  // =================== MENSAJE FINAL ===================
+
+  const fecha = new Date().toLocaleString('es-UY', { timeZone: 'America/Montevideo' })
+
+  await conn.sendMessage(m.chat, {
+    text: `${emoji} *Reset completado*\n\n👤 Usuario: @${number}\n🧾 Base de datos eliminada\n📅 ${fecha}\n\n${done} Base actualizada correctamente.`,
+    mentions: [who]
+  })
+}
+
+// =================== FLAGS ===================
+
+handler.command = ['resetuser', 're', 'borrardatos']
+handler.rowner = true
+handler.tags = ['owner']
+
+export default handler

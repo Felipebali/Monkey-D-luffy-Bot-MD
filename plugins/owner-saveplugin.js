@@ -1,6 +1,11 @@
 import fs from 'fs';
 
 let handler = async (m, { text, usedPrefix, command }) => {
+
+    const emoji = '⚡️';
+    const emoji2 = '📂';
+    const msm = '❌'; 
+
     if (!text) {
         return m.reply(`${emoji} Por favor, ingrese el nombre del plugin.`);
     }
@@ -10,7 +15,7 @@ let handler = async (m, { text, usedPrefix, command }) => {
     }
 
     const ruta = `plugins/${text}.js`;
-    
+
     try {
         await fs.writeFileSync(ruta, m.quoted.text);
         m.reply(`${emoji} Guardando plugin en ${ruta}`);

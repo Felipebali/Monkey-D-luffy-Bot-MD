@@ -4,7 +4,7 @@ const exec = promisify(_exec).bind(cp);
 const handler = async (m, {conn, isOwner, command, text, usedPrefix, args, isROwner}) => {
   if (!isROwner) return;
   if (global.conn.user.jid != conn.user.jid) return;
-  m.reply(`${emoji} *Ejecutando...*`);
+  m.reply('🐉 *Ejecutando orden.*');
   let o;
   try {
     o = await exec(command.trimStart() + ' ' + text.trimEnd());
@@ -18,8 +18,9 @@ const handler = async (m, {conn, isOwner, command, text, usedPrefix, args, isROw
 };
 handler.help = ['$']
 handler.tags = ['owner']
-handler.customPrefix = ['$']
+handler.customPrefix = /^[$] /
 handler.command = new RegExp
+
 handler.rowner = true
 
 export default handler

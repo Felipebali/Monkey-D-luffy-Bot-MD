@@ -1,33 +1,117 @@
-let linkRegex = /chat.whatsapp.com\/([0-9A-Za-z]{20,24})/i;
-let linkRegex1 = /whatsapp.com\/channel\/([0-9A-Za-z]{20,24})/i;
+// 🔹 Regex
+const groupLinkRegex = /chat.whatsapp.com\/(invite\/)?([0-9A-Za-z]{20,24})/i;
+const channelRegex = /whatsapp\.com\/channel\/[0-9A-Za-z]{15,50}/i;
+const genericGroupRegex = /(chat\.whatsapp\.com|whatsapp\.com\/invite)/i;
 
-export async function before(m, { conn, isAdmin, isBotAdmin, isOwner, isROwner, participants }) {
-if (!m.isGroup) return 
-if (isAdmin || isOwner || m.fromMe || isROwner) return
+// 🔗 Enlace especial permitido
+const tagallLink = "https://miunicolink.local/tagall-FelixCat";
 
-let chat = global.db.data.chats[m.chat];
-let delet = m.key.participant;
-let bang = m.key.id;
-const user = `@${m.sender.split`@`[0]}`;
-const groupAdmins = participants.filter(p => p.admin);
-const listAdmin = groupAdmins.map((v, i) => `*» ${i + 1}. @${v.id.split('@')[0]}*`).join('\n');
-let bot = global.db.data.settings[this.user.jid] || {};
-const isGroupLink = linkRegex.exec(m.text) || linkRegex1.exec(m.text);
-const grupo = `https://chat.whatsapp.com`;
-if (isAdmin && chat.antiLink && m.text.includes(grupo)) return m.reply(`✦ El antilink está activo pero te salvaste por ser admin.`);
-if (chat.antiLink && isGroupLink && !isAdmin) {
-if (isBotAdmin) {
-const linkThisGroup = `https://chat.whatsapp.com/${await this.groupInviteCode(m.chat)}`;
-if (m.text.includes(linkThisGroup)) return !0;
-}
-await conn.sendMessage(m.chat, { text: `*「 ENLACE DETECTADO 」*\n\n《✧》${user} Rompiste las reglas del Grupo serás eliminado...`, mentions: [m.sender] }, { quoted: m, ephemeralExpiration: 24*60*100, disappearingMessagesInChat: 24*60*100 });
-if (!isBotAdmin) return conn.sendMessage(m.chat, { text: `✦ El antilink está activo pero no puedo eliminarte porque no soy admin.`, mentions: [...groupAdmins.map(v => v.id)] }, { quoted: m });
-if (isBotAdmin) {
-await conn.sendMessage(m.chat, { delete: { remoteJid: m.chat, fromMe: false, id: bang, participant: delet } });
-let responseb = await conn.groupParticipantsUpdate(m.chat, [m.sender], 'remove');
-if (responseb[0].status === "404") return;
-}} // else if (!bot.restrict) {
-// return m.reply(`${emoji} ¡Esta característica está deshabilitada!`);
-// }
-return !0;
+// 👑 Dueños
+const owners = ["59896026646", "59898719147", "59892363485", "59899022028"];
+
+// 🧠 Cache de invitaciones
+if (!global.groupInviteCodes) global.groupInviteCodes = {};
+
+export async function before(m, { conn, isAdmin, isBotAdmin }) {
+  if (!m.isGroup || !isBotAdmin || !m.message) return true;
+
+  const chat = global.db.data.chats[m.chat];
+  if (!chat?.antiLink) return true;
+
+  const text =
+    m.text ||
+    m.message.conversation ||
+    m.message.extendedTextMessage?.text ||
+    m.message.caption ||
+    "";
+
+  if (!text) return true;
+
+  const who = m.sender;
+  const number = who.replace(/\D/g, "");
+
+  // 👑 Owner → permiso total
+  if (owners.includes(number)) return true;
+
+  const isGroupLink = groupLinkRegex.test(text);
+  const isGenericGroup = genericGroupRegex.test(text);
+  const isChannel = channelRegex.test(text);
+  const isTagall = text.includes(tagallLink);
+
+  async function deleteMsg() {
+    try {
+      await conn.sendMessage(m.chat, {
+        delete: {
+          remoteJid: m.chat,
+          fromMe: false,
+          id: m.key.id,
+          participant: m.key.participant || m.sender,
+        },
+      });
+    } catch {}
+  }
+
+  async function kickUser() {
+    try {
+      await conn.groupParticipantsUpdate(m.chat, [who], "remove");
+    } catch {}
+  }
+
+  // 🛡️ Admines → todo permitido
+  if (isAdmin) return true;
+
+  // 🚫 TAGALL
+  if (isTagall) {
+    await deleteMsg();
+    await kickUser();
+
+    await conn.sendMessage(m.chat, {
+      text: `🚫 @${who.split("@")[0]} no se permiten enlaces tagall`,
+      mentions: [who],
+    });
+
+    return false;
+  }
+
+  // 🚫 CANALES → solo borrar, NO expulsar
+  if (isChannel) {
+    await deleteMsg();
+
+    await conn.sendMessage(m.chat, {
+      text: `⚠️ @${who.split("@")[0]} no se permiten enlaces de canales`,
+      mentions: [who],
+    });
+
+    return false;
+  }
+
+  // 🔐 Código del grupo actual
+  let currentInvite = global.groupInviteCodes[m.chat];
+  if (!currentInvite) {
+    try {
+      currentInvite = await conn.groupInviteCode(m.chat);
+      global.groupInviteCodes[m.chat] = currentInvite;
+    } catch {
+      return true;
+    }
+  }
+
+  // ✅ Link del mismo grupo permitido
+  if (isGroupLink && text.includes(currentInvite)) return true;
+
+  // ❌ Cualquier otro link de grupo
+  if (isGenericGroup) {
+    await deleteMsg();
+    await kickUser();
+
+    await conn.sendMessage(m.chat, {
+      text: `🚫 Link de grupo no permitido.\n\n👤 @${who.split("@")[0]} es expulsado del grupo actual.`,
+      mentions: [who],
+    });
+
+    return false;
+  }
+
+  // 🟢 Todo lo demás permitido
+  return true;
 }

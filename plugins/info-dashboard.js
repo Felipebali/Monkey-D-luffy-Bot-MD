@@ -1,35 +1,17 @@
-let handler = async (m, { conn, command }) => {
+let handler = async (m, { conn }) => {
+  let texto = `
+👑 *Dashboard Oficial*
 
-    if (command == 'dash' || command == 'dashboard' || command == 'views') {
-        let stats = Object.entries(global.db.data.stats || {}).map(([key, val]) => {
-            let name = Array.isArray(global.plugins[key]?.help) ? global.plugins[key]?.help?.join(' , ') : global.plugins[key]?.help || key
-            if (/exec/.test(name)) return null
-            return { name, ...val }
-        }).filter(Boolean)
+Aquí puedes administrar tu bot desde el panel web:
 
-        stats = stats.sort((a, b) => b.total - a.total)
+🌐 *Dash:* https://dash.deluxehost.cl
+`;
 
-        if (!stats.length) return conn.reply(m.chat, '📊 No hay estadísticas aún.', m)
+  await conn.sendMessage(m.chat, { text: texto }, { quoted: m });
+};
 
-        const handlers = stats.slice(0, 10).map(({ name, total }) => {
-            return `⬡ *Comando* : *${name}*\n⬡ *Usos* : ${total}`
-        }).join('\n\n')
+handler.command = /^dash|dashboard$/i;
+handler.tags = ['info'];
+handler.help = ['dash'];
 
-        conn.reply(m.chat, `📊 *Top 10 Comandos Más Usados*\n\n${handlers}`, m)
-    }
-
-    if (command == 'database' || command == 'usuarios' || command == 'user') {
-        let totalreg = Object.keys(global.db.data.users).length
-        let rtotalreg = Object.values(global.db.data.users).filter(user => user.registered == true).length
-
-        conn.reply(m.chat, `🗂️ *Tengo ${rtotalreg} Usuarios Registrados*\n\n📂 *${totalreg} en total*`, m)
-    }
-
-}
-
-handler.help = ['dash', 'dashboard', 'views', 'database', 'usuarios', 'user']
-handler.tags = ['info']
-handler.command = ['dashboard', 'dash', 'views', 'database', 'usuarios', 'user']
-handler.owner = true
-
-export default handler
+export default handler;

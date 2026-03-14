@@ -1,98 +1,77 @@
-import { WAMessageStubType } from '@whiskeysockets/baileys'
+// 📂 plugins/welcome.js
+// Welcome + Leave con toggle usando SOLO: welcome
 
-export async function before(m, { conn, participants, groupMetadata }) {
-  try {
-    if (!m.isGroup) return true
-    if (!m.messageStubType) return true
+let handler = async (m, { conn, isAdmin }) => {
+    if (!m.isGroup)
+        return conn.sendMessage(m.chat, { text: "❌ Solo funciona en grupos." });
 
-    // Obtener la cantidad actual de miembros
-    const currentSize = (participants || []).length
-    const groupName = groupMetadata?.subject || 'este grupo'
-    const defaultImg = 'https://raw.githubusercontent.com/danielalejandrobasado-glitch/Yotsuba-MD-Premium/main/uploads/f3dec04bc1df5762.jpg' 
+    if (!isAdmin)
+        return conn.sendMessage(m.chat, { text: "⚠️ Solo los administradores pueden usar este comando." });
 
-    const sendMsg = async (jid, text, user, title) => {
-      let pp
-      try {
-        pp = await conn.profilePictureUrl(user, 'image')
-      } catch (e) {
-        pp = defaultImg
-      }
+    if (!global.db.data.chats[m.chat]) global.db.data.chats[m.chat] = {};
 
-      await conn.sendMessage(jid, {
-        text: text,
-        contextInfo: {
-          mentionedJid: [user],
-          forwardingScore: 999,
-          isForwarded: true,
-          forwardedNewsletterMessageInfo: {
-            newsletterJid: '120363420846835529@newsletter',
-            newsletterName: '🎄 Jolly Roger Navideño V2 🎄',
-            serverMessageId: -1
-          },
-          externalAdReply: {
-            title: title,
-            body: '', 
-            thumbnailUrl: pp,
-            mediaType: 1,
-            renderLargerThumbnail: true, 
-            sourceUrl: 'Power by ɴ͡ᴇ͜ɴᴇ❀᭄☂️' 
-          }
-        }
-      }, { quoted: m })
+    let chat = global.db.data.chats[m.chat];
+
+    // Si no existe, por defecto desactivado
+    if (typeof chat.welcome === 'undefined') chat.welcome = false;
+
+    chat.welcome = !chat.welcome;
+
+    await conn.sendMessage(m.chat, {
+        text: `✨ *Welcome ${chat.welcome ? "ACTIVADO" : "DESACTIVADO"}*\nLos mensajes de entrada y salida están ${chat.welcome ? "habilitados" : "deshabilitados"}.`
+    });
+};
+
+// --- BEFORE ---
+handler.before = async function (m, { conn }) {
+    if (!m.isGroup) return;
+
+    if (!global.db.data.chats[m.chat]) global.db.data.chats[m.chat] = {};
+    let chat = global.db.data.chats[m.chat];
+
+    // Si welcome está apagado → no hacer nada
+    if (!chat.welcome) return;
+
+    // Obtener lista anterior o crearla
+    if (!chat.participants) {
+        const meta = await conn.groupMetadata(m.chat);
+        chat.participants = meta.participants.map(p => p.id);
+        return;
     }
 
-    // --- LÓGICA DE BIENVENIDA (Suma 1 al conteo) ---
-    if (m.messageStubType === WAMessageStubType.GROUP_PARTICIPANT_ADD || m.messageStubType === 27) {
-      const users = m.messageStubParameters || []
-      for (const user of users) {
-        const jid = user.includes('@') ? user : `${user}@s.whatsapp.net`
-        const mentionTag = '@' + jid.split('@')[0]
+    // Metadata actual
+    const meta = await conn.groupMetadata(m.chat);
+    const current = meta.participants.map(p => p.id);
+    const old = chat.participants;
 
-        // Sumamos 1 porque el evento ocurre mientras se añaden
-        const realSize = currentSize + 1 
+    const added = current.filter(x => !old.includes(x));
+    const removed = old.filter(x => !current.includes(x));
 
-        const welcomeText = `
-🕊️ *BIENVENIDO/DA* 🕊️
-─── ˗ˏˋ 🍖 ˎˊ˗ ───
+    const groupName = meta.subject;
 
-∫ ⚓ *USUARIO* : ${mentionTag}
-∫ 🌍 *GRUPO* : ${groupName}
-∫ 👥 *MIEMBROS* : ${realSize}
-∫ 📅 *FECHA* : ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
-
-*¡Yoshaaa! Un nuevo nakama se une a la tripulación.*`.trim()
-
-        await sendMsg(m.chat, welcomeText, jid, '✨ B I E N V E N I D O ✨')
-      }
+    // 🎉 Bienvenida
+    for (let user of added) {
+        await conn.sendMessage(m.chat, {
+            text: `🎉 ¡Bienvenido/a *@${user.split("@")[0]}* al grupo *${groupName}*!\nDisfruta tu estadía.`,
+            mentions: [user]
+        });
     }
 
-    // --- LÓGICA DE ADIÓS (Resta 1 al conteo) ---
-    if (m.messageStubType === WAMessageStubType.GROUP_PARTICIPANT_REMOVE || m.messageStubType === 32) {
-      const users = m.messageStubParameters || []
-      for (const user of users) {
-        const jid = user.includes('@') ? user : `${user}@s.whatsapp.net`
-        const mentionTag = '@' + jid.split('@')[0]
-
-        // Restamos 1 porque el bot todavía cuenta a la persona que se acaba de ir
-        const realSize = currentSize - 1
-
-        const byeText = `
-🥀 *ADIÓS NAKAMA* 🥀
-─── ˗ˏˋ 🌊 ˎˊ˗ ───
-
-∫ 👤 *USUARIO* : ${mentionTag}
-∫ 🚢 *GRUPO* : ${groupName}
-∫ 👥 *QUEDAN* : ${realSize}
-
-*¡Esperamos verte de nuevo en Grand Line!*`.trim()
-
-        await sendMsg(m.chat, byeText, jid, '┖ [ 🖇️ A D I O S / B Y E ] ───⊚')
-      }
+    // 👋 Despedida
+    for (let user of removed) {
+        await conn.sendMessage(m.chat, {
+            text: `👋 *@${user.split("@")[0]}* salió del grupo *${groupName}*.`,
+            mentions: [user]
+        });
     }
 
-    return true
-  } catch (e) {
-    console.error(e)
-    return true
-  }
-}
+    chat.participants = current;
+};
+
+// 📌 ARRAY DE COMANDOS
+handler.command = ["welcome", "welc", "wl"];
+
+handler.group = true;
+handler.admin = true;
+
+export default handler;

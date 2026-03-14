@@ -1,11 +1,23 @@
-const handler = async (m, {conn}) => {
-  global.prefix = new RegExp('^[' + (opts['prefix'] || '‎xzXZ/i!#$%+£¢€¥^°=¶∆×÷π√✓©®:;?&.\\-').replace(/[|\\{}()[\]^$+*?.\-\^]/g, '\\$&') + ']');
-  //await m.reply(`✅️ *Prefijo Restablecido Con Éxito!*`);
-  conn.fakeReply(m.chat, `${emoji} *Prefijo Restablecido Con Éxito!*`, '0@s.whatsapp.net', '✨ PREFIJO RESTABLECIDO ✨')
-};
-handler.help = ['resetprefix'];
-handler.tags = ['owner'];
-handler.command = ['resetprefix'];
-handler.rowner = true;
+const handler = async (m, { conn }) => {
+    try {
+        const user = m.sender; 
+        const db = global.db.data.users;
 
+        
+        if (!db[user]) db[user] = {};
+
+        
+        db[user].prefix = global.prefix || '!';
+
+        await m.reply(`✅ Tu prefix ha sido reiniciado al valor por defecto: ${db[user].prefix}`);
+    } catch (error) {
+        console.error(error);
+        m.reply('❌ Ocurrió un error al intentar resetear tu prefix.');
+    }
+}
+
+
+handler.command = ['resetprefix'];
+handler.private = true; 
+handler.group = true;   
 export default handler;

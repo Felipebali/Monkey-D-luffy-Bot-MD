@@ -43,12 +43,12 @@ global.LuffyJadibts = true
 
 //*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
 
-global.packname = '🏴‍☠️ ＭＯＮＫＥＹ Ｄ ＬＵＦＦＹ ☠️'
-global.botname = '☠️⃟⋆≛⃝ ＭＯＮＫＥＹ Ｄ ＬＵＦＦＹ - ＭＤ 🏴‍☠️'
+global.packname = 'Felix-Cat-Bot'
+global.botname = 'Felix-Cat-Bot'
 global.wm = '‧˚꒰🏴‍☠️꒱ ፝͜⁞ M͢ᴏɴᴋᴇʏ D L͢ᴜғғʏ-𝘉𝘰𝘵-𝑴𝑫✰⃔⃝'
 global.author = 'Made By ɴ͡ᴇ͜ɴᴇ❀᭄☂️' // Nombre del creador cambiado
 global.dev = '⌬ Modified by: ɴ͡ᴇ͜ɴᴇ❀᭄☂️ '
-global.textbot = '⏤͟͞ू⃪ ＭＯＮＫＥＹ Ｄ ＬＵＦＦＹ - ＭＤ 🏴‍☠️ • 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗕𝘆 ɴ͡ᴇ͜ɴᴇ❀᭄☂️'
+global.textbot = 'Felix-Cat-Bot • 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗕𝘆 ɴ͡ᴇ͜ɴᴇ❀᭄☂️'
 global.etiqueta = 'ˑ 𓈒 𐔌 ɴ͡ᴇ͜ɴᴇ❀᭄☂️ ͡꒱ ۫' // Etiqueta cambiada
 
 //*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*

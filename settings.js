@@ -18,23 +18,15 @@ global.botNumber = '' //Ejemplo: 573218138672
 global.owner = [
 // <-- Número @s.whatsapp.net -->
   ['59898719147', 'Feli', true], // tu número como dueño
-  ['59896026646', 'G', true], 
-  ['59899022028', 'A', true],
-  ['59892363485', 'Benja', true],
-  ['59892975182', 'M', true], 
 
 // <-- Número @lid -->
-  ['119069730668723', 'FeliLID', true], // tu LID
-  ['262573496758272', 'GerLID', true], 
-  ['219357485498419', 'ALID', true], 
-  ['109848586911986', 'benjaLID', true], 
-  ['275483598016526', 'MLID', true] 
+  ['119069730668723', 'FeliLID', true] // tu LID
 ];
 
 //*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
 
 global.mods = []
-global.suittag = ['584244144821'] // Cambiado al nuevo número principal
+global.suittag = ['59898719147'] // Cambiado al nuevo número principal
 global.prems = []
 
 //*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
@@ -44,7 +36,7 @@ global.baileys = 'V 6.7.16'
 global.languaje = 'Español'
 global.vs = '2.2.0'
 global.nameqr = 'monkey-D-luffy-MD'
-global.namebot = '☠️ ＭＯＮＫＥＹ Ｄ ＬＵＦＦＹ - ＭＤ 🏴‍☠️'
+global.namebot = 'Felix-Cat-Bot'
 global.LuffySessions = 'LuffySessions'
 global.jadi = 'LuffyJadiBots' 
 global.LuffyJadibts = true

@@ -12,8 +12,12 @@ let handler = async (m, { conn, text, command, isAdmin }) => {
 
     // 🔧 Valores por defecto
     if (typeof chat.welcome === 'undefined') chat.welcome = false;
-    if (!chat.welcomeMsg) chat.welcomeMsg = "🎉 ¡Bienvenido/a!";
-    if (!chat.leaveMsg) chat.leaveMsg = "👋 Se fue del grupo.";
+
+    const defaultWelcome = "🎉 ¡Bienvenido/a!";
+    const defaultLeave = "👋 Se fue del grupo.";
+
+    if (!chat.welcomeMsg) chat.welcomeMsg = defaultWelcome;
+    if (!chat.leaveMsg) chat.leaveMsg = defaultLeave;
 
     // 🔘 ACTIVAR / DESACTIVAR
     if (command === "welcome") {
@@ -36,6 +40,16 @@ let handler = async (m, { conn, text, command, isAdmin }) => {
         if (!text) return m.reply("✏️ Usa:\n.set2 texto");
         chat.leaveMsg = text;
         return m.reply("✅ Despedida actualizada.");
+    }
+
+    // 🧹 RESET TOTAL
+    if (command === "clearwel") {
+        chat.welcomeMsg = defaultWelcome;
+        chat.leaveMsg = defaultLeave;
+
+        return conn.sendMessage(m.chat, {
+            text: `🧹 *Mensajes reiniciados*\nSe restauraron los mensajes por defecto de bienvenida y despedida.`
+        });
     }
 };
 
@@ -69,7 +83,6 @@ handler.before = async function (m, { conn }) {
             .replace(/@user/g, username)
             .replace(/@group/g, groupName);
 
-        // 🔥 FORZAR MENCIÓN
         if (!text.includes(username)) {
             text = `${username}\n${text}`;
         }
@@ -97,7 +110,6 @@ handler.before = async function (m, { conn }) {
             .replace(/@user/g, username)
             .replace(/@group/g, groupName);
 
-        // 🔥 FORZAR MENCIÓN
         if (!text.includes(username)) {
             text = `${username}\n${text}`;
         }
@@ -121,7 +133,7 @@ handler.before = async function (m, { conn }) {
 };
 
 // 📌 COMANDOS
-handler.command = ["welcome", "welc", "wl", "set1", "set2"];
+handler.command = ["welcome", "welc", "wl", "set1", "set2", "clearwel"];
 
 handler.group = true;
 handler.admin = true;

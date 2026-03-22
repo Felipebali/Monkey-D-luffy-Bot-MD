@@ -83,10 +83,6 @@ handler.before = async function (m, { conn }) {
             .replace(/@user/g, username)
             .replace(/@group/g, groupName);
 
-        if (!text.includes(username)) {
-            text = `${username}\n${text}`;
-        }
-
         let finalText = `
 ╭━━━〔 🎉 BIENVENIDO 〕━━━⬣
 ┃ 👤 Usuario: ${username}
@@ -109,10 +105,6 @@ handler.before = async function (m, { conn }) {
         let text = chat.leaveMsg
             .replace(/@user/g, username)
             .replace(/@group/g, groupName);
-
-        if (!text.includes(username)) {
-            text = `${username}\n${text}`;
-        }
 
         let finalText = `
 ╭━━━〔 👋 DESPEDIDA 〕━━━⬣

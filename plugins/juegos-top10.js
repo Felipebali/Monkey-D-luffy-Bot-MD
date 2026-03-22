@@ -40,6 +40,5 @@ handler.help = ['top10 <texto>'];
 handler.tags = ['fun', 'juego'];
 handler.group = true;
 handler.command = ['top10'];
-handler.register = true;
 
 export default handler;

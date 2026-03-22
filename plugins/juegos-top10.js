@@ -1,48 +1,34 @@
-// 📂 plugins/top10.js — FULL COMPATIBLE CON CUALQUIER LOADER
+// 📂 plugins/top10.js — FelixCat-Bot 🩸
 console.log('[Plugin] top10 cargado');
 
-let handler = async (m, { conn, groupMetadata, text, command }) => {
+let handler = async (m, { conn, groupMetadata, command }) => {
   try {
-    const chat = global.db.data.chats[m.chat] || {};
+    const chatId = m.chat;
+    const chatData = global.db.data.chats[chatId] || {};
+    if (!chatData.games) return; // Juegos desactivados
+    if (!m.isGroup) return conn.sendMessage(chatId, { text: '❌ Este comando solo funciona en grupos.' });
 
-    // 🔒 Juegos activados?
-    if (chat.games === false) return;
+    // 🔹 Texto después del comando
+    let text = m.text?.trim();
+    if (!text) return conn.sendMessage(chatId, { text: '❌ Debes escribir algo.\nUso: `.top10 <texto>`' });
+    text = text.replace(new RegExp(`^\\.${command}\\s*`, 'i'), '').trim();
+    if (!text) return conn.sendMessage(chatId, { text: '❌ Debes escribir algo después del comando.' });
 
-    // Validar que el usuario haya puesto un texto
-    if (!text) {
-      return await conn.sendMessage(m.chat, {
-        text: '❌ Debes escribir algo.\n\n👉 *Uso correcto:* `.top10 <texto>`\nEjemplo: `.top10 los más guapos`'
-      });
-    }
+    // 🔹 Participantes del grupo
+    let participants = groupMetadata?.participants?.filter(p => p.id && !p.id.includes('status@broadcast'));
+    if (!participants || participants.length === 0) return conn.sendMessage(chatId, { text: '❌ No hay participantes en el grupo.' });
 
-    // Obtener participantes reales del grupo
-    const participants = groupMetadata?.participants
-      .filter(p => !p.id.includes('status@broadcast'));
+    // 🔹 Mezclar y seleccionar top 10
+    let shuffled = participants.sort(() => 0.5 - Math.random());
+    let topCount = Math.min(10, shuffled.length);
+    let top10 = shuffled.slice(0, topCount);
 
-    if (!participants || participants.length === 0) {
-      return await conn.sendMessage(m.chat, { text: '❌ No hay participantes en el grupo.' });
-    }
+    // 🔹 Crear lista con menciones
+    let listTop = top10.map((p, i) => `🩸 ${i + 1}. @${p.id.split('@')[0]} 🩸`).join('\n');
 
-    // Mezclar y seleccionar 10
-    const shuffled = participants.sort(() => 0.5 - Math.random());
-    const top10 = shuffled.slice(0, 10);
+    let finalText = `🩸🖤 *TOP ${topCount} - ${text.toUpperCase()}* 🖤🩸\n\n${listTop}\n🩸━━━━━━━━━━━━🩸`;
 
-    // Crear lista final con menciones
-    const listTop = top10
-      .map((v, i) => `🩸 ${i + 1}. @${v.id.split('@')[0]} 🩸`)
-      .join('\n');
-
-    // Texto final usando lo que el usuario escribió
-    const finalText = `🩸🖤 *TOP 10 - ${text.toUpperCase()}* 🖤🩸
-
-${listTop}
-🩸━━━━━━━━━━━━🩸`;
-
-    // Enviar con menciones
-    await conn.sendMessage(m.chat, {
-      text: finalText,
-      mentions: top10.map(v => v.id)
-    });
+    await conn.sendMessage(chatId, { text: finalText, mentions: top10.map(p => p.id) });
 
   } catch (e) {
     console.error(e);
@@ -50,19 +36,10 @@ ${listTop}
   }
 };
 
-// 🔥 Compatibilidad máxima para cualquier loader
 handler.help = ['top10 <texto>'];
 handler.tags = ['fun', 'juego'];
 handler.group = true;
-
-// Formato normal
 handler.command = ['top10'];
-
-// Regex alternativo por si el loader lo usa
-handler.command = handler.command || /^top10$/i;
-
-// Permitir alias en loader
-handler.customPrefix = null;
 handler.register = true;
 
 export default handler;

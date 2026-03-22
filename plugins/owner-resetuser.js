@@ -1,8 +1,14 @@
+// 🌪 RESET ABSOLUTO DE USUARIO — FELI 2026 💎 FULL
+
 import fs from 'fs'
 
+// Archivos
 const WARN_FILE = './data/warns.json'
+const PAREJAS_FILE = './database/parejas.json'
+const HERMANOS_FILE = './database/hermanos.json'
+const PERFILES_FILE = './database/perfiles.json'
 
-// =================== UTILIDADES ===================
+// ================= UTILIDADES =================
 
 function normalizeJid(jid = '') {
   return jid
@@ -15,14 +21,23 @@ function extractNumber(jid = '') {
   return jid.replace(/[^\d]/g, '')
 }
 
-// =================== HANDLER ===================
+function loadJson(file) {
+  if (!fs.existsSync(file)) return {}
+  return JSON.parse(fs.readFileSync(file))
+}
+
+function saveJson(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2))
+}
+
+// ================= HANDLER =================
 
 const handler = async (m, { conn, text, mentionedJid }) => {
+
   const emoji = '♻️'
-  const done = '✅'
   let user = ''
 
-  // 1️⃣ Detectar usuario
+  // 🔎 Detectar usuario
   if (mentionedJid?.length) user = mentionedJid[0]
   else if (text?.match(/\d+/)) user = text.match(/\d+/)[0] + '@s.whatsapp.net'
   else if (m.quoted?.sender) user = m.quoted.sender
@@ -34,72 +49,96 @@ const handler = async (m, { conn, text, mentionedJid }) => {
   const number = extractNumber(userJid)
   const who = number + '@s.whatsapp.net'
 
-  // =================== CARGAR WARNS ===================
-
-  let warns = {}
-  if (fs.existsSync(WARN_FILE)) {
-    warns = JSON.parse(fs.readFileSync(WARN_FILE))
-  }
-
   let removed = false
 
-  // 🧨 BORRADO REAL DE WARNS.JSON
-  for (const chatId in warns) {
-    const chat = warns[chatId]
-    if (!chat || typeof chat !== 'object') continue
+  // ================= BORRAR WARNS =================
+  if (fs.existsSync(WARN_FILE)) {
+    const warns = loadJson(WARN_FILE)
+    for (const chatId in warns) {
+      if (!warns[chatId]) continue
+      for (const key in warns[chatId]) {
+        if (key.replace(/[^\d]/g, '') === number) {
+          delete warns[chatId][key]
+          removed = true
+        }
+      }
+    }
+    saveJson(WARN_FILE, warns)
+  }
 
-    for (const key in chat) {
-      const cleanKey = key.replace(/[^\d]/g, '')
-      if (cleanKey === number) {
-        delete chat[key]
+  // ================= BORRAR PERFILES =================
+  if (fs.existsSync(PERFILES_FILE)) {
+    const perfiles = loadJson(PERFILES_FILE)
+    if (perfiles[who]) {
+      delete perfiles[who]
+      removed = true
+    }
+    saveJson(PERFILES_FILE, perfiles)
+  }
+
+  // ================= BORRAR PAREJAS =================
+  if (fs.existsSync(PAREJAS_FILE)) {
+    const parejas = loadJson(PAREJAS_FILE)
+    for (const id in parejas) {
+      if (id === who || parejas[id]?.pareja === who) {
+        delete parejas[id]
         removed = true
       }
     }
+    saveJson(PAREJAS_FILE, parejas)
   }
 
-  fs.writeFileSync(WARN_FILE, JSON.stringify(warns, null, 2))
+  // ================= BORRAR HERMANOS =================
+  if (fs.existsSync(HERMANOS_FILE)) {
+    const hermanos = loadJson(HERMANOS_FILE)
+    for (const id in hermanos) {
+      if (id === who || hermanos[id]?.hermano === who) {
+        delete hermanos[id]
+        removed = true
+      }
+    }
+    saveJson(HERMANOS_FILE, hermanos)
+  }
 
-  // =================== LIMPIAR GLOBAL.DB ===================
-
+  // ================= BORRAR GLOBAL.DB =================
   if (!global.db.data.users) global.db.data.users = {}
-  if (!global.db.data.chats) global.db.data.chats = {}
-
   if (global.db.data.users[who]) {
     delete global.db.data.users[who]
     removed = true
   }
 
-  for (const chat of Object.values(global.db.data.chats)) {
-    if (!chat?.warns) continue
-
-    for (const key in chat.warns) {
-      const cleanKey = key.replace(/[^\d]/g, '')
-      if (cleanKey === number) {
-        delete chat.warns[key]
-        removed = true
-      }
-    }
-  }
-
   if (global.db.write) await global.db.write()
 
   if (!removed) {
-    return conn.reply(m.chat, `⚠️ El usuario no se encuentra en la base de datos.`, m)
+    return conn.reply(
+      m.chat,
+      '⚠️ No se encontraron registros asociados a ese usuario.',
+      m
+    )
   }
 
-  // =================== MENSAJE FINAL ===================
+  // ================= MENSAJE FINAL =================
 
-  const fecha = new Date().toLocaleString('es-UY', { timeZone: 'America/Montevideo' })
+  const fecha = new Date().toLocaleString('es-UY', {
+    timeZone: 'America/Montevideo'
+  })
 
   await conn.sendMessage(m.chat, {
-    text: `${emoji} *Reset completado*\n\n👤 Usuario: @${number}\n🧾 Base de datos eliminada\n📅 ${fecha}\n\n${done} Base actualizada correctamente.`,
+    text:
+`${emoji} *RESET EJECUTADO CORRECTAMENTE*
+
+👤 Usuario: @${number}
+📅 ${fecha}
+
+El usuario ha sido reinicializado en el sistema.
+Operación completada sin errores.`,
     mentions: [who]
   })
 }
 
-// =================== FLAGS ===================
+// ================= FLAGS =================
 
-handler.command = ['resetuser', 're', 'borrardatos']
+handler.command = ['resetabsoluto', 're', 'resetuser', 'borrardatos']
 handler.rowner = true
 handler.tags = ['owner']
 

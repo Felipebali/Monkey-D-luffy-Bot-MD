@@ -36,17 +36,34 @@ let handler = async (m, { conn }) => {
 ┃ 🚻 *.genero a elección* – Configurar género
 ┗━━━━━━━━━━━━━━━━━━━━━┛
 
+┏━━━ 🧬 *HERMANOS* ━━━┓
+┃ 🤝 *.hermano* – Proponer hermandad
+┃ ✅ *.aceptarhermano* – Aceptar propuesta
+┃ ❌ *.rechazarhermano* – Rechazar propuesta
+┃ 💔 *.romperhermandad* – Romper hermandad
+┃ 🫂 *.abrazohermano* – Abrazar a tu hermano
+┃ 🛡️ *.proteger* – Proteger a tu hermano
+┃ 🤜 *.chocarhermano* – Chocar puños
+┃ 🏋️ *.entrenarhermano* – Entrenar juntos
+┃ 📊 *.relacionhermano* – Ver estado de hermandad
+┗━━━━━━━━━━━━━━━━━━━━━┛
+
 ┏━━━ 💕 *RELACIONES* ━━━┓
 ┃ 💘 *.pareja citando mensaje* – Proponer relación
-┃ ✅ *.aceptar* – Aceptar propuesta
-┃ ❌ *.rechazar* – Rechazar propuesta
+┃ ✅ *.aceptar* – Aceptar propuesta de pareja
+┃ ❌ *.rechazar* – Rechazar propuesta de pareja
 ┃ 💔 *.terminar* – Terminar relación
-┃ 💍 *.casarse* – Casarse (tras 7 días)
+┃ 💍 *.casarse* – Proponer matrimonio
+┃ ✅ *.si* – Aceptar propuesta de matrimonio
+┃ ❌ *.no* – Rechazar propuesta de matrimonio
 ┃ ⚖️ *.divorcio* – Divorciarse
 ┃ ❤️ *.relacion* – Ver estado actual
 ┃ 💋 *.besar* – Besar a tu pareja
 ┃ 🤗 *.abrazar* – Abrazar a tu pareja
 ┃ 💖 *.amor* – Aumentar amor
+┃ 🌹 *.flores* – Regalar flores
+┃ 🎁 *.regalo* – Dar un regalo
+┃ 🍷 *.cita* – Tener una cita romántica
 ┗━━━━━━━━━━━━━━━━━━━━━┛
 
 ┏━━━ 📚 *TIPOS DE MENÚ* ━━━┓
@@ -130,7 +147,6 @@ let handler = async (m, { conn }) => {
 
 ┏━━━ 👑 *OWNERS* ━━━┓
 ┃ 🛡️ *.autoadmin*
-┃ 🎯 *.chetar* / *.deschetar*
 ┃ 🕵️ *.detectar*
 ┃ 🔗 *.join*
 ┃ 📜 *.grouplist*
@@ -138,7 +154,6 @@ let handler = async (m, { conn }) => {
 ┃ ✏️ *.setprefix*
 ┃ 🧹 *.resetprefix*
 ┃ 🔁 *.restart*
-┃ 💣 *.wipe*
 ┃ 🪄 *.resetlink*
 ┃ ⚙️ *.update*
 ┗━━━━━━━━━━━━━━━━━━━━━┛

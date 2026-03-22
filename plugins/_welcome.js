@@ -10,12 +10,12 @@ let handler = async (m, { conn, text, command, isAdmin }) => {
     if (!global.db.data.chats[m.chat]) global.db.data.chats[m.chat] = {};
     let chat = global.db.data.chats[m.chat];
 
-    // Defaults
+    // 🔧 Valores por defecto
     if (typeof chat.welcome === 'undefined') chat.welcome = false;
     if (!chat.welcomeMsg) chat.welcomeMsg = "🎉 ¡Bienvenido/a!";
     if (!chat.leaveMsg) chat.leaveMsg = "👋 Se fue del grupo.";
 
-    // 🔘 TOGGLE
+    // 🔘 ACTIVAR / DESACTIVAR
     if (command === "welcome") {
         chat.welcome = !chat.welcome;
 
@@ -39,7 +39,7 @@ let handler = async (m, { conn, text, command, isAdmin }) => {
     }
 };
 
-// --- BEFORE ---
+// --- DETECTOR DE CAMBIOS ---
 handler.before = async function (m, { conn }) {
     if (!m.isGroup) return;
 
@@ -57,23 +57,19 @@ handler.before = async function (m, { conn }) {
     }
 
     const old = chat.participants;
-
     const added = current.filter(x => !old.includes(x));
     const removed = old.filter(x => !current.includes(x));
-
     const groupName = meta.subject;
 
     // 🎉 BIENVENIDA
     for (let user of added) {
         let username = `@${user.split("@")[0]}`;
 
-        let text = chat.welcomeMsg;
+        let text = chat.welcomeMsg
+            .replace(/@user/g, username)
+            .replace(/@group/g, groupName);
 
-        // Reemplazos opcionales
-        text = text.replace(/@user/g, username)
-                   .replace(/@group/g, groupName);
-
-        // 👇 FORZAR mención + grupo SIEMPRE
+        // 🔥 FORZAR mención y grupo
         if (!text.includes(username)) {
             text = `${username}\n${text}`;
         }
@@ -82,8 +78,18 @@ handler.before = async function (m, { conn }) {
             text = `${text}\n📌 Grupo: ${groupName}`;
         }
 
+        // 💎 DISEÑO BONITO
+        let finalText = `
+╭━━━〔 🎉 BIENVENIDO 〕━━━⬣
+┃ 👤 Usuario: ${username}
+┃ 🏷️ Grupo: *${groupName}*
+┃
+┃ ${text}
+╰━━━━━━━━━━━━━━━━⬣
+`.trim();
+
         await conn.sendMessage(m.chat, {
-            text,
+            text: finalText,
             mentions: [user]
         });
     }
@@ -92,12 +98,11 @@ handler.before = async function (m, { conn }) {
     for (let user of removed) {
         let username = `@${user.split("@")[0]}`;
 
-        let text = chat.leaveMsg;
+        let text = chat.leaveMsg
+            .replace(/@user/g, username)
+            .replace(/@group/g, groupName);
 
-        text = text.replace(/@user/g, username)
-                   .replace(/@group/g, groupName);
-
-        // 👇 FORZAR mención + grupo SIEMPRE
+        // 🔥 FORZAR mención y grupo
         if (!text.includes(username)) {
             text = `${username}\n${text}`;
         }
@@ -106,8 +111,18 @@ handler.before = async function (m, { conn }) {
             text = `${text}\n📌 Grupo: ${groupName}`;
         }
 
+        // 💎 DISEÑO BONITO
+        let finalText = `
+╭━━━〔 👋 DESPEDIDA 〕━━━⬣
+┃ 👤 Usuario: ${username}
+┃ 🏷️ Grupo: *${groupName}*
+┃
+┃ ${text}
+╰━━━━━━━━━━━━━━━━⬣
+`.trim();
+
         await conn.sendMessage(m.chat, {
-            text,
+            text: finalText,
             mentions: [user]
         });
     }

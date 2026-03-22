@@ -70,7 +70,7 @@ let handler = async (m, { conn }) => {
 ┃ 🎮 *.menuj*
 ┃ 👥 *.menugp*
 ┃ 🔥 *.menuhot*
-┃ 👑 *.menuowner*
+┃ 👑 *.mw*
 ┗━━━━━━━━━━━━━━━━━━━━━┛
 
 ┏━━━ 🛡️ *SEGURIDAD DEL GRUPO* ━━━┓

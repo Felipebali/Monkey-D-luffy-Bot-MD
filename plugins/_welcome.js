@@ -5,45 +5,41 @@ let handler = async (m, { conn, text, command, isAdmin }) => {
         return conn.sendMessage(m.chat, { text: "❌ Solo funciona en grupos." });
 
     if (!isAdmin)
-        return conn.sendMessage(m.chat, { text: "⚠️ Solo los administradores pueden usar esto." });
+        return conn.sendMessage(m.chat, { text: "⚠️ Solo los administradores pueden usar este comando." });
 
     if (!global.db.data.chats[m.chat]) global.db.data.chats[m.chat] = {};
     let chat = global.db.data.chats[m.chat];
 
     // Defaults
     if (typeof chat.welcome === 'undefined') chat.welcome = false;
-    if (!chat.welcomeMsg) chat.welcomeMsg = "🎉 ¡Bienvenido/a @user al grupo *@group*!";
-    if (!chat.leaveMsg) chat.leaveMsg = "👋 @user salió del grupo *@group*.";
+    if (!chat.welcomeMsg) chat.welcomeMsg = "🎉 ¡Bienvenido/a!";
+    if (!chat.leaveMsg) chat.leaveMsg = "👋 Se fue del grupo.";
 
     // 🔘 TOGGLE
     if (command === "welcome") {
         chat.welcome = !chat.welcome;
 
         return conn.sendMessage(m.chat, {
-            text: `✨ *Welcome ${chat.welcome ? "ACTIVADO" : "DESACTIVADO"}*`
+            text: `✨ *Welcome ${chat.welcome ? "ACTIVADO" : "DESACTIVADO"}*\nLos mensajes están ${chat.welcome ? "habilitados" : "deshabilitados"}.`
         });
     }
 
-    // ✏️ SET BIENVENIDA
+    // ✏️ EDITAR BIENVENIDA
     if (command === "set1") {
-        if (!text) return m.reply("✏️ Usa:\n.set1 texto\n\nEjemplo:\n.set1 Bienvenido @user a @group");
-
+        if (!text) return m.reply("✏️ Usa:\n.set1 texto");
         chat.welcomeMsg = text;
-
-        return m.reply("✅ Mensaje de *bienvenida* actualizado.");
+        return m.reply("✅ Bienvenida actualizada.");
     }
 
-    // ✏️ SET DESPEDIDA
+    // ✏️ EDITAR DESPEDIDA
     if (command === "set2") {
-        if (!text) return m.reply("✏️ Usa:\n.set2 texto\n\nEjemplo:\n.set2 Chau @user de @group");
-
+        if (!text) return m.reply("✏️ Usa:\n.set2 texto");
         chat.leaveMsg = text;
-
-        return m.reply("✅ Mensaje de *despedida* actualizado.");
+        return m.reply("✅ Despedida actualizada.");
     }
 };
 
-// --- DETECTOR DE ENTRADAS Y SALIDAS ---
+// --- BEFORE ---
 handler.before = async function (m, { conn }) {
     if (!m.isGroup) return;
 
@@ -69,9 +65,22 @@ handler.before = async function (m, { conn }) {
 
     // 🎉 BIENVENIDA
     for (let user of added) {
-        let text = chat.welcomeMsg
-            .replace(/@user/g, `@${user.split("@")[0]}`)
-            .replace(/@group/g, groupName);
+        let username = `@${user.split("@")[0]}`;
+
+        let text = chat.welcomeMsg;
+
+        // Reemplazos opcionales
+        text = text.replace(/@user/g, username)
+                   .replace(/@group/g, groupName);
+
+        // 👇 FORZAR mención + grupo SIEMPRE
+        if (!text.includes(username)) {
+            text = `${username}\n${text}`;
+        }
+
+        if (!text.includes(groupName)) {
+            text = `${text}\n📌 Grupo: ${groupName}`;
+        }
 
         await conn.sendMessage(m.chat, {
             text,
@@ -81,9 +90,21 @@ handler.before = async function (m, { conn }) {
 
     // 👋 DESPEDIDA
     for (let user of removed) {
-        let text = chat.leaveMsg
-            .replace(/@user/g, `@${user.split("@")[0]}`)
-            .replace(/@group/g, groupName);
+        let username = `@${user.split("@")[0]}`;
+
+        let text = chat.leaveMsg;
+
+        text = text.replace(/@user/g, username)
+                   .replace(/@group/g, groupName);
+
+        // 👇 FORZAR mención + grupo SIEMPRE
+        if (!text.includes(username)) {
+            text = `${username}\n${text}`;
+        }
+
+        if (!text.includes(groupName)) {
+            text = `${text}\n📌 Grupo: ${groupName}`;
+        }
 
         await conn.sendMessage(m.chat, {
             text,
@@ -95,7 +116,7 @@ handler.before = async function (m, { conn }) {
 };
 
 // 📌 COMANDOS
-handler.command = ["welcome", "set1", "set2"];
+handler.command = ["welcome", "welc", "wl", "set1", "set2"];
 
 handler.group = true;
 handler.admin = true;

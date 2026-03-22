@@ -3,7 +3,7 @@ import path from 'path'
 import { execSync } from 'child_process'
 
 const SNAPSHOT = '.last_update_snapshot.json'
-const REPO = 'https://github.com/Felipebali/Mi-gaara-bot.git'
+const REPO = 'https://github.com/Felipebali/Monkey-D-luffy-Bot-MD.git'
 
 function scanPlugins() {
   const dir = path.join(process.cwd(), 'plugins')
@@ -25,7 +25,7 @@ let handler = async (m, { conn }) => {
   try {
     // 🛡️ Respaldos
     const backupFiles = ['config.js', '.env', 'owner-ban.js', 'grupo-warn.js']
-    const backupDirs = ['GaaraSessions']
+    const backupDirs = ['LuffySessions']
     const backups = {}
 
     backupFiles.forEach(f => { if (fs.existsSync(f)) backups[f] = fs.readFileSync(f) })

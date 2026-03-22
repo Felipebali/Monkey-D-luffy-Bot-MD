@@ -76,7 +76,6 @@ let handler = async (m, { conn }) => {
 ┏━━━ 🛡️ *SEGURIDAD DEL GRUPO* ━━━┓
 ┃ 🔗 *.antilink*
 ┃ 🧩 *.antilink2*
-┃ 🚫 *.antispam*
 ┃ 🤖 *.antibot*
 ┃ ☣️ *.antitoxico*
 ┃ 👻 *.antifake*

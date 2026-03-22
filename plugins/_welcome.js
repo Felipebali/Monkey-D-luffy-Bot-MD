@@ -39,7 +39,7 @@ let handler = async (m, { conn, text, command, isAdmin }) => {
     }
 };
 
-// --- DETECTOR DE CAMBIOS ---
+// --- DETECTOR ---
 handler.before = async function (m, { conn }) {
     if (!m.isGroup) return;
 
@@ -69,23 +69,18 @@ handler.before = async function (m, { conn }) {
             .replace(/@user/g, username)
             .replace(/@group/g, groupName);
 
-        // 🔥 FORZAR mención y grupo
+        // 🔥 FORZAR MENCIÓN
         if (!text.includes(username)) {
             text = `${username}\n${text}`;
         }
 
-        if (!text.includes(groupName)) {
-            text = `${text}\n📌 Grupo: ${groupName}`;
-        }
-
-        // 💎 DISEÑO BONITO
         let finalText = `
 ╭━━━〔 🎉 BIENVENIDO 〕━━━⬣
 ┃ 👤 Usuario: ${username}
 ┃ 🏷️ Grupo: *${groupName}*
-┃
+┃━━━━━━━━━━━━━━
 ┃ ${text}
-╰━━━━━━━━━━━━━━━━⬣
+╰━━━━━━━━━━━━━━⬣
 `.trim();
 
         await conn.sendMessage(m.chat, {
@@ -102,23 +97,18 @@ handler.before = async function (m, { conn }) {
             .replace(/@user/g, username)
             .replace(/@group/g, groupName);
 
-        // 🔥 FORZAR mención y grupo
+        // 🔥 FORZAR MENCIÓN
         if (!text.includes(username)) {
             text = `${username}\n${text}`;
         }
 
-        if (!text.includes(groupName)) {
-            text = `${text}\n📌 Grupo: ${groupName}`;
-        }
-
-        // 💎 DISEÑO BONITO
         let finalText = `
 ╭━━━〔 👋 DESPEDIDA 〕━━━⬣
 ┃ 👤 Usuario: ${username}
 ┃ 🏷️ Grupo: *${groupName}*
-┃
+┃━━━━━━━━━━━━━━
 ┃ ${text}
-╰━━━━━━━━━━━━━━━━⬣
+╰━━━━━━━━━━━━━━⬣
 `.trim();
 
         await conn.sendMessage(m.chat, {

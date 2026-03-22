@@ -1,47 +1,65 @@
 // 📂 plugins/welcome.js
-// Welcome + Leave con toggle usando SOLO: welcome
 
-let handler = async (m, { conn, isAdmin }) => {
+let handler = async (m, { conn, text, command, isAdmin }) => {
     if (!m.isGroup)
         return conn.sendMessage(m.chat, { text: "❌ Solo funciona en grupos." });
 
     if (!isAdmin)
-        return conn.sendMessage(m.chat, { text: "⚠️ Solo los administradores pueden usar este comando." });
+        return conn.sendMessage(m.chat, { text: "⚠️ Solo los administradores pueden usar esto." });
 
     if (!global.db.data.chats[m.chat]) global.db.data.chats[m.chat] = {};
-
     let chat = global.db.data.chats[m.chat];
 
-    // Si no existe, por defecto desactivado
+    // Defaults
     if (typeof chat.welcome === 'undefined') chat.welcome = false;
+    if (!chat.welcomeMsg) chat.welcomeMsg = "🎉 ¡Bienvenido/a @user al grupo *@group*!";
+    if (!chat.leaveMsg) chat.leaveMsg = "👋 @user salió del grupo *@group*.";
 
-    chat.welcome = !chat.welcome;
+    // 🔘 TOGGLE
+    if (command === "welcome") {
+        chat.welcome = !chat.welcome;
 
-    await conn.sendMessage(m.chat, {
-        text: `✨ *Welcome ${chat.welcome ? "ACTIVADO" : "DESACTIVADO"}*\nLos mensajes de entrada y salida están ${chat.welcome ? "habilitados" : "deshabilitados"}.`
-    });
+        return conn.sendMessage(m.chat, {
+            text: `✨ *Welcome ${chat.welcome ? "ACTIVADO" : "DESACTIVADO"}*`
+        });
+    }
+
+    // ✏️ SET BIENVENIDA
+    if (command === "set1") {
+        if (!text) return m.reply("✏️ Usa:\n.set1 texto\n\nEjemplo:\n.set1 Bienvenido @user a @group");
+
+        chat.welcomeMsg = text;
+
+        return m.reply("✅ Mensaje de *bienvenida* actualizado.");
+    }
+
+    // ✏️ SET DESPEDIDA
+    if (command === "set2") {
+        if (!text) return m.reply("✏️ Usa:\n.set2 texto\n\nEjemplo:\n.set2 Chau @user de @group");
+
+        chat.leaveMsg = text;
+
+        return m.reply("✅ Mensaje de *despedida* actualizado.");
+    }
 };
 
-// --- BEFORE ---
+// --- DETECTOR DE ENTRADAS Y SALIDAS ---
 handler.before = async function (m, { conn }) {
     if (!m.isGroup) return;
 
     if (!global.db.data.chats[m.chat]) global.db.data.chats[m.chat] = {};
     let chat = global.db.data.chats[m.chat];
 
-    // Si welcome está apagado → no hacer nada
     if (!chat.welcome) return;
 
-    // Obtener lista anterior o crearla
+    const meta = await conn.groupMetadata(m.chat);
+    const current = meta.participants.map(p => p.id);
+
     if (!chat.participants) {
-        const meta = await conn.groupMetadata(m.chat);
-        chat.participants = meta.participants.map(p => p.id);
+        chat.participants = current;
         return;
     }
 
-    // Metadata actual
-    const meta = await conn.groupMetadata(m.chat);
-    const current = meta.participants.map(p => p.id);
     const old = chat.participants;
 
     const added = current.filter(x => !old.includes(x));
@@ -49,18 +67,26 @@ handler.before = async function (m, { conn }) {
 
     const groupName = meta.subject;
 
-    // 🎉 Bienvenida
+    // 🎉 BIENVENIDA
     for (let user of added) {
+        let text = chat.welcomeMsg
+            .replace(/@user/g, `@${user.split("@")[0]}`)
+            .replace(/@group/g, groupName);
+
         await conn.sendMessage(m.chat, {
-            text: `🎉 ¡Bienvenido/a *@${user.split("@")[0]}* al grupo *${groupName}*!\nDisfruta tu estadía.`,
+            text,
             mentions: [user]
         });
     }
 
-    // 👋 Despedida
+    // 👋 DESPEDIDA
     for (let user of removed) {
+        let text = chat.leaveMsg
+            .replace(/@user/g, `@${user.split("@")[0]}`)
+            .replace(/@group/g, groupName);
+
         await conn.sendMessage(m.chat, {
-            text: `👋 *@${user.split("@")[0]}* salió del grupo *${groupName}*.`,
+            text,
             mentions: [user]
         });
     }
@@ -68,8 +94,8 @@ handler.before = async function (m, { conn }) {
     chat.participants = current;
 };
 
-// 📌 ARRAY DE COMANDOS
-handler.command = ["welcome", "welc", "wl"];
+// 📌 COMANDOS
+handler.command = ["welcome", "set1", "set2"];
 
 handler.group = true;
 handler.admin = true;

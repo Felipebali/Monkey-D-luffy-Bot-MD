@@ -6,7 +6,7 @@ const handler = async (m, { conn, text, isOwner, chat = {} }) => {
 
   // 🔞 Filtro adultMode
   if (!chat.adultMode && m.isGroup && !isOwner) {
-    const prohibited = ["caca", "polla", "gay", "hombres cogiendo", "mía malkova", "mia malkova", "hombres gay", "fisting", "porno", "porn", "gore", "cum", "semen", "puta", "puto", "culo", "putita", "putito", "pussy", "hentai", "pene", "coño", "asesinato", "zoofilia", "mia khalifa", "desnudo", "desnuda", "cuca", "chocha", "muertos", "pornhub", "xnxx", "xvideos", "teta", "vagina", "marsha may", "misha cross", "sexmex", "furry", "furro", "furra", "xxx", "rule34", "panocha", "pedofilia", "necrofilia", "pinga", "horny", "ass", "nude", "popo", "nsfw", "femdom", "futanari", "erofeet", "sexo", "sex", "yuri", "ero", "ecchi", "blowjob", "anal", "ahegao", "pija", "verga", "trasero", "violation", "violacion", "bdsm", "cachonda", "+18", "cp"];
+    const prohibited = ["caca", "polla", "gay", "hombres cogiendo", "mía malkova", "mia malkova", "hombres gay", "fisting", "porno", "porn", "gore", "cum", "semen", "puta", "puto", "culo", "putita", "putito", "pussy", "hentai", "pene", "coño", "asesinato", "zoofilia", "mia khalifa", "desnudo", "desnuda", "cuca", "chocha", "muertos", "pornhub", "xnxx", "xvideos", "teta", "vagina", "marsha may", "misha cross", "sexmex", "furry", "furro", "furra", "xxx", "rule34", "panocha", "pedofilia", "necrofilia", "pinga", "horny", "ass", "nude", "popo", "nsfw", "femdom", "futanari", "erofeet", "sexo", "sex", "yuri", "ero", "ecchi", "blowjob", "anal", "ahegao", "pija", "verga", "trasero", "violation", "violacion", "bdsm", "cachonda", "+18", "cp", "mia marin", "lana rhoades", "cepesito", "hot", "buceta", "xxx"];
 
     const normalizedText = text.replace(/\s+/g, "").toLowerCase();
 
@@ -53,13 +53,16 @@ const handler = async (m, { conn, text, isOwner, chat = {} }) => {
 
       if (!visto.has(original_url)) {
         visto.add(original_url);
-        resultados.push({ titulo, url: original_url });
+        resultados.push({
+          titulo,
+          url: original_url,
+        });
       }
 
       if (resultados.length >= 10) break;
     }
 
-    if (!resultados.length) {
+    if (resultados.length === 0) {
       return conn.reply(m.chat, "❌ No hubo resultados.", m);
     }
 
@@ -82,6 +85,7 @@ const handler = async (m, { conn, text, isOwner, chat = {} }) => {
 handler.help = ['imagen <texto>'];
 handler.tags = ['tools'];
 handler.command = ['imagen', 'foto', 'imágen'];
+
 handler.group = true;
 handler.botAdmin = false;
 

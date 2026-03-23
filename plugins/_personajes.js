@@ -1,4 +1,4 @@
-// 📂 plugins/personajes.js — Sistema PRO Anime 🐉👑
+// 📂 plugins/personajes.js — Sistema PRO Anime 🐉👑✨
 
 import fs from 'fs'
 import path from 'path'
@@ -53,21 +53,30 @@ let handler = async (m, { conn, text, command }) => {
 
   if (command === 'personajes') {
 
-    let texto = "🎌 PERSONAJES\n\n"
+    let texto = `
+╭━━━〔 🎌 *PERSONAJES DISPONIBLES* 〕━━━⬣
 
-    texto += "🟢 NORMALES:\n"
+🟢 *NORMALES*
+`
+
     normales.forEach(p => {
       let dueño = Object.keys(db).find(u => db[u] === p)
-      texto += dueño ? `❌ ${p}\n` : `✅ ${p}\n`
+      texto += dueño ? `┃ ❌ ${p}\n` : `┃ ✅ ${p}\n`
     })
 
-    texto += "\n🌟 RAROS:\n"
+    texto += `
+┃
+🌟 *RAROS*
+`
+
     raros.forEach(p => {
       let dueño = Object.keys(db).find(u => db[u] === p)
-      texto += dueño ? `🔒 ${p}\n` : `✨ ${p}\n`
+      texto += dueño ? `┃ 🔒 ${p}\n` : `┃ ✨ ${p}\n`
     })
 
-    return m.reply(texto)
+    texto += `╰━━━━━━━━━━━━━━━━━━⬣`
+
+    return m.reply(texto.trim())
   }
 
   // ======================
@@ -77,7 +86,7 @@ let handler = async (m, { conn, text, command }) => {
   if (command === 'claim') {
 
     if (db[jid])
-      return m.reply(`⚠️ Ya tienes a *${db[jid]}*`)
+      return m.reply(`⚠️ Ya posees a *${db[jid]}*`)
 
     let pool = chanceRaro() ? raros : normales
     let disponibles = pool.filter(p => !Object.values(db).includes(p))
@@ -90,9 +99,14 @@ let handler = async (m, { conn, text, command }) => {
     db[jid] = personaje
     saveDB(db)
 
-    return m.reply(
-      `🎉 Has obtenido: *${personaje}*\n${raros.includes(personaje) ? "🌟 ¡PERSONAJE RARO!" : ""}`
-    )
+    return m.reply(`
+╭━━━〔 🎉 *INVOCACIÓN EXITOSA* 〕━━━⬣
+┃ 🐉 Has obtenido:
+┃ ✨ *${personaje}*
+┃
+${raros.includes(personaje) ? "┃ 🌟 ¡UN PERSONAJE RARO HA APARECIDO!" : "┃ 🔥 Personaje normal obtenido"}
+╰━━━━━━━━━━━━━━━━━━⬣
+`.trim())
   }
 
   // ======================
@@ -104,7 +118,12 @@ let handler = async (m, { conn, text, command }) => {
     if (!db[jid])
       return m.reply("❌ No tienes personaje.")
 
-    return m.reply(`🐉 Tu personaje: *${db[jid]}*`)
+    return m.reply(`
+╭━━━〔 🐉 *TU PERSONAJE* 〕━━━⬣
+┃ 👤 Usuario: @${jid.split('@')[0]}
+┃ ⚔️ Personaje: *${db[jid]}*
+╰━━━━━━━━━━━━━━━━━━⬣
+`.trim(), null, { mentions: [jid] })
   }
 
   // ======================
@@ -120,7 +139,14 @@ let handler = async (m, { conn, text, command }) => {
     delete db[jid]
     saveDB(db)
 
-    return m.reply(`💔 Perdiste a *${viejo}*`)
+    return m.reply(`
+╭━━━〔 💔 *DESPEDIDA* 〕━━━⬣
+┃ Has liberado a:
+┃ ❌ *${viejo}*
+┃
+┃ 🔓 Ahora está disponible nuevamente
+╰━━━━━━━━━━━━━━━━━━⬣
+`.trim())
   }
 
   // ======================
@@ -149,7 +175,12 @@ let handler = async (m, { conn, text, command }) => {
     db[jid] = personaje
     saveDB(db)
 
-    return m.reply(`🔄 Cambiaste *${viejo}* por *${personaje}*`)
+    return m.reply(`
+╭━━━〔 🔄 *CAMBIO REALIZADO* 〕━━━⬣
+┃ ❌ Antes: *${viejo}*
+┃ ✅ Ahora: *${personaje}*
+╰━━━━━━━━━━━━━━━━━━⬣
+`.trim())
   }
 
   // ======================
@@ -159,12 +190,11 @@ let handler = async (m, { conn, text, command }) => {
   if (command === 'addpj') {
 
     if (!isOwner) return m.reply('❌ Solo owners.')
-
     if (!text) return m.reply('⚠️ Escribe el nombre.')
 
     normales.push(text.trim())
 
-    return m.reply(`✅ Personaje agregado: *${text}*`)
+    return m.reply(`👑 Nuevo personaje agregado:\n✨ *${text}*`)
   }
 
   // ======================
@@ -174,13 +204,12 @@ let handler = async (m, { conn, text, command }) => {
   if (command === 'delpj') {
 
     if (!isOwner) return m.reply('❌ Solo owners.')
-
     if (!text) return m.reply('⚠️ Escribe el nombre.')
 
     normales = normales.filter(p => p.toLowerCase() !== text.toLowerCase())
     raros = raros.filter(p => p.toLowerCase() !== text.toLowerCase())
 
-    return m.reply(`❌ Personaje eliminado: *${text}*`)
+    return m.reply(`❌ Personaje eliminado:\n*${text}*`)
   }
 
   // ======================
@@ -190,9 +219,7 @@ let handler = async (m, { conn, text, command }) => {
   if (command === 'resetpj') {
 
     if (!isOwner) return m.reply('❌ Solo owners.')
-
-    if (!m.mentionedJid[0])
-      return m.reply('⚠️ Menciona usuario.')
+    if (!m.mentionedJid[0]) return m.reply('⚠️ Menciona usuario.')
 
     let target = m.mentionedJid[0]
 
@@ -214,17 +241,21 @@ let handler = async (m, { conn, text, command }) => {
 
   if (command === 'listpj') {
 
-    let texto = "📊 PERSONAJES EN USO\n\n"
+    let texto = `
+╭━━━〔 📊 *PERSONAJES EN USO* 〕━━━⬣
+`
 
     for (let user in db) {
-      texto += `👤 @${user.split('@')[0]} → ${db[user]}\n`
+      texto += `┃ 👤 @${user.split('@')[0]} → ${db[user]}\n`
     }
 
     if (Object.keys(db).length === 0)
       return m.reply("❌ Nadie tiene personajes.")
 
+    texto += `╰━━━━━━━━━━━━━━━━━━⬣`
+
     return conn.sendMessage(m.chat, {
-      text: texto,
+      text: texto.trim(),
       mentions: Object.keys(db)
     })
   }

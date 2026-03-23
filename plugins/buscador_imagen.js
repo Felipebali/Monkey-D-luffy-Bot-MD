@@ -7,12 +7,16 @@ const handler = async (m, { conn, text }) => {
   try {
     const query = encodeURIComponent(text);
 
+    // 📸 Imagen random basada en búsqueda
     const url = `https://source.unsplash.com/900x700/?${query}`;
 
-    await conn.sendMessage(m.chat, {
-      image: { url },
-      caption: `*Resultado de:* ${text}`
-    }, { quoted: m });
+    await conn.sendFile(
+      m.chat,
+      url,
+      "imagen.jpg",
+      `*Resultado de:* ${text}`,
+      m
+    );
 
   } catch (e) {
     console.error(e);

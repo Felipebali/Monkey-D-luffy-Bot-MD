@@ -29,6 +29,17 @@ let handler = async (m, { conn }) => {
 ┃ ✉️ *.sug*
 ┗━━━━━━━━━━━━━━━━━━━━━┛
 
+┏━━━ 📚 *TIPOS DE MENÚ* ━━━┓
+┃ 🎮 *.menuj*
+┃ 👥 *.menugp*
+┃ 🔥 *.menuhot*
+┃ 👑 *.mw*
+┗━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━ 🎌 *ANIME / PERSONAJES* ━━━┓
+┃ 🎴 *.menupj*
+┗━━━━━━━━━━━━━━━━━━━━━┛
+
 ┏━━━ 👤 *PERFIL DE USUARIO* ━━━┓
 ┃ 🪪 *.perfil* – Ver tu perfil
 ┃ 🎂 *.setbr 01/01/2001* – Fecha nacimiento
@@ -64,13 +75,6 @@ let handler = async (m, { conn }) => {
 ┃ 🌹 *.flores* – Regalar flores
 ┃ 🎁 *.regalo* – Dar un regalo
 ┃ 🍷 *.cita* – Tener una cita romántica
-┗━━━━━━━━━━━━━━━━━━━━━┛
-
-┏━━━ 📚 *TIPOS DE MENÚ* ━━━┓
-┃ 🎮 *.menuj*
-┃ 👥 *.menugp*
-┃ 🔥 *.menuhot*
-┃ 👑 *.mw*
 ┗━━━━━━━━━━━━━━━━━━━━━┛
 
 ┏━━━ 🛡️ *SEGURIDAD DEL GRUPO* ━━━┓

@@ -1,4 +1,4 @@
-// 📂 plugins/bot.js — STATUS BOT PRO 👑
+// 📂 plugins/bot.js — STATUS PRO HOST 👑
 
 import os from 'os'
 
@@ -16,37 +16,42 @@ let handler = async (m, { conn }) => {
   }
 
   // ⏱️ UPTIME
-  const uptime = process.uptime() * 1000
-  const seconds = Math.floor(uptime / 1000) % 60
-  const minutes = Math.floor(uptime / (1000 * 60)) % 60
-  const hours = Math.floor(uptime / (1000 * 60 * 60))
-  const tiempo = `${hours}h ${minutes}m ${seconds}s`
+  const uptime = process.uptime()
+  const hours = Math.floor(uptime / 3600)
+  const minutes = Math.floor((uptime % 3600) / 60)
+  const seconds = Math.floor(uptime % 60)
 
-  // 💻 INFO DEL SISTEMA
-  const platform = os.platform()
+  // 💾 MEMORIA (IMPORTANTE EN HOST)
+  const used = process.memoryUsage()
+  const ramUsed = (used.rss / 1024 / 1024).toFixed(2)
+  const ramTotal = (os.totalmem() / 1024 / 1024).toFixed(2)
+
+  // 🧠 CPU / SISTEMA
   const cpu = os.cpus()[0].model
-  const totalMem = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2)
-  const freeMem = (os.freemem() / 1024 / 1024 / 1024).toFixed(2)
+  const platform = os.platform()
 
-  // 📊 LATENCIA
-  const speed = (performance.now()).toFixed(2)
+  // ⚡ LATENCIA REAL
+  const start = performance.now()
+  const end = performance.now()
+  const speed = (end - start).toFixed(2)
 
   // 💎 MENSAJE PRO
   let texto = `
 ╭━━━〔 👑 FELIXCAT BOT 〕━━━⬣
 ┃ 🚀 Estado: *ONLINE*
-┃ ⚡ Rendimiento: *ÓPTIMO*
+┃ ⚡ Host: *BoxMine*
 ┃
-┃ ⏱️ Uptime: ${tiempo}
+┃ ⏱️ Uptime: ${hours}h ${minutes}m ${seconds}s
 ┃ 📡 Latencia: ${speed} ms
 ┃
 ┃ 💻 Sistema: ${platform}
 ┃ 🧠 CPU: ${cpu}
 ┃
-┃ 🗄️ RAM Total: ${totalMem} GB
-┃ 📉 RAM Libre: ${freeMem} GB
+┃ 📦 RAM usada: ${ramUsed} MB
+┃ 🗄️ RAM total: ${ramTotal} MB
 ┃
-┃ 🤖 Versión: 1.0 PRO
+┃ 🧬 Node.js: ${process.version}
+┃ 🤖 Modo: Producción
 ╰━━━━━━━━━━━━━━━━⬣
 `.trim()
 

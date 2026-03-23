@@ -1,4 +1,4 @@
-// 📂 plugins/personajes.js — Sistema PRO Anime 🐉👑✨
+// 📂 plugins/personajes.js — Sistema PRO Anime 🐉👑
 
 import fs from 'fs'
 import path from 'path'
@@ -53,30 +53,21 @@ let handler = async (m, { conn, text, command }) => {
 
   if (command === 'personajes') {
 
-    let texto = `
-╭━━━〔 🎌 *PERSONAJES DISPONIBLES* 〕━━━⬣
+    let texto = "🎌 PERSONAJES\n\n"
 
-🟢 *NORMALES*
-`
-
+    texto += "🟢 NORMALES:\n"
     normales.forEach(p => {
       let dueño = Object.keys(db).find(u => db[u] === p)
-      texto += dueño ? `┃ ❌ ${p}\n` : `┃ ✅ ${p}\n`
+      texto += dueño ? `❌ ${p}\n` : `✅ ${p}\n`
     })
 
-    texto += `
-┃
-🌟 *RAROS*
-`
-
+    texto += "\n🌟 RAROS:\n"
     raros.forEach(p => {
       let dueño = Object.keys(db).find(u => db[u] === p)
-      texto += dueño ? `┃ 🔒 ${p}\n` : `┃ ✨ ${p}\n`
+      texto += dueño ? `🔒 ${p}\n` : `✨ ${p}\n`
     })
 
-    texto += `╰━━━━━━━━━━━━━━━━━━⬣`
-
-    return m.reply(texto.trim())
+    return m.reply(texto)
   }
 
   // ======================
@@ -86,7 +77,7 @@ let handler = async (m, { conn, text, command }) => {
   if (command === 'claim') {
 
     if (db[jid])
-      return m.reply(`⚠️ Ya posees a *${db[jid]}*`)
+      return m.reply(`⚠️ Ya tienes a *${db[jid]}*`)
 
     let pool = chanceRaro() ? raros : normales
     let disponibles = pool.filter(p => !Object.values(db).includes(p))
@@ -99,14 +90,9 @@ let handler = async (m, { conn, text, command }) => {
     db[jid] = personaje
     saveDB(db)
 
-    return m.reply(`
-╭━━━〔 🎉 *INVOCACIÓN EXITOSA* 〕━━━⬣
-┃ 🐉 Has obtenido:
-┃ ✨ *${personaje}*
-┃
-${raros.includes(personaje) ? "┃ 🌟 ¡UN PERSONAJE RARO HA APARECIDO!" : "┃ 🔥 Personaje normal obtenido"}
-╰━━━━━━━━━━━━━━━━━━⬣
-`.trim())
+    return m.reply(
+      `🎉 Has obtenido: *${personaje}*\n${raros.includes(personaje) ? "🌟 ¡PERSONAJE RARO!" : ""}`
+    )
   }
 
   // ======================
@@ -118,12 +104,7 @@ ${raros.includes(personaje) ? "┃ 🌟 ¡UN PERSONAJE RARO HA APARECIDO!" : "�
     if (!db[jid])
       return m.reply("❌ No tienes personaje.")
 
-    return m.reply(`
-╭━━━〔 🐉 *TU PERSONAJE* 〕━━━⬣
-┃ 👤 Usuario: @${jid.split('@')[0]}
-┃ ⚔️ Personaje: *${db[jid]}*
-╰━━━━━━━━━━━━━━━━━━⬣
-`.trim(), null, { mentions: [jid] })
+    return m.reply(`🐉 Tu personaje: *${db[jid]}*`)
   }
 
   // ======================
@@ -139,18 +120,11 @@ ${raros.includes(personaje) ? "┃ 🌟 ¡UN PERSONAJE RARO HA APARECIDO!" : "�
     delete db[jid]
     saveDB(db)
 
-    return m.reply(`
-╭━━━〔 💔 *DESPEDIDA* 〕━━━⬣
-┃ Has liberado a:
-┃ ❌ *${viejo}*
-┃
-┃ 🔓 Ahora está disponible nuevamente
-╰━━━━━━━━━━━━━━━━━━⬣
-`.trim())
+    return m.reply(`💔 Perdiste a *${viejo}*`)
   }
 
   // ======================
-  // 🔄 CAMBIAR
+  // 🔄 CAMBIAR AUTOMÁTICO
   // ======================
 
   if (command === 'cambiar') {
@@ -158,29 +132,33 @@ ${raros.includes(personaje) ? "┃ 🌟 ¡UN PERSONAJE RARO HA APARECIDO!" : "�
     if (!db[jid])
       return m.reply("❌ No tienes personaje.")
 
-    if (!text)
-      return m.reply("⚠️ Escribe el personaje.")
+    let viejo = db[jid]
 
-    let personaje = [...normales, ...raros].find(
-      p => p.toLowerCase() === text.toLowerCase()
+    // elegir pool con probabilidad
+    let pool = chanceRaro() ? raros : normales
+
+    let disponibles = pool.filter(p =>
+      !Object.values(db).includes(p) && p !== viejo
     )
 
-    if (!personaje)
-      return m.reply("❌ No existe.")
+    // fallback si no hay disponibles
+    if (!disponibles.length) {
+      disponibles = [...normales, ...raros].filter(p =>
+        !Object.values(db).includes(p) && p !== viejo
+      )
+    }
 
-    if (Object.values(db).includes(personaje))
-      return m.reply("❌ Está ocupado.")
+    if (!disponibles.length)
+      return m.reply("❌ No hay personajes disponibles para cambiar.")
 
-    let viejo = db[jid]
+    let personaje = disponibles[Math.floor(Math.random() * disponibles.length)]
+
     db[jid] = personaje
     saveDB(db)
 
-    return m.reply(`
-╭━━━〔 🔄 *CAMBIO REALIZADO* 〕━━━⬣
-┃ ❌ Antes: *${viejo}*
-┃ ✅ Ahora: *${personaje}*
-╰━━━━━━━━━━━━━━━━━━⬣
-`.trim())
+    return m.reply(
+      `🔄 Cambiaste *${viejo}* por *${personaje}*\n${raros.includes(personaje) ? "🌟 ¡PERSONAJE RARO!" : ""}`
+    )
   }
 
   // ======================
@@ -190,11 +168,12 @@ ${raros.includes(personaje) ? "┃ 🌟 ¡UN PERSONAJE RARO HA APARECIDO!" : "�
   if (command === 'addpj') {
 
     if (!isOwner) return m.reply('❌ Solo owners.')
+
     if (!text) return m.reply('⚠️ Escribe el nombre.')
 
     normales.push(text.trim())
 
-    return m.reply(`👑 Nuevo personaje agregado:\n✨ *${text}*`)
+    return m.reply(`✅ Personaje agregado: *${text}*`)
   }
 
   // ======================
@@ -204,12 +183,13 @@ ${raros.includes(personaje) ? "┃ 🌟 ¡UN PERSONAJE RARO HA APARECIDO!" : "�
   if (command === 'delpj') {
 
     if (!isOwner) return m.reply('❌ Solo owners.')
+
     if (!text) return m.reply('⚠️ Escribe el nombre.')
 
     normales = normales.filter(p => p.toLowerCase() !== text.toLowerCase())
     raros = raros.filter(p => p.toLowerCase() !== text.toLowerCase())
 
-    return m.reply(`❌ Personaje eliminado:\n*${text}*`)
+    return m.reply(`❌ Personaje eliminado: *${text}*`)
   }
 
   // ======================
@@ -219,7 +199,9 @@ ${raros.includes(personaje) ? "┃ 🌟 ¡UN PERSONAJE RARO HA APARECIDO!" : "�
   if (command === 'resetpj') {
 
     if (!isOwner) return m.reply('❌ Solo owners.')
-    if (!m.mentionedJid[0]) return m.reply('⚠️ Menciona usuario.')
+
+    if (!m.mentionedJid[0])
+      return m.reply('⚠️ Menciona usuario.')
 
     let target = m.mentionedJid[0]
 
@@ -241,21 +223,17 @@ ${raros.includes(personaje) ? "┃ 🌟 ¡UN PERSONAJE RARO HA APARECIDO!" : "�
 
   if (command === 'listpj') {
 
-    let texto = `
-╭━━━〔 📊 *PERSONAJES EN USO* 〕━━━⬣
-`
+    let texto = "📊 PERSONAJES EN USO\n\n"
 
     for (let user in db) {
-      texto += `┃ 👤 @${user.split('@')[0]} → ${db[user]}\n`
+      texto += `👤 @${user.split('@')[0]} → ${db[user]}\n`
     }
 
     if (Object.keys(db).length === 0)
       return m.reply("❌ Nadie tiene personajes.")
 
-    texto += `╰━━━━━━━━━━━━━━━━━━⬣`
-
     return conn.sendMessage(m.chat, {
-      text: texto.trim(),
+      text: texto,
       mentions: Object.keys(db)
     })
   }

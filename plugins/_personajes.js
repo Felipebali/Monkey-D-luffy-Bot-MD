@@ -27,7 +27,7 @@ let raros = [
   "Levi Ackerman Elite (Raro)"
 ]
 
-// 💥 STATS (para mostrar y usar en batalla)
+// 💥 STATS
 const statsBase = {
   "Naruto": { atk: 80, def: 70, hp: 100 },
   "Sasuke": { atk: 85, def: 65, hp: 95 },
@@ -68,17 +68,15 @@ let handler = async (m, { conn, command, text }) => {
 
   const isOwner = owners.includes(jid)
 
-  // ======================
-  // 📜 LISTA OTAKU + STATS
-  // ======================
-
+  // 📜 LISTA OTAKU
   if (command === 'personajes') {
 
     let texto = `
-╭━━━〔 🌌 PORTAL DEL ANIME 〕━━━⬣
-┃ "El multiverso está en equilibrio..."
+╭━━━〔 🌌 PORTAL DEL MULTIVERSO ANIME 〕━━━⬣
+┃ "Las almas de los guerreros aguardan..."
+┃ "¿Serás digno de invocarlos?"
 ┃
-┃ 🟢 *CLASE NORMAL*
+┃ 🟢 *CLASE NORMAL — SHINOBI / PIRATAS / TITANES*
 `
 
     normales.forEach(p => {
@@ -86,14 +84,14 @@ let handler = async (m, { conn, command, text }) => {
       let s = statsBase[p] || {}
 
       texto += dueño
-        ? `┃ ❌ ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Ocupado\n`
-        : `┃ ✨ ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Libre\n`
+        ? `┃ ❌ ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Sellado 💀\n`
+        : `┃ ✨ ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Esperando invocador\n`
     })
 
     texto += `
 ┃
-┃ 🌟 *CLASE LEGENDARIA*
-┃ "Solo los dignos pueden obtenerlos..."
+┃ 🌟 *CLASE LEGENDARIA — DIOSES DEL ANIME*
+┃ "Su poder desafía la realidad..."
 `
 
     raros.forEach(p => {
@@ -101,8 +99,8 @@ let handler = async (m, { conn, command, text }) => {
       let s = statsBase[p] || {}
 
       texto += dueño
-        ? `┃ 🔒 ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}]\n`
-        : `┃ 🌟 ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}]\n`
+        ? `┃ 🔒 ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Encadenado por otro usuario\n`
+        : `┃ 🌟 ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Energía abrumadora detectada...\n`
     })
 
     texto += `╰━━━━━━━━━━━━━━━━⬣`
@@ -110,14 +108,11 @@ let handler = async (m, { conn, command, text }) => {
     return m.reply(texto)
   }
 
-  // ======================
   // 🎲 CLAIM
-  // ======================
-
   if (command === 'claim') {
 
     if (db[jid])
-      return m.reply(`⚠️ Ya tienes un contrato con *${db[jid]}* 🐉`)
+      return m.reply(`⚠️ "Ya has sellado un contrato..." 🐉\n✨ *${db[jid]}* permanece a tu lado.`)
 
     let esRaro = isOwner ? chanceRaroOwner() : chanceRaro()
     let pool = esRaro ? raros : normales
@@ -125,7 +120,7 @@ let handler = async (m, { conn, command, text }) => {
     let disponibles = pool.filter(p => !Object.values(db).includes(p))
 
     if (!disponibles.length)
-      return m.reply("💀 No quedan personajes...")
+      return m.reply("💀 " + "El multiverso ha sido drenado... no quedan almas disponibles.")
 
     let personaje = disponibles[Math.floor(Math.random() * disponibles.length)]
 
@@ -133,57 +128,59 @@ let handler = async (m, { conn, command, text }) => {
     saveDB(db)
 
     return m.reply(
-`╭━━━〔 🎲 INVOCACIÓN 〕━━━⬣
-┃ 🐉 *${personaje}*
-${raros.includes(personaje) ? "┃ 🌟✨ LEGENDARIO ✨🌟" : ""}
-┃ "Tu destino ha sido elegido..."
+`╭━━━〔 🎲 INVOCACIÓN DIMENSIONAL 〕━━━⬣
+┃ 🔮 Canalizando energía espiritual...
+┃ ⚡ Rompiendo barreras del universo...
+┃
+┃ 🐉 *${personaje}* ha respondido a tu llamado
+${raros.includes(personaje) ? "┃ 🌟✨ UNA ENTIDAD LEGENDARIA HA DESPERTADO ✨🌟" : ""}
+┃
+┃ "Desde este momento... luchará a tu lado"
 ╰━━━━━━━━━━━━━━━━⬣`)
   }
 
-  // ======================
   // 👤 MI PERSONAJE
-  // ======================
-
   if (command === 'mipersonaje') {
 
     if (!db[jid])
-      return m.reply("❌ No tienes personaje.")
+      return m.reply("❌ " + "Aún no has formado un contrato espiritual...")
 
     let s = statsBase[db[jid]] || {}
 
     return m.reply(
-`╭━━━〔 🐉 VÍNCULO ACTIVO 〕━━━⬣
+`╭━━━〔 🐉 CONTRATO ESPIRITUAL 〕━━━⬣
 ┃ ✨ ${db[jid]}
-┃ ⚔️ ATK: ${s.atk}
-┃ 🛡️ DEF: ${s.def}
-┃ ❤️ HP: ${s.hp}
+┃
+┃ ⚔️ Poder ofensivo: ${s.atk}
+┃ 🛡️ Defensa: ${s.def}
+┃ ❤️ Vitalidad: ${s.hp}
+┃
+┃ "Su poder fluye a través de ti..."
 ╰━━━━━━━━━━━━━━━━⬣`)
   }
 
-  // ======================
   // 💔 DROP
-  // ======================
-
   if (command === 'drop') {
 
     if (!db[jid])
-      return m.reply("❌ No tienes personaje.")
+      return m.reply("❌ " + "No tienes ningún vínculo que romper.")
 
     let viejo = db[jid]
     delete db[jid]
     saveDB(db)
 
-    return m.reply(`💔 Has liberado a *${viejo}*`)
+    return m.reply(
+`💔 Has roto el contrato con *${viejo}*
+🌌 Su esencia se desvanece en el vacío...
+
+"Algunas alianzas... no estaban destinadas a durar..."`)
   }
 
-  // ======================
   // 🔄 CAMBIAR
-  // ======================
-
   if (command === 'cambiar') {
 
     if (!db[jid])
-      return m.reply("❌ No tienes personaje.")
+      return m.reply("❌ " + "No tienes personaje.")
 
     let viejo = db[jid]
 
@@ -195,7 +192,7 @@ ${raros.includes(personaje) ? "┃ 🌟✨ LEGENDARIO ✨🌟" : ""}
     )
 
     if (!disponibles.length)
-      return m.reply("💀 No hay personajes disponibles.")
+      return m.reply("💀 " + "El destino no ofrece nuevas opciones...")
 
     let personaje = disponibles[Math.floor(Math.random() * disponibles.length)]
 
@@ -203,23 +200,23 @@ ${raros.includes(personaje) ? "┃ 🌟✨ LEGENDARIO ✨🌟" : ""}
     saveDB(db)
 
     return m.reply(
-`╭━━━〔 🔄 REENCARNACIÓN 〕━━━⬣
-┃ ${viejo} ❌
+`╭━━━〔 🔄 REENCARNACIÓN DEL DESTINO 〕━━━⬣
+┃ ⚔️ ${viejo} ha sido liberado...
+┃ 🌌 Nuevo vínculo sellado:
 ┃ ✨ ${personaje}
-${raros.includes(personaje) ? "┃ 🌟 LEGENDARIO 🌟" : ""}
+${raros.includes(personaje) ? "┃ 🌟 EL DESTINO HA CAMBIADO DRÁSTICAMENTE 🌟" : ""}
+┃
+┃ "Tu camino acaba de cambiar..."
 ╰━━━━━━━━━━━━━━━━⬣`)
   }
 
-  // ======================
   // 👑 OWNER
-  // ======================
-
   if (command === 'addpj') {
-    if (!isOwner) return m.reply('❌ Solo dioses 👑')
+    if (!isOwner) return m.reply('❌ Solo los dioses pueden alterar la existencia 👑')
     if (!text) return m.reply('⚠️ Escribe nombre')
 
     normales.push(text.trim())
-    return m.reply(`👑 Creaste: *${text}*`)
+    return m.reply(`👑 Has creado una nueva entidad:\n✨ *${text}*\n"Un nuevo poder ha nacido..."`)
   }
 
   if (command === 'delpj') {
@@ -229,7 +226,7 @@ ${raros.includes(personaje) ? "┃ 🌟 LEGENDARIO 🌟" : ""}
     normales = normales.filter(p => p.toLowerCase() !== text.toLowerCase())
     raros = raros.filter(p => p.toLowerCase() !== text.toLowerCase())
 
-    return m.reply(`💀 Eliminado: *${text}*`)
+    return m.reply(`💀 Has borrado a *${text}* del multiverso\n"Su existencia ha sido eliminada..."`)
   }
 
   if (command === 'resetpj') {
@@ -238,14 +235,11 @@ ${raros.includes(personaje) ? "┃ 🌟 LEGENDARIO 🌟" : ""}
 
     let target = m.mentionedJid[0]
 
-    if (!db[target])
-      return m.reply('❌ No tiene personaje.')
-
     delete db[target]
     saveDB(db)
 
     return conn.sendMessage(m.chat, {
-      text: `🧹 Eliminado personaje de @${target.split('@')[0]}`,
+      text: `🧹 Has roto el vínculo espiritual de @${target.split('@')[0]}\n"Su contrato ha sido destruido..."`,
       mentions: [target]
     })
   }
@@ -253,7 +247,7 @@ ${raros.includes(personaje) ? "┃ 🌟 LEGENDARIO 🌟" : ""}
   if (command === 'listpj') {
 
     if (!Object.keys(db).length)
-      return m.reply("❌ Nadie tiene personajes.")
+      return m.reply("❌ El multiverso está vacío...")
 
     let texto = `╭━━━〔 📊 REGISTRO DEL MULTIVERSO 〕━━━⬣\n\n`
 
@@ -261,7 +255,7 @@ ${raros.includes(personaje) ? "┃ 🌟 LEGENDARIO 🌟" : ""}
       texto += `👤 @${user.split('@')[0]} → ${db[user]}\n`
     }
 
-    texto += `\n╰━━━━━━━━━━━━━━━━⬣`
+    texto += `\n"Todos los contratos están registrados aquí..."\n╰━━━━━━━━━━━━━━━━⬣`
 
     return conn.sendMessage(m.chat, {
       text: texto,
@@ -273,7 +267,7 @@ ${raros.includes(personaje) ? "┃ 🌟 LEGENDARIO 🌟" : ""}
     if (!isOwner) return m.reply('❌ Solo dioses 👑')
 
     saveDB({})
-    return m.reply("🌌 Universo reiniciado.")
+    return m.reply("🌌 REINICIO TOTAL\n" + `"El multiverso ha sido destruido y reconstruido..."`)
   }
 
 }

@@ -2,10 +2,9 @@ import fs from 'fs'
 import path from 'path'
 
 const file = path.join('./database', 'personajes.json')
-
 const loadDB = () => JSON.parse(fs.readFileSync(file))
 
-// 💥 STATS BASE (podés expandir esto)
+// 💥 STATS
 const statsBase = {
   "Naruto": { atk: 80, def: 70, hp: 100 },
   "Sasuke": { atk: 85, def: 65, hp: 95 },
@@ -18,7 +17,6 @@ const statsBase = {
   "Gojo": { atk: 100, def: 100, hp: 120 },
   "Itachi": { atk: 92, def: 75, hp: 95 },
 
-  // 🌟 RAROS (ROTOS)
   "Madara (Raro)": { atk: 110, def: 100, hp: 130 },
   "Sukuna (Raro)": { atk: 115, def: 95, hp: 130 },
   "Goku Ultra Instinto (Raro)": { atk: 130, def: 110, hp: 140 },
@@ -28,25 +26,27 @@ const statsBase = {
 
 // ⚔️ ATAQUE
 function atacar(p1, p2) {
-  let daño = Math.max(5, p1.atk - Math.floor(p2.def / 2))
-  return daño
+  return Math.max(5, p1.atk - Math.floor(p2.def / 2))
 }
 
 let handler = async (m, { conn }) => {
 
   const db = loadDB()
 
-  if (!m.mentionedJid[0])
-    return m.reply("⚔️ *Menciona a tu rival para iniciar el combate*")
+  // 🔥 DETECTAR USUARIO (MENCIÓN O RESPUESTA)
+  let target = m.mentionedJid?.[0] 
+    || (m.quoted ? m.quoted.sender : null)
+
+  if (!target)
+    return m.reply("⚔️ *Menciona o responde a tu rival para iniciar el combate*")
 
   const user = m.sender
-  const target = m.mentionedJid[0]
 
   if (!db[user])
-    return m.reply("❌ No tienes personaje para luchar.")
+    return m.reply("❌ *No tienes personaje invocado para luchar* 🐉")
 
   if (!db[target])
-    return m.reply("❌ El rival no tiene personaje.")
+    return m.reply("❌ *Ese usuario no tiene personaje activo*")
 
   const p1 = db[user]
   const p2 = db[target]
@@ -57,13 +57,16 @@ let handler = async (m, { conn }) => {
   let hp1 = s1.hp
   let hp2 = s2.hp
 
-  let log = `╭━━━〔 ⚔️ BATALLA ANIME 〕━━━⬣\n`
-  log += `👤 @${user.split('@')[0]} → ${p1}\n`
-  log += `🆚\n`
-  log += `👤 @${target.split('@')[0]} → ${p2}\n`
-  log += `━━━━━━━━━━━━━━\n`
+  let log = `╭━━━〔 ⚔️ COMBATE DIMENSIONAL 〕━━━⬣
+┃
+┃ 👤 @${user.split('@')[0]} invoca a *${p1}*
+┃ 🆚
+┃ 👤 @${target.split('@')[0]} invoca a *${p2}*
+┃
+┃ ⚡ ¡El campo de batalla tiembla!
+┃━━━━━━━━━━━━━━`
 
-  // 🔁 3 TURNOS
+  // 🔁 TURNOS
   for (let i = 1; i <= 3; i++) {
 
     let daño1 = atacar(s1, s2)
@@ -72,28 +75,37 @@ let handler = async (m, { conn }) => {
     hp2 -= daño1
     hp1 -= daño2
 
-    log += `\n🔥 TURNO ${i}\n`
-    log += `⚔️ ${p1} ataca → -${daño1} HP\n`
-    log += `⚔️ ${p2} contraataca → -${daño2} HP\n`
+    log += `
+
+🔥 TURNO ${i}
+⚔️ ${p1} ataca → -${daño1} HP
+💥 ${p2} responde → -${daño2} HP`
   }
 
-  log += `\n━━━━━━━━━━━━━━\n`
+  log += `
+
+┃━━━━━━━━━━━━━━`
 
   // 🏆 RESULTADO
   let resultado = ""
 
   if (hp1 > hp2) {
-    resultado = `🏆 *GANADOR:* ${p1}\n✨ "La victoria es suya..."`
+    resultado = `🏆 *VICTORIA:* ${p1}
+✨ "Su poder ha superado todos los límites..."`
 
   } else if (hp2 > hp1) {
-    resultado = `🏆 *GANADOR:* ${p2}\n🔥 "Dominó el combate..."`
+    resultado = `🏆 *VICTORIA:* ${p2}
+🔥 "Una fuerza imparable ha dominado..."`
 
   } else {
-    resultado = `🤝 *EMPATE*\n⚡ "Ambos colapsaron..."`
-
+    resultado = `🤝 *EMPATE*
+⚡ "Dos titanes han caído juntos..."`
   }
 
-  log += resultado + `\n╰━━━━━━━━━━━━━━━━⬣`
+  log += `
+
+${resultado}
+╰━━━━━━━━━━━━━━━━⬣`
 
   return conn.sendMessage(m.chat, {
     text: log,

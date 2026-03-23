@@ -13,13 +13,13 @@ const loadDB = () => JSON.parse(fs.readFileSync(file))
 const saveDB = (data) => fs.writeFileSync(file, JSON.stringify(data, null, 2))
 
 // 🎌 NORMALES
-const normales = [
+let normales = [
   "Naruto","Sasuke","Goku","Vegeta","Luffy","Zoro",
   "Levi","Eren","Gojo","Itachi","Tanjiro","Zenitsu","Inosuke","Mikasa"
 ]
 
 // 🌟 RAROS
-const raros = [
+let raros = [
   "Madara (Raro)",
   "Sukuna (Raro)",
   "Goku Ultra Instinto (Raro)",
@@ -27,7 +27,7 @@ const raros = [
   "Levi Ackerman Elite (Raro)"
 ]
 
-// 🎲 PROBABILIDAD DE RARO (10%)
+// 🎲 PROBABILIDAD DE RARO
 const chanceRaro = () => Math.random() < 0.10
 
 // ======================
@@ -80,8 +80,6 @@ let handler = async (m, { conn, text, command }) => {
       return m.reply(`⚠️ Ya tienes a *${db[jid]}*`)
 
     let pool = chanceRaro() ? raros : normales
-
-    // filtrar libres
     let disponibles = pool.filter(p => !Object.values(db).includes(p))
 
     if (!disponibles.length)
@@ -155,43 +153,43 @@ let handler = async (m, { conn, text, command }) => {
   }
 
   // ======================
-  // 👑 OWNER: DAR PERSONAJE
+  // 👑 OWNER: AGREGAR PJ
   // ======================
 
-  if (command === 'give') {
+  if (command === 'addpj') {
 
-    if (!isOwner)
-      return m.reply('❌ Solo owners.')
+    if (!isOwner) return m.reply('❌ Solo owners.')
 
-    if (!m.mentionedJid[0])
-      return m.reply('⚠️ Menciona usuario.')
+    if (!text) return m.reply('⚠️ Escribe el nombre.')
 
-    let target = m.mentionedJid[0]
-    let personaje = text.replace(/@\d+/g,'').trim()
+    normales.push(text.trim())
 
-    if (!personaje)
-      return m.reply("⚠️ Escribe personaje.")
-
-    if (Object.values(db).includes(personaje))
-      return m.reply("❌ Ya está ocupado.")
-
-    db[target] = personaje
-    saveDB(db)
-
-    return conn.sendMessage(m.chat, {
-      text: `👑 Personaje asignado\n*${personaje}* → @${target.split('@')[0]}`,
-      mentions: [target]
-    })
+    return m.reply(`✅ Personaje agregado: *${text}*`)
   }
 
   // ======================
-  // 👑 OWNER: QUITAR
+  // 👑 OWNER: ELIMINAR PJ
   // ======================
 
-  if (command === 'removechar') {
+  if (command === 'delpj') {
 
-    if (!isOwner)
-      return m.reply('❌ Solo owners.')
+    if (!isOwner) return m.reply('❌ Solo owners.')
+
+    if (!text) return m.reply('⚠️ Escribe el nombre.')
+
+    normales = normales.filter(p => p.toLowerCase() !== text.toLowerCase())
+    raros = raros.filter(p => p.toLowerCase() !== text.toLowerCase())
+
+    return m.reply(`❌ Personaje eliminado: *${text}*`)
+  }
+
+  // ======================
+  // 👑 OWNER: RESET USER
+  // ======================
+
+  if (command === 'resetpj') {
+
+    if (!isOwner) return m.reply('❌ Solo owners.')
 
     if (!m.mentionedJid[0])
       return m.reply('⚠️ Menciona usuario.')
@@ -205,13 +203,34 @@ let handler = async (m, { conn, text, command }) => {
     saveDB(db)
 
     return conn.sendMessage(m.chat, {
-      text: `❌ Personaje removido a @${target.split('@')[0]}`,
+      text: `🧹 Personaje eliminado a @${target.split('@')[0]}`,
       mentions: [target]
     })
   }
 
   // ======================
-  // 👑 OWNER: RESET TODO
+  // 👑 OWNER: LISTA GLOBAL
+  // ======================
+
+  if (command === 'listpj') {
+
+    let texto = "📊 PERSONAJES EN USO\n\n"
+
+    for (let user in db) {
+      texto += `👤 @${user.split('@')[0]} → ${db[user]}\n`
+    }
+
+    if (Object.keys(db).length === 0)
+      return m.reply("❌ Nadie tiene personajes.")
+
+    return conn.sendMessage(m.chat, {
+      text: texto,
+      mentions: Object.keys(db)
+    })
+  }
+
+  // ======================
+  // 👑 OWNER: RESET TOTAL
   // ======================
 
   if (command === 'resetchars') {
@@ -231,8 +250,10 @@ handler.command = [
   'mipersonaje',
   'drop',
   'cambiar',
-  'give',
-  'removechar',
+  'addpj',
+  'delpj',
+  'resetpj',
+  'listpj',
   'resetchars'
 ]
 

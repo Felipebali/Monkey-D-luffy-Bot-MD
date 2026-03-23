@@ -1,24 +1,25 @@
 // 📂 plugins/resetlink.js — Reset link solo para owners 🔗
 
-console.log('[Plugin] resetlink cargado') // <-- Log para confirmar carga en Termux
-
-const owners = ['59896026646@s.whatsapp.net', '59898719147@s.whatsapp.net'];
+console.log('[Plugin] resetlink cargado')
 
 let handler = async (m, { conn, isOwner, isBotAdmin }) => {
   try {
-    if (!m.isGroup) return m.reply('❌ Este comando solo funciona en grupos.')
+    if (!m.isGroup) 
+      return m.reply('❌ Este comando solo funciona en grupos.')
 
-    const sender = m.sender
-    if (!owners.includes(sender)) return
+    // 🔐 Usa el sistema del bot (MUY IMPORTANTE)
+    if (!isOwner) 
+      return m.reply('❌ Este comando es solo para owners.')
 
-    if (!isBotAdmin) return m.reply('❌ Necesito ser administrador del grupo para resetear el link.')
+    if (!isBotAdmin) 
+      return m.reply('❌ Necesito ser administrador del grupo para resetear el link.')
 
-    // Resetea el link del grupo
-    const res = await conn.groupRevokeInvite(m.chat)
+    // 🔗 Resetear link
+    const code = await conn.groupRevokeInvite(m.chat)
 
-    // Envía el nuevo link
+    // 📩 Enviar nuevo link
     await conn.sendMessage(m.chat, { 
-      text: `🔗 *Link del grupo reseteado correctamente*\n\nNuevo link:\nhttps://chat.whatsapp.com/${res}`
+      text: `🔗 *Link del grupo reseteado correctamente*\n\nNuevo link:\nhttps://chat.whatsapp.com/${code}`
     })
 
   } catch (e) {
@@ -27,16 +28,14 @@ let handler = async (m, { conn, isOwner, isBotAdmin }) => {
   }
 }
 
-// Compatibilidad con distintos loaders
-handler.command = ['resetlink'] // array de comandos
-handler.command = handler.command || /^\.resetlink$/i // regex alternativa
+// ✅ COMANDOS (IMPORTANTE: no duplicar)
+handler.command = /^resetlink$/i
 
 handler.help = ['resetlink']
-handler.tags = ['owner', 'group']
+handler.tags = ['owner']
 handler.group = true
 
-// Meta para loader: solo owners
+// 🔐 Restricción real
 handler.owner = true
-handler.rowner = true
 
 export default handler

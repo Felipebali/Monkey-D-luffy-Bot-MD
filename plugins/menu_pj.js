@@ -22,8 +22,8 @@ let handler = async (m, { conn }) => {
 ┃ 💔 *.drop*
 ┃ ➤ Liberar tu personaje
 ┃
-┃ 🔄 *.cambiar <nombre>*
-┃ ➤ Cambiar personaje manualmente
+┃ 🔄 *.cambiar*
+┃ ➤ Cambiar personaje automáticamente
 ┃
 ┃━━━━━━━━━━━━━━
 ┃ 👑 *PODER DE LOS OWNERS*

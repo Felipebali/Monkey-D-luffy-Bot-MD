@@ -1,44 +1,58 @@
-// 📂 plugins/menu-personajes.js — MENÚ PERSONAJES 🎌
+// 📂 plugins/menu-personajes.js — MENÚ PERSONAJES 🎌✨
 
 let handler = async (m, { conn }) => {
 
   let menu = `
-╭━━━〔 🎌 SISTEMA DE PERSONAJES 〕━━━⬣
-┃
-┃ 🐉 *COMANDOS PRINCIPALES*
-┃
-┃ 📜 .personajes
-┃ ➤ Ver lista de personajes disponibles
-┃
-┃ 🎯 .claim <nombre>
-┃ ➤ Reclamar un personaje
-┃
-┃ 👤 .mipersonaje
-┃ ➤ Ver tu personaje actual
-┃
-┃ 💔 .drop
-┃ ➤ Abandonar tu personaje
-┃
-┃ 🔄 .cambiar <nombre>
-┃ ➤ Cambiar de personaje
+╭━━━〔 🎴 *GREMIO ANIME* 〕━━━⬣
+┃ 🐉 Bienvenido al sistema de invocación
+┃ ⚔️ Recluta, colecciona y domina personajes
 ┃
 ┃━━━━━━━━━━━━━━
-┃ 👑 *COMANDOS DE OWNER*
+┃ 🎌 *COMANDOS PRINCIPALES*
 ┃
-┃ ⚡ .addpj <nombre>
-┃ ➤ Agregar personaje nuevo
+┃ 📜 *.personajes*
+┃ ➤ Ver personajes disponibles
 ┃
-┃ ❌ .delpj <nombre>
-┃ ➤ Eliminar personaje
+┃ 🎲 *.claim*
+┃ ➤ Invocar un personaje aleatorio
 ┃
-┃ 🔓 .resetpj @user
+┃ 👤 *.mipersonaje*
+┃ ➤ Ver tu personaje actual
+┃
+┃ 💔 *.drop*
+┃ ➤ Liberar tu personaje
+┃
+┃ 🔄 *.cambiar <nombre>*
+┃ ➤ Cambiar personaje manualmente
+┃
+┃━━━━━━━━━━━━━━
+┃ 👑 *PODER DE LOS OWNERS*
+┃
+┃ ⚡ *.addpj <nombre>*
+┃ ➤ Invocar nuevo personaje al mundo
+┃
+┃ ❌ *.delpj <nombre>*
+┃ ➤ Borrar personaje del sistema
+┃
+┃ 🔓 *.resetpj @user*
 ┃ ➤ Quitar personaje a un usuario
 ┃
-┃ 📊 .listpj
-┃ ➤ Ver quién tiene cada personaje
+┃ 📊 *.listpj*
+┃ ➤ Ver todos los personajes en uso
 ┃
-╰━━━━━━━━━━━━━━━━⬣
-  `.trim()
+┃ 🧹 *.resetchars*
+┃ ➤ Liberar TODOS los personajes
+┃
+┃━━━━━━━━━━━━━━
+┃ 🌟 *RAREZA*
+┃ ✨ Normales → Comunes
+┃ 🌟 Raros → 10% probabilidad
+┃
+┃ 🎴 ¡Colecciona los más poderosos!
+╰━━━━━━━━━━━━━━━━━━⬣
+
+🐾 *FelixCat-Bot* — Sistema Anime RPG ⚔️
+`.trim()
 
   conn.sendMessage(m.chat, { text: menu }, { quoted: m })
 }

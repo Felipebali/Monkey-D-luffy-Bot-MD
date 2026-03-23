@@ -23,7 +23,7 @@ const statsBase = {
   "Inosuke": { atk: 88, def: 65, hp: 105 },
   "Mikasa": { atk: 86, def: 72, hp: 100 },
 
-  // 🌟 RAROS
+  // 🌟 RAROS (OP)
   "Madara (Raro)": { atk: 110, def: 100, hp: 130 },
   "Sukuna (Raro)": { atk: 115, def: 95, hp: 130 },
   "Goku Ultra Instinto (Raro)": { atk: 130, def: 110, hp: 140 },
@@ -31,23 +31,39 @@ const statsBase = {
   "Levi Ackerman Elite (Raro)": { atk: 105, def: 90, hp: 110 }
 }
 
-// ⚔️ ATAQUE + CRÍTICO
+// ⚔️ SISTEMA DE ATAQUE REALISTA
 function atacar(p1, p2) {
-  let base = Math.max(5, p1.atk - Math.floor(p2.def / 2))
 
-  // 💥 CRÍTICO (20%)
-  if (Math.random() < 0.2) {
-    return { daño: base * 2, crit: true }
+  // ⚡ variación aleatoria
+  let variacion = 0.85 + Math.random() * 0.3
+
+  // 🧠 cálculo balanceado
+  let dañoBase = (p1.atk * variacion) - (p2.def * 0.6)
+
+  let daño = Math.max(8, Math.floor(dañoBase))
+
+  // 💥 crítico
+  let crit = false
+  if (Math.random() < 0.15) {
+    daño = Math.floor(daño * 1.8)
+    crit = true
   }
 
-  return { daño: base, crit: false }
+  // 🌀 esquiva
+  let dodge = false
+  if (Math.random() < 0.10) {
+    daño = 0
+    dodge = true
+  }
+
+  return { daño, crit, dodge }
 }
 
 let handler = async (m, { conn }) => {
 
   const db = loadDB()
 
-  // 🔥 DETECTAR USUARIO (MENCIÓN O RESPUESTA)
+  // 🔥 detectar rival (mención o respuesta)
   let target = m.mentionedJid?.[0] || (m.quoted ? m.quoted.sender : null)
 
   if (!target)
@@ -70,6 +86,10 @@ let handler = async (m, { conn }) => {
   let hp1 = s1.hp
   let hp2 = s2.hp
 
+  // 🌟 BONUS RAROS
+  if (p1.includes("(Raro)")) hp1 += 20
+  if (p2.includes("(Raro)")) hp2 += 20
+
   let log = `╭━━━〔 ⚔️ BATALLA LEGENDARIA 〕━━━⬣
 ┃ 👤 @${user.split('@')[0]} → *${p1}*
 ┃ 🆚
@@ -88,8 +108,18 @@ let handler = async (m, { conn }) => {
     log += `
 
 🔥 TURNO ${i}
-⚔️ ${p1} → -${atk1.daño} HP ${atk1.crit ? "💥 CRÍTICO!" : ""}
-⚔️ ${p2} → -${atk2.daño} HP ${atk2.crit ? "💥 CRÍTICO!" : ""}`
+
+⚔️ ${p1} → ${
+      atk1.dodge 
+        ? "🌀 ESQUIVADO" 
+        : `-${atk1.daño} HP ${atk1.crit ? "💥 CRÍTICO!" : ""}`
+    }
+
+⚔️ ${p2} → ${
+      atk2.dodge 
+        ? "🌀 ESQUIVADO" 
+        : `-${atk2.daño} HP ${atk2.crit ? "💥 CRÍTICO!" : ""}`
+    }`
   }
 
   log += `

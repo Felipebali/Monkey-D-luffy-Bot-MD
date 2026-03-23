@@ -35,7 +35,6 @@ const loadHermanos = () => JSON.parse(fs.readFileSync(hermanosFile))
 // =====================
 
 const calcularEdad = fecha => {
-
 const [d,m,a] = fecha.split('/').map(Number)
 if(!d || !m || !a) return null
 
@@ -52,7 +51,6 @@ return edad
 }
 
 const signoZodiacal = fecha => {
-
 const [d,m] = fecha.split('/').map(Number)
 if(!d || !m) return null
 
@@ -75,22 +73,16 @@ const signos = [
 return d <= signos[m-1][1]
 ? signos[m-1][0]
 : signos[m][0]
-
 }
 
 const tiempoRelacion = fecha => {
-
 if(!fecha) return null
-
 const diff = Date.now() - Number(fecha)
 const dias = Math.floor(diff / 86400000)
-
 return `${dias} día(s)`
-
 }
 
 const diasParaCumple = fecha => {
-
 const [d,m] = fecha.split('/').map(Number)
 if(!d || !m) return null
 
@@ -98,12 +90,9 @@ const hoy = new Date()
 const año = hoy.getFullYear()
 
 let cumple = new Date(año,m-1,d)
-
-if(cumple < hoy)
-cumple = new Date(año+1,m-1,d)
+if(cumple < hoy) cumple = new Date(año+1,m-1,d)
 
 return Math.ceil((cumple-hoy)/86400000)
-
 }
 
 // =====================
@@ -126,7 +115,6 @@ const username = jid.split('@')[0]
 // =====================
 
 if(!perfiles[jid]){
-
 perfiles[jid] = {
 registered:Date.now(),
 joinGroup:null,
@@ -135,7 +123,6 @@ genero:null,
 birth:null,
 bio:null
 }
-
 }
 
 const user = perfiles[jid]
@@ -162,15 +149,10 @@ const isAdmin = m.isAdmin || false
 // =====================
 
 if(command==='bio'){
-
 if(!text) return m.reply('✍️ Escribe tu nueva bio.')
-
 user.bio = text.trim()
-
 savePerfiles(perfiles)
-
 return m.reply('✅ Bio actualizada.')
-
 }
 
 // =====================
@@ -178,15 +160,10 @@ return m.reply('✅ Bio actualizada.')
 // =====================
 
 if(command==='genero'){
-
 if(!text) return m.reply('⚧️ Escribe tu género.')
-
 user.genero = text.trim()
-
 savePerfiles(perfiles)
-
 return m.reply('✅ Género actualizado.')
-
 }
 
 // =====================
@@ -194,37 +171,26 @@ return m.reply('✅ Género actualizado.')
 // =====================
 
 if(command==='setbr'){
-
 if(!text) return m.reply('🎂 Usa formato: .setbr 31/12/1998')
-
 user.birth = text.trim()
-
 savePerfiles(perfiles)
-
 return m.reply('✅ Fecha de nacimiento guardada.')
-
 }
 
 // =====================
-// OTORGAR INSIGNIA
+// OTORGAR INSIGNIA (MEJORADO)
 // =====================
 
 if(command==='otorgar'){
 
-if(!m.mentionedJid[0])
-return m.reply('⚠️ Menciona a un usuario.')
+const target = m.mentionedJid?.[0] || m.quoted?.sender
+if(!target) return m.reply('⚠️ Menciona o responde a un usuario.')
 
-const target = m.mentionedJid[0]
 const insignia = text.replace(/@\d+/g,'').trim()
+if(!insignia) return m.reply('⚠️ Escribe la insignia.')
 
-if(!insignia)
-return m.reply('⚠️ Escribe la insignia.')
-
-if(!perfiles[target])
-perfiles[target]={insignias:[]}
-
-if(!perfiles[target].insignias)
-perfiles[target].insignias=[]
+if(!perfiles[target]) perfiles[target]={insignias:[]}
+if(!perfiles[target].insignias) perfiles[target].insignias=[]
 
 perfiles[target].insignias.push(insignia)
 
@@ -236,19 +202,17 @@ ${insignia}`,
 null,
 {mentions:[target]}
 )
-
 }
 
 // =====================
-// QUITAR INSIGNIA
+// QUITAR INSIGNIA (MEJORADO)
 // =====================
 
 if(command==='quitar'){
 
-if(!m.mentionedJid[0])
-return m.reply('⚠️ Menciona a un usuario.')
+const target = m.mentionedJid?.[0] || m.quoted?.sender
+if(!target) return m.reply('⚠️ Menciona o responde a un usuario.')
 
-const target = m.mentionedJid[0]
 const insignia = text.replace(/@\d+/g,'').trim()
 
 if(!perfiles[target]?.insignias?.length)
@@ -264,23 +228,18 @@ return m.reply(
 null,
 {mentions:[target]}
 )
-
 }
 
 // =====================
-// VER INSIGNIAS
+// INSIGNIAS
 // =====================
 
 if(command==='insignias'){
 
 const target = m.mentionedJid?.[0]
 
-// ver insignias de usuario
-
 if(target){
-
 const data = perfiles[target]
-
 if(!data?.insignias?.length)
 return m.reply('🏅 Este usuario no tiene insignias.')
 
@@ -293,36 +252,27 @@ ${lista}`,
 null,
 {mentions:[target]}
 )
-
 }
-
-// listar todos
 
 let texto = '🏅 USUARIOS CON INSIGNIAS\n\n'
 let mentions = []
 
 for(const id in perfiles){
-
 const data = perfiles[id]
 
 if(data.insignias && data.insignias.length){
-
 texto += `👤 @${id.split('@')[0]}
 ${data.insignias.join(' ')}
 
 `
-
 mentions.push(id)
-
 }
-
 }
 
 if(!mentions.length)
 return m.reply('❌ Nadie tiene insignias.')
 
 return m.reply(texto.trim(),null,{mentions})
-
 }
 
 // =====================
@@ -340,7 +290,6 @@ let parejaJid=null
 const data = parejas[jid]
 
 if(data?.pareja){
-
 parejaJid=data.pareja
 
 estadoTexto =
@@ -354,7 +303,6 @@ amorTexto=`💖 Amor: ${data.amor || 0}`
 tiempoTexto=data.relacionFecha
 ?`⏳ Tiempo juntos: ${tiempoRelacion(data.relacionFecha)}`
 :''
-
 }
 
 // hermanos
@@ -366,15 +314,12 @@ let hermanoJid=null
 const dataHermano = hermanos[jid]
 
 if(dataHermano?.hermano){
-
 hermanoJid=dataHermano.hermano
 
 hermanoTexto=`🧬 Hermano: @${hermanoJid.split('@')[0]}`
-
 tiempoHermano=dataHermano.fecha
 ?`⏳ Tiempo de hermandad: ${tiempoRelacion(dataHermano.fecha)}`
 :''
-
 }
 
 // edad
@@ -384,7 +329,6 @@ const signo=user.birth?signoZodiacal(user.birth):null
 const diasCumple=user.birth?diasParaCumple(user.birth):null
 
 const textoPerfil = `
-
 👤 PERFIL
 
 @${username}
@@ -410,13 +354,11 @@ ${signo?`🔮 Signo: ${signo}`:''}
 ${diasCumple?`⏳ Faltan ${diasCumple} día(s) para tu cumpleaños`:''}
 
 📝 Bio: ${user.bio || 'Sin bio'}
-
 `.trim()
 
 savePerfiles(perfiles)
 
 const mentions=[jid]
-
 if(parejaJid) mentions.push(parejaJid)
 if(hermanoJid) mentions.push(hermanoJid)
 
@@ -427,7 +369,6 @@ pp = await conn.profilePictureUrl(jid,'image')
 }catch{}
 
 if(pp){
-
 return conn.sendMessage(
 m.chat,
 {
@@ -437,18 +378,14 @@ mentions
 },
 {quoted:m}
 )
-
 }
 
 return m.reply(textoPerfil,null,{mentions})
-
 }
 
 }catch(e){
-
 console.error(e)
 m.reply('❌ Error en perfil.')
-
 }
 
 }

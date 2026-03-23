@@ -1,33 +1,39 @@
-// AUTO-ADMIN SILENCIOSO
-// Activador: "aa" → promote, "ad" → demote
-// SOLO ROOT OWNERS reales
+// 📂 plugins/autoadmin.js — AUTO ADMIN SILENCIOSO 👑
 
-let handler = async (m, { conn }) => {
+let handler = async (m, { conn, isBotAdmin }) => {
   try {
     if (!m.isGroup) return
 
-    // 🔐 Verificación REAL de owners desde config.js
-    const owners = (global.owner || []).map(v => String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net')
+    // 🔐 Owners reales
+    const owners = (global.owner || []).map(v => {
+      if (Array.isArray(v)) v = v[0]
+      return String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net'
+    })
 
     const sender = conn.decodeJid ? conn.decodeJid(m.sender) : m.sender
     if (!owners.includes(sender)) return
 
-    const texto = (m.text || '').trim().toLowerCase()
+    // ⚠️ Verificar si el bot es admin
+    if (!isBotAdmin) return
 
-    if (texto === 'aa') {
-      await conn.groupParticipantsUpdate(
-        m.chat,
-        [sender],
-        'promote'
-      )
+    // 🧠 Detectar texto correctamente
+    const texto =
+      m.text ||
+      m.body ||
+      m.message?.conversation ||
+      m.message?.extendedTextMessage?.text ||
+      ''
+
+    const cmd = texto.trim().toLowerCase()
+
+    // 🔥 PROMOTE
+    if (cmd === 'aa') {
+      await conn.groupParticipantsUpdate(m.chat, [sender], 'promote')
     }
 
-    if (texto === 'ad') {
-      await conn.groupParticipantsUpdate(
-        m.chat,
-        [sender],
-        'demote'
-      )
+    // 🔥 DEMOTE
+    if (cmd === 'ad') {
+      await conn.groupParticipantsUpdate(m.chat, [sender], 'demote')
     }
 
   } catch (e) {
@@ -35,8 +41,8 @@ let handler = async (m, { conn }) => {
   }
 }
 
-// Detecta "aa" o "ad" sin prefijo
-handler.customPrefix = /^\s*(aa|ad)\s*$/i
+// 👇 IMPORTANTE
+handler.customPrefix = /^(aa|ad)$/i
 handler.command = new RegExp()
 handler.group = true
 

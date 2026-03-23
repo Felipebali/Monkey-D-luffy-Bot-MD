@@ -1,4 +1,4 @@
-// 📂 plugins/personajes.js — Sistema PRO Anime 🐉👑
+// 📂 plugins/personajes.js — Sistema PRO Anime GOD MODE 🐉👑✨
 
 import fs from 'fs'
 import path from 'path'
@@ -12,13 +12,13 @@ if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify({}, null, 2))
 const loadDB = () => JSON.parse(fs.readFileSync(file))
 const saveDB = (data) => fs.writeFileSync(file, JSON.stringify(data, null, 2))
 
-// 🎌 NORMALES
+// 🎌 PERSONAJES NORMALES
 let normales = [
   "Naruto","Sasuke","Goku","Vegeta","Luffy","Zoro",
   "Levi","Eren","Gojo","Itachi","Tanjiro","Zenitsu","Inosuke","Mikasa"
 ]
 
-// 🌟 RAROS
+// 🌟 PERSONAJES RAROS
 let raros = [
   "Madara (Raro)",
   "Sukuna (Raro)",
@@ -27,19 +27,18 @@ let raros = [
   "Levi Ackerman Elite (Raro)"
 ]
 
-// 🎲 PROBABILIDAD DE RARO
+// 🎲 PROBABILIDAD GACHA
 const chanceRaro = () => Math.random() < 0.10
 
 // ======================
 // HANDLER
 // ======================
 
-let handler = async (m, { conn, text, command }) => {
+let handler = async (m, { conn, command }) => {
 
   const db = loadDB()
   const jid = m.sender
 
-  // 🔐 OWNERS
   const owners = (global.owner || []).map(v => {
     if (Array.isArray(v)) v = v[0]
     return String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net'
@@ -48,42 +47,56 @@ let handler = async (m, { conn, text, command }) => {
   const isOwner = owners.includes(jid)
 
   // ======================
-  // 📜 VER LISTA
+  // 📜 LISTA OTAKU
   // ======================
 
   if (command === 'personajes') {
 
-    let texto = "🎌 PERSONAJES\n\n"
+    let texto = `
+╭━━━〔 🌌 PORTAL DEL ANIME 〕━━━⬣
+┃ "Solo los elegidos pueden invocar..."
+┃
+┃ 🟢 *CLASE NORMAL*
+`
 
-    texto += "🟢 NORMALES:\n"
     normales.forEach(p => {
       let dueño = Object.keys(db).find(u => db[u] === p)
-      texto += dueño ? `❌ ${p}\n` : `✅ ${p}\n`
+      texto += dueño 
+      ? `┃ ❌ ${p} → Ya tiene dueño... 💀\n`
+      : `┃ ✨ ${p} → Disponible para invocar\n`
     })
 
-    texto += "\n🌟 RAROS:\n"
+    texto += `┃
+┃ 🌟 *CLASE LEGENDARIA*
+┃ "Solo el destino decide si te toca..."
+`
+
     raros.forEach(p => {
       let dueño = Object.keys(db).find(u => db[u] === p)
-      texto += dueño ? `🔒 ${p}\n` : `✨ ${p}\n`
+      texto += dueño 
+      ? `┃ 🔒 ${p} → Sellado por otro usuario\n`
+      : `┃ 🌟 ${p} → Energía detectable...\n`
     })
+
+    texto += `╰━━━━━━━━━━━━━━━━⬣`
 
     return m.reply(texto)
   }
 
   // ======================
-  // 🎲 CLAIM RANDOM
+  // 🎲 CLAIM GACHA
   // ======================
 
   if (command === 'claim') {
 
     if (db[jid])
-      return m.reply(`⚠️ Ya tienes a *${db[jid]}*`)
+      return m.reply(`⚠️ Ya tienes un contrato activo con *${db[jid]}* 🐉`)
 
     let pool = chanceRaro() ? raros : normales
     let disponibles = pool.filter(p => !Object.values(db).includes(p))
 
     if (!disponibles.length)
-      return m.reply("❌ No hay personajes disponibles.")
+      return m.reply("💀 El sistema gacha ha colapsado... no quedan personajes.")
 
     let personaje = disponibles[Math.floor(Math.random() * disponibles.length)]
 
@@ -91,7 +104,16 @@ let handler = async (m, { conn, text, command }) => {
     saveDB(db)
 
     return m.reply(
-      `🎉 Has obtenido: *${personaje}*\n${raros.includes(personaje) ? "🌟 ¡PERSONAJE RARO!" : ""}`
+`╭━━━〔 🎲 INVOCACIÓN GACHA 〕━━━⬣
+┃
+┃ 🔮 Canalizando chakra...
+┃ ⚡ Abriendo portal dimensional...
+┃
+┃ 🐉 *${personaje}* ha respondido a tu llamado
+┃
+${raros.includes(personaje) ? "┃ 🌟✨ ¡HAS DESPERTADO UNA ENTIDAD LEGENDARIA! ✨🌟\n┃" : ""}
+┃ "A partir de ahora... luchará a tu lado"
+╰━━━━━━━━━━━━━━━━⬣`
     )
   }
 
@@ -102,29 +124,42 @@ let handler = async (m, { conn, text, command }) => {
   if (command === 'mipersonaje') {
 
     if (!db[jid])
-      return m.reply("❌ No tienes personaje.")
+      return m.reply("❌ No tienes ningún contrato espiritual activo.")
 
-    return m.reply(`🐉 Tu personaje: *${db[jid]}*`)
+    return m.reply(
+`╭━━━〔 🐉 VÍNCULO ACTIVO 〕━━━⬣
+┃
+┃ Tu espíritu aliado es:
+┃ ✨ *${db[jid]}*
+┃
+┃ "El lazo entre ustedes es irrompible..."
+╰━━━━━━━━━━━━━━━━⬣`
+    )
   }
 
   // ======================
-  // 🗑️ DROP
+  // 💔 DROP
   // ======================
 
   if (command === 'drop') {
 
     if (!db[jid])
-      return m.reply("❌ No tienes personaje.")
+      return m.reply("❌ No tienes personaje que liberar.")
 
     let viejo = db[jid]
     delete db[jid]
     saveDB(db)
 
-    return m.reply(`💔 Perdiste a *${viejo}*`)
+    return m.reply(
+`💔 Has roto el contrato con *${viejo}*
+🌌 Su alma regresa al plano anime...
+
+"Algunos vínculos... no están destinados a durar"`
+    )
   }
 
   // ======================
-  // 🔄 CAMBIAR AUTOMÁTICO
+  // 🔄 CAMBIO AUTOMÁTICO
   // ======================
 
   if (command === 'cambiar') {
@@ -134,14 +169,11 @@ let handler = async (m, { conn, text, command }) => {
 
     let viejo = db[jid]
 
-    // elegir pool con probabilidad
     let pool = chanceRaro() ? raros : normales
-
     let disponibles = pool.filter(p =>
       !Object.values(db).includes(p) && p !== viejo
     )
 
-    // fallback si no hay disponibles
     if (!disponibles.length) {
       disponibles = [...normales, ...raros].filter(p =>
         !Object.values(db).includes(p) && p !== viejo
@@ -149,7 +181,7 @@ let handler = async (m, { conn, text, command }) => {
     }
 
     if (!disponibles.length)
-      return m.reply("❌ No hay personajes disponibles para cambiar.")
+      return m.reply("💀 No hay entidades disponibles en el sistema.")
 
     let personaje = disponibles[Math.floor(Math.random() * disponibles.length)]
 
@@ -157,80 +189,60 @@ let handler = async (m, { conn, text, command }) => {
     saveDB(db)
 
     return m.reply(
-      `🔄 Cambiaste *${viejo}* por *${personaje}*\n${raros.includes(personaje) ? "🌟 ¡PERSONAJE RARO!" : ""}`
+`╭━━━〔 🔄 REENCARNACIÓN 〕━━━⬣
+┃
+┃ ⚔️ *${viejo}* ha desaparecido...
+┃ 🌌 Nuevo vínculo establecido:
+┃ ✨ *${personaje}*
+┃
+${raros.includes(personaje) ? "┃ 🌟 ¡REENCARNACIÓN LEGENDARIA ACTIVADA! 🔥\n┃" : ""}
+┃ "Tu destino acaba de cambiar..."
+╰━━━━━━━━━━━━━━━━⬣`
     )
   }
 
   // ======================
-  // 👑 OWNER: AGREGAR PJ
+  // 👑 OWNER
   // ======================
 
   if (command === 'addpj') {
-
-    if (!isOwner) return m.reply('❌ Solo owners.')
-
-    if (!text) return m.reply('⚠️ Escribe el nombre.')
+    if (!isOwner) return m.reply('❌ Solo los dioses pueden crear vida 👑')
 
     normales.push(text.trim())
-
-    return m.reply(`✅ Personaje agregado: *${text}*`)
+    return m.reply(`👑 Has creado un nuevo ser:\n✨ *${text}*`)
   }
 
-  // ======================
-  // 👑 OWNER: ELIMINAR PJ
-  // ======================
-
   if (command === 'delpj') {
-
-    if (!isOwner) return m.reply('❌ Solo owners.')
-
-    if (!text) return m.reply('⚠️ Escribe el nombre.')
+    if (!isOwner) return m.reply('❌ Solo los dioses pueden borrar existencia 👑')
 
     normales = normales.filter(p => p.toLowerCase() !== text.toLowerCase())
     raros = raros.filter(p => p.toLowerCase() !== text.toLowerCase())
 
-    return m.reply(`❌ Personaje eliminado: *${text}*`)
+    return m.reply(`💀 Has borrado a *${text}* del universo`)
   }
 
-  // ======================
-  // 👑 OWNER: RESET USER
-  // ======================
-
   if (command === 'resetpj') {
-
-    if (!isOwner) return m.reply('❌ Solo owners.')
-
-    if (!m.mentionedJid[0])
-      return m.reply('⚠️ Menciona usuario.')
+    if (!isOwner) return m.reply('❌ Solo los dioses 👑')
 
     let target = m.mentionedJid[0]
-
-    if (!db[target])
-      return m.reply('❌ No tiene personaje.')
-
     delete db[target]
     saveDB(db)
 
-    return conn.sendMessage(m.chat, {
-      text: `🧹 Personaje eliminado a @${target.split('@')[0]}`,
-      mentions: [target]
-    })
+    return m.reply(`🧹 Has borrado el vínculo de ese usuario.`)
   }
-
-  // ======================
-  // 👑 OWNER: LISTA GLOBAL
-  // ======================
 
   if (command === 'listpj') {
 
-    let texto = "📊 PERSONAJES EN USO\n\n"
+    if (!Object.keys(db).length)
+      return m.reply("❌ Nadie ha invocado personajes.")
+
+    let texto = `╭━━━〔 📊 REGISTRO DEL MULTIVERSO 〕━━━⬣\n\n`
 
     for (let user in db) {
       texto += `👤 @${user.split('@')[0]} → ${db[user]}\n`
     }
 
-    if (Object.keys(db).length === 0)
-      return m.reply("❌ Nadie tiene personajes.")
+    texto += `\n╰━━━━━━━━━━━━━━━━⬣`
 
     return conn.sendMessage(m.chat, {
       text: texto,
@@ -238,17 +250,11 @@ let handler = async (m, { conn, text, command }) => {
     })
   }
 
-  // ======================
-  // 👑 OWNER: RESET TOTAL
-  // ======================
-
   if (command === 'resetchars') {
-
-    if (!isOwner)
-      return m.reply('❌ Solo owners.')
+    if (!isOwner) return m.reply('❌ Solo dioses 👑')
 
     saveDB({})
-    return m.reply('🧹 Todos los personajes fueron liberados.')
+    return m.reply("🌌 REINICIO TOTAL: El universo ha sido reiniciado.")
   }
 
 }

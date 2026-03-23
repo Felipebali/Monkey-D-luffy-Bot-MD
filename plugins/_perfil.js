@@ -178,7 +178,7 @@ return m.reply('✅ Fecha de nacimiento guardada.')
 }
 
 // =====================
-// OTORGAR INSIGNIA (MEJORADO)
+// OTORGAR INSIGNIA
 // =====================
 
 if(command==='otorgar'){
@@ -205,7 +205,7 @@ null,
 }
 
 // =====================
-// QUITAR INSIGNIA (MEJORADO)
+// QUITAR INSIGNIA
 // =====================
 
 if(command==='quitar'){
@@ -305,7 +305,9 @@ tiempoTexto=data.relacionFecha
 :''
 }
 
-// hermanos
+// =====================
+// HERMANOS PRO 🔥
+// =====================
 
 let hermanoTexto=''
 let tiempoHermano=''
@@ -313,16 +315,33 @@ let hermanoJid=null
 
 const dataHermano = hermanos[jid]
 
-if(dataHermano?.hermano){
-hermanoJid=dataHermano.hermano
+if (dataHermano?.hermano) {
+hermanoJid = dataHermano.hermano
 
-hermanoTexto=`🧬 Hermano: @${hermanoJid.split('@')[0]}`
-tiempoHermano=dataHermano.fecha
-?`⏳ Tiempo de hermandad: ${tiempoRelacion(dataHermano.fecha)}`
-:''
+const nivel = dataHermano.nivel || 0
+const interacciones = dataHermano.interacciones || 0
+
+const rango = (nivel) => {
+if (nivel >= 200) return '🔥 Hermanos Legendarios'
+if (nivel >= 120) return '💪 Hermanos Fuertes'
+if (nivel >= 60) return '🤝 Hermanos Reales'
+if (nivel >= 30) return '🙂 Hermanos Cercanos'
+return '👶 Hermanos Nuevos'
 }
 
-// edad
+hermanoTexto = `🧬 Hermano: @${hermanoJid.split('@')[0]}
+💪 Nivel: ${nivel}
+🏅 Rango: ${rango(nivel)}
+🎮 Interacciones: ${interacciones}`
+
+tiempoHermano = dataHermano.hermandadFecha
+? `⏳ Tiempo de hermandad: ${tiempoRelacion(dataHermano.hermandadFecha)}`
+: ''
+}
+
+// =====================
+// RESTO
+// =====================
 
 const edad=user.birth?calcularEdad(user.birth):null
 const signo=user.birth?signoZodiacal(user.birth):null

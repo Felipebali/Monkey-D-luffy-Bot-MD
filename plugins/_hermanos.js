@@ -1,4 +1,4 @@
-// 🔹 handler hermanos completo — FELI 2026 PRO (FIX FINAL)
+// 🔹 handler hermanos completo — FELI 2026 PRO (FIXED)
 
 import fs from 'fs'
 import path from 'path'
@@ -12,10 +12,6 @@ if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify({}, null, 2))
 const loadDB = () => JSON.parse(fs.readFileSync(file))
 const saveDB = (data) => fs.writeFileSync(file, JSON.stringify(data, null, 2))
 
-// 🔥 FIX JID (CLAVE)
-const cleanJid = (jid) => jid?.split(':')[0]
-
-// 🔥 FIX OWNERS
 function getOwnersJid() {
   return (global.owner || [])
     .map(v => {
@@ -23,23 +19,18 @@ function getOwnersJid() {
       if (typeof v !== 'string') return null
       return v.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
     })
-    .map(jid => cleanJid(jid)) // 🔥 normaliza también owners
     .filter(Boolean)
 }
 
 let handler = async (m, { conn, command }) => {
 
   const db = loadDB()
-
-  // 🔥 FIX PRINCIPAL
-  const sender = cleanJid(conn.decodeJid(m.sender))
-
+  const sender = conn.decodeJid(m.sender)
   const ahora = Date.now()
   const ownersJid = getOwnersJid()
 
+  // 🔧 FIX: asegura que los campos siempre existan
   const getUser = (id) => {
-
-    id = cleanJid(id)
 
     if (!db[id]) db[id] = {}
 
@@ -55,12 +46,12 @@ let handler = async (m, { conn, command }) => {
   }
 
   const getTarget = () => {
-    if (m.mentionedJid?.length) return cleanJid(m.mentionedJid[0])
-    if (m.quoted?.sender) return cleanJid(m.quoted.sender)
+    if (m.mentionedJid?.length) return m.mentionedJid[0]
+    if (m.quoted?.sender) return m.quoted.sender
     return null
   }
 
-  const tag = (id) => '@' + cleanJid(id).split('@')[0]
+  const tag = (id) => '@' + id.split('@')[0]
 
   const fechaBonita = (ms) => {
     if (!ms) return 'Desconocida'
@@ -219,7 +210,7 @@ m,{mentions:[sender,proposer]})
 m,{mentions:[sender,broId]})
   }
 
-  // 🤜 INTERACCIONES (igual que antes)
+  // 🤜 INTERACCIONES
   if ([
     'abrazohermano',
     'proteger',
@@ -293,13 +284,91 @@ m,{mentions:[sender,user.hermano]})
 m,{mentions:[sender,user.hermano]})
   }
 
-  // 🏆 / 📜 / 🧹 (YA FUNCIONAN con el FIX)
-  if (['tophermanos','listahermanos','clearbro'].includes(command)) {
+  // 🏆 TOP
+  if (command === 'tophermanos') {
+
     if (!ownersJid.includes(sender))
       return m.reply('❌ Solo el dueño.')
+
+    const ranking = Object.entries(db)
+      .filter(([id,u]) => u.hermano && id < u.hermano)
+      .sort((a,b)=>b[1].nivel - a[1].nivel)
+      .slice(0,5)
+
+    let txt = '🏆 *TOP HERMANOS*\n\n'
+    let mentions = []
+
+    ranking.forEach(([id,u],i)=>{
+
+      txt += `🥇 *${i+1}° Lugar*
+${tag(id)} 🧬 ${tag(u.hermano)}
+💪 Nivel: ${u.nivel}
+🏅 ${rango(u.nivel)}
+
+`
+
+      mentions.push(id,u.hermano)
+    })
+
+    if (!mentions.length)
+      txt += '😹 No hay hermanos aún.'
+
+    return conn.reply(m.chat, txt.trim(), m, { mentions })
   }
 
-  // resto igual (no tocado)
+  // 📜 LISTA
+  if (command === 'listahermanos') {
+
+    if (!ownersJid.includes(sender))
+      return m.reply('❌ Solo el dueño.')
+
+    let texto = '🧬 *Hermanos activos*\n\n'
+    let mentions = []
+
+    for (let id in db) {
+
+      const user = db[id]
+
+      if (user.hermano && id < user.hermano) {
+
+        texto += `🤝 ${tag(id)} 🧬 ${tag(user.hermano)}
+💪 Nivel: ${user.nivel}
+
+`
+
+        mentions.push(id,user.hermano)
+      }
+    }
+
+    if (!mentions.length)
+      texto += '😹 No hay hermanos activos.'
+
+    return conn.reply(m.chat, texto.trim(), m, { mentions })
+  }
+
+  // 🧹 CLEAR
+  if (command === 'clearbro') {
+
+    if (!ownersJid.includes(sender))
+      return m.reply('❌ Solo el dueño.')
+
+    for (let id in db) {
+
+      db[id] = {
+        hermano: null,
+        propuesta: null,
+        propuestaFecha: null,
+        hermandadFecha: null,
+        nivel: 0,
+        interacciones: 0,
+        cooldown: 0
+      }
+    }
+
+    saveDB(db)
+
+    return m.reply('🧹 Todas las hermandades fueron eliminadas.')
+  }
 }
 
 handler.command = [

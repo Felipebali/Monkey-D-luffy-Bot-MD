@@ -1,8 +1,7 @@
-// 📂 plugins/menu.js — MENU PRO FelixCat 🐾✨
-
+// plugins/menu.js
 const botname = global.botname || '😸 FelixCat-Bot 😸';
 const creador = 'Anónimo🐼';
-const versionBot = '11.0 PRO';
+const versionBot = '10.6.1';
 
 let handler = async (m, { conn }) => {
   try {
@@ -13,113 +12,157 @@ let handler = async (m, { conn }) => {
     });
 
     let menu = `
-╔═══ 🐾 *${botname}* 🐾 ═══╗
-║ 👑 Creador: ${creador}
-║ ⚙️ Versión: ${versionBot}
-║ 🕒 ${fecha}
-║ 💬 ${saludo}
-╚═══════════════════════╝
+╭━━━ ✨ *CENTRO FELINO* ✨ ━━━╮
+│ 😺 *${botname}* 😺
+│ 👑 *Creador:* ${creador}
+│ ⚙️ *Versión:* ${versionBot}
+│ 💬 *${saludo}*
+│ ⏰ *Hora actual:* ${fecha}
+╰━━━━━━━━━━━━━━━━━━━━━━━╯
 
-🌐 *COMANDOS GENERALES*
-➤ 🔮 .horoscopo
-➤ 🌦️ .clima
-➤ 🕐 .hora
-➤ 🌍 .traducir
-➤ 🚨 .reportar
-➤ ✉️ .sug
+🌦️ *Consultas rápidas:*
+┃ 🔮 *.horoscopo <signo>*
+┃ 🚨 *.reportar <motivo>*
+┃ 🌍 *.clima <ciudad>*
+┃ 🕐 *.hora*
+┃ 🌐 *.traducir <idioma> <texto>*
+┃ ✉️ *.sug*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-📚 *MENÚS*
-➤ 🎮 .menuj
-➤ 👥 .menugp
-➤ 🔥 .menuhot
-➤ 👑 .mw
-➤ 🎌 .menupj
+┏━━━ 📚 *TIPOS DE MENÚ* ━━━┓
+┃ 🎮 *.menuj*
+┃ 👥 *.menugp*
+┃ 🔥 *.menuhot*
+┃ 👑 *.mw*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-━━━━━━━━━━━━━━━━━━━━
+┏━━━ 🎌 *ANIME / PERSONAJES* ━━━┓
+┃ 🎴 *.menupj*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-👤 *PERFIL*
-➤ 🪪 .perfil
-➤ 🎂 .setbr
-➤ 📝 .bio
-➤ 🚻 .genero
+┏━━━ 👤 *PERFIL DE USUARIO* ━━━┓
+┃ 🪪 *.perfil* – Ver tu perfil
+┃ 🎂 *.setbr 01/01/2001* – Fecha nacimiento
+┃ 📝 *.bio texto* – Biografía personal
+┃ 🚻 *.genero a elección* – Configurar género
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-🤝 *HERMANOS*
-➤ .hermano / .aceptarhermano
-➤ .rechazarhermano / .romperhermandad
-➤ .abrazohermano / .proteger
-➤ .chocarhermano / .entrenarhermano
-➤ .relacionhermano
+┏━━━ 🧬 *HERMANOS* ━━━┓
+┃ 🤝 *.hermano* – Proponer hermandad
+┃ ✅ *.aceptarhermano* – Aceptar propuesta
+┃ ❌ *.rechazarhermano* – Rechazar propuesta
+┃ 💔 *.romperhermandad* – Romper hermandad
+┃ 🫂 *.abrazohermano* – Abrazar a tu hermano
+┃ 🛡️ *.proteger* – Proteger a tu hermano
+┃ 🤜 *.chocarhermano* – Chocar puños
+┃ 🏋️ *.entrenarhermano* – Entrenar juntos
+┃ 📊 *.relacionhermano* – Ver estado de hermandad
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-💕 *RELACIONES*
-➤ 💘 .pareja / .aceptar / .rechazar
-➤ 💍 .casarse / .si / .no
-➤ 💔 .terminar / .divorcio
-➤ ❤️ .relacion
-➤ 💋 .besar / 🤗 .abrazar
-➤ 💖 .amor / 🌹 .flores
-➤ 🎁 .regalo / 🍷 .cita
+┏━━━ 💕 *RELACIONES* ━━━┓
+┃ 💘 *.pareja citando mensaje* – Proponer relación
+┃ ✅ *.aceptar* – Aceptar propuesta de pareja
+┃ ❌ *.rechazar* – Rechazar propuesta de pareja
+┃ 💔 *.terminar* – Terminar relación
+┃ 💍 *.casarse* – Proponer matrimonio
+┃ ✅ *.si* – Aceptar propuesta de matrimonio
+┃ ❌ *.no* – Rechazar propuesta de matrimonio
+┃ ⚖️ *.divorcio* – Divorciarse
+┃ ❤️ *.relacion* – Ver estado actual
+┃ 💋 *.besar* – Besar a tu pareja
+┃ 🤗 *.abrazar* – Abrazar a tu pareja
+┃ 💖 *.amor* – Aumentar amor
+┃ 🌹 *.flores* – Regalar flores
+┃ 🎁 *.regalo* – Dar un regalo
+┃ 🍷 *.cita* – Tener una cita romántica
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-━━━━━━━━━━━━━━━━━━━━
+┏━━━ 🛡️ *SEGURIDAD DEL GRUPO* ━━━┓
+┃ 🔗 *.antilink*
+┃ 🧩 *.antilink2*
+┃ 🤖 *.antibot*
+┃ ☣️ *.antitoxico*
+┃ 👻 *.antifake*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-🛡️ *SEGURIDAD*
-➤ 🔗 .antilink / .antilink2
-➤ 🤖 .antibot
-➤ ☣️ .antitoxico
-➤ 👻 .antifake
+┏━━━ 📥 *DESCARGAS* ━━━┓
+┃ 📲 *.apk*
+┃ 🎧 *.spotify*
+┃ 📘 *.fb*
+┃ 📸 *.ig*
+┃ 📂 *.mediafire*
+┃ 🎵 *.tiktok*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-📥 *DESCARGAS*
-➤ 📲 .apk
-➤ 🎧 .spotify
-➤ 📘 .fb / 📸 .ig
-➤ 📂 .mediafire
-➤ 🎵 .tiktok
+┏━━━ 🎬 *ENTRETENIMIENTO* ━━━┓
+┃ 🎥 *.quever <género>*
+┃ 📺 *.verserie <género>*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-🎶 *MÚSICA*
-➤ 🎵 .play / .play2
-➤ 🔊 .mp3
-➤ 🎬 .mp2 / .ytmp4
+┏━━━ 🎶 *MÚSICA / VIDEOS* ━━━┓
+┃ 🎵 *.play*
+┃ 🔊 *.mp3*
+┃ 🎬 *.mp2*
+┃ 🎥 *.play2*
+┃ 🎬 *.ytmp4*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-🖼️ *MULTIMEDIA*
-➤ 💬 .qc
-➤ ✂️ .s
-➤ 🖼️ .imagen
-➤ 🌐 .google
+┏━━━ 🖼️ *STICKERS & MULTIMEDIA* ━━━┓
+┃ 💬 *.qc <texto>*
+┃ ✂️ *.s*
+┃ 🖼️ *.imagen*
+┃ 🌐 *.google*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-━━━━━━━━━━━━━━━━━━━━
+┏━━━ 🎮 *GAMES FELINOS* ━━━┓
+┃ 🕹️ *.juegos*
+┃ ❓ *.adivinanza*
+┃ 🏴 *.bandera*
+┃ 🏛️ *.capital*
+┃ 🧠 *.pensar*
+┃ 🔢 *.número*
+┃ 🐈‍⬛ *.miau*
+┃ 🏆 *.top10*
+┃ 🍝 *.plato*
+┃ 💃 *.dance*
+┃ 🎯 *.trivia*
+┃ 🧞 *.consejo*
+┃ 📱 *.fakewpp*
+┃ 💔 *.infiel*
+┃ 🦊 *.zorro/a*
+┃ 🤡 *.cornudo/a*
+┃ 💋 *.kiss*
+┃ 💞 *.puta*
+┃ 🏳️‍🌈 *.trolo*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-🎮 *JUEGOS*
-➤ 🎯 .trivia / ❓ .adivinanza
-➤ 🏴 .bandera / 🏛️ .capital
-➤ 🧠 .pensar / 🔢 .numero
-➤ 🐈 .miau / 🏆 .top10
-➤ 💃 .dance / 🍝 .plato
-➤ 🤡 .cornudo / 💔 .infiel
-➤ 💋 .kiss / 🦊 .zorro
+┏━━━ 🧰 *ADMINS / STAFF* ━━━┓
+┃ 🗑️ *.del*
+┃ 👢 *.k*
+┃ 🅿️ *.p*
+┃ 🅳 *.d*
+┃ 🔇 *.mute* / *.unmute*
+┃ 🏷️ *.tagall*
+┃ 📣 *.tag*
+┃ 🧠 *.ht*
+┃ ⚙️ *.g*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-━━━━━━━━━━━━━━━━━━━━
+┏━━━ 👑 *OWNERS* ━━━┓
+┃ 🛡️ *.autoadmin*
+┃ 🕵️ *.detectar*
+┃ 🔗 *.join*
+┃ 📜 *.grouplist*
+┃ 🔄 *.resetuser*
+┃ ✏️ *.setprefix*
+┃ 🧹 *.resetprefix*
+┃ 🔁 *.restart*
+┃ 🪄 *.resetlink*
+┃ ⚙️ *.update*
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-🧰 *ADMINS*
-➤ 🗑️ .del
-➤ 👢 .k
-➤ 🅿️ .p / 🅳 .d
-➤ 🔇 .mute / .unmute
-➤ 🏷️ .tagall / .tag
-➤ ⚙️ .g
-
-👑 *OWNERS*
-➤ 🛡️ .autoadmin
-➤ 🔗 .join
-➤ 📜 .grouplist
-➤ 🔄 .resetuser
-➤ ✏️ .setprefix / 🧹 .resetprefix
-➤ 🔁 .restart
-➤ 🪄 .resetlink
-➤ ⚙️ .update
-
-━━━━━━━━━━━━━━━━━━━━
-
-🐾 ${botname} activo 24/7 😼  
-✨ _“Un maullido, una orden.”_
+🐾 *${botname}* siempre vigilante 😼  
+✨ _“Un maullido, una acción.”_
 `;
 
     await conn.reply(m.chat, menu.trim(), m);
@@ -139,7 +182,7 @@ export default handler;
 
 function getSaludoGatuno() {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return "🌅 Buenos días felinos";
-  if (hour >= 12 && hour < 18) return "☀️ Buenas tardes felinas";
-  return "🌙 Buenas noches felinas";
+  if (hour >= 5 && hour < 12) return "🌅 Maullidos buenos días!";
+  if (hour >= 12 && hour < 18) return "☀️ Maullidos buenas tardes!";
+  return "🌙 Maullidos buenas noches!";
 }

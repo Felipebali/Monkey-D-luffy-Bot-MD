@@ -1,55 +1,59 @@
-//Codígo creado por Destroy wa.me/584120346669
+// plugins/nsfw-footjob.js
+let handler = async (m, { conn }) => {
+    try {
+        const chat = global.db.data.chats[m.chat] || {};
 
-import fs from 'fs';
-import path from 'path';
+        // Verificar si NSFW está activado
+        if (!chat.nsfw && m.isGroup) {
+            return conn.sendMessage(m.chat, { 
+                text: `⚠️ El contenido *NSFW* está desactivado en este grupo.\n> Un dueño puede activarlo con *#nsfw*` 
+            }, { quoted: m });
+        }
 
-let handler = async (m, { conn, usedPrefix }) => {
-if (!db.data.chats[m.chat].nsfw && m.isGroup) {
-    return m.reply(`${emoji} El contenido *NSFW* está desactivado en este grupo.\n> Un administrador puede activarlo con el comando » *#nsfw on*`);
-    }
+        // Detectar usuario objetivo
+        let who;
+        if (m.mentionedJid?.length) who = m.mentionedJid[0];
+        else if (m.quoted) who = m.quoted.sender;
+        else who = m.sender;
 
-    let who;
-    if (m.mentionedJid.length > 0) {
-        who = m.mentionedJid[0];
-    } else if (m.quoted) {
-        who = m.quoted.sender;
-    } else {
-        who = m.sender;
-    }
+        // Solo usernames
+        const usernameTarget = `@${who.split("@")[0]}`;
+        const usernameSender = `@${m.sender.split("@")[0]}`;
 
-    let name = conn.getName(who);
-    let name2 = conn.getName(m.sender);
-    m.react('🥵');
+        // Construir mensaje usando solo usernames
+        let str;
+        if (m.mentionedJid?.length || m.quoted) {
+            str = `${usernameSender} le hizo una paja con los pies a ${usernameTarget}.`;
+        } else {
+            str = `${usernameSender} está haciendo una paja con los pies!`;
+        }
 
-    let str;
-    if (m.mentionedJid.length > 0) {
-        str = `\`${name2}\` *le hizo una paja con los pies a* \`${name || who}\`.`;
-    } else if (m.quoted) {
-        str = `\`${name2}\` *le hizo una paja con los pies a* \`${name || who}\`.`;
-    } else {
-        str = `\`${name2}\` *está haciendo una paja con los pies!*`.trim();
-    }
-    
-    if (m.isGroup) {
-        let pp = 'https://qu.ax/aTGxj.mp4'; 
-        let pp2 = 'https://qu.ax/SCxhs.mp4'; 
-        let pp3 = 'https://qu.ax/ASKQT.mp4';
-        let pp4 = 'https://qu.ax/UQzPO.mp4';
-        let pp5 = 'https://qu.ax/yexqZ.mp4';
-        let pp6 = 'https://qu.ax/Agxmr.mp4';
-        let pp7 = 'https://qu.ax/dvgDr.mp4';
-        
-        const videos = [pp, pp2, pp3, pp4, pp5, pp6, pp7];
+        // Lista de videos NSFW
+        const videos = [
+            'https://qu.ax/aTGxj.mp4',
+            'https://qu.ax/SCxhs.mp4',
+            'https://qu.ax/ASKQT.mp4',
+            'https://qu.ax/UQzPO.mp4',
+            'https://qu.ax/yexqZ.mp4',
+            'https://qu.ax/Agxmr.mp4',
+            'https://qu.ax/dvgDr.mp4'
+        ];
+
         const video = videos[Math.floor(Math.random() * videos.length)];
 
-        let mentions = [who];
-        conn.sendMessage(m.chat, { video: { url: video }, gifPlayback: true, caption: str, mentions }, { quoted: m });
+        // Enviar video con mención de ambos
+        const mentions = [m.sender, who];
+        await conn.sendMessage(m.chat, { video: { url: video }, gifPlayback: true, caption: str, mentions }, { quoted: m });
+
+    } catch (e) {
+        console.error(e);
+        await conn.sendMessage(m.chat, { text: '✖️ Ocurrió un error al ejecutar el comando NSFW.' }, { quoted: m });
     }
-}
+};
 
 handler.help = ['footjob/pies @tag'];
 handler.tags = ['nsfw'];
-handler.command = ['footjob','pies'];
+handler.command = ['footjob', 'pies'];
 handler.group = true;
 
 export default handler;

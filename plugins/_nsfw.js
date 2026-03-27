@@ -44,7 +44,8 @@ export async function before(m, { conn }) {
         'hentaisearch',
         'penetrar',
         'sexo', 'sex',
-        'tetas', 'cum' 
+        'tetas', 'cum',
+        'lesbianas', 'yuri'
     ];
 
     if (!chat.nsfw && nsfwCommands.includes(m.command?.toLowerCase())) {

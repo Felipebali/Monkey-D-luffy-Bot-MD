@@ -1,8 +1,8 @@
-// 📂 plugins/menu.js — MENU PRO FelixCat 🐾✨
+// 📂 plugins/menu.js — FELIXCAT ULTRA MENU 🐾👑
 
 const botname = global.botname || '😸 FelixCat-Bot 😸';
 const creador = 'Anónimo🐼';
-const versionBot = '11.0 PRO';
+const versionBot = '11.0 ULTRA';
 
 let handler = async (m, { conn }) => {
   try {
@@ -13,113 +13,153 @@ let handler = async (m, { conn }) => {
     });
 
     let menu = `
-╔═══ 🐾 *${botname}* 🐾 ═══╗
-║ 👑 Creador: ${creador}
-║ ⚙️ Versión: ${versionBot}
-║ 🕒 ${fecha}
-║ 💬 ${saludo}
-╚═══════════════════════╝
+╔══════════════════════╗
+   🐾 *${botname}* 🐾
+╚══════════════════════╝
+👑 Creador: ${creador}
+⚙️ Versión: ${versionBot}
+🕒 ${fecha}
+💬 ${saludo}
 
-🌐 *COMANDOS GENERALES*
-➤ 🔮 .horoscopo
-➤ 🌦️ .clima
-➤ 🕐 .hora
-➤ 🌍 .traducir
-➤ 🚨 .reportar
-➤ ✉️ .sug
+━━━━━━━━━━━━━━━━━━━
+🌐 『 COMANDOS GENERALES 』
+━━━━━━━━━━━━━━━━━━━
+• .horoscopo → Tu destino 🔮
+• .clima → Clima actual 🌦️
+• .hora → Hora exacta 🕐
+• .traducir → Traducciones 🌍
+• .reportar → Reportes 🚨
+• .sug → Sugerencias ✉️
 
-📚 *MENÚS*
-➤ 🎮 .menuj
-➤ 👥 .menugp
-➤ 🔥 .menuhot
-➤ 👑 .mw
-➤ 🎌 .menupj
+━━━━━━━━━━━━━━━━━━━
+📚 『 MENÚS DEL BOT 』
+━━━━━━━━━━━━━━━━━━━
+• .menuj → Juegos 🎮
+• .menugp → Grupo 👥
+• .menuhot → NSFW 🔥
+• .mw → Owner 👑
+• .menupj → Personajes 🎌
 
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━
+👤 『 PERFIL 』
+━━━━━━━━━━━━━━━━━━━
+• .perfil → Ver perfil 🪪
+• .setbr → Cumpleaños 🎂
+• .bio → Biografía 📝
+• .genero → Género 🚻
 
-👤 *PERFIL*
-➤ 🪪 .perfil
-➤ 🎂 .setbr
-➤ 📝 .bio
-➤ 🚻 .genero
+━━━━━━━━━━━━━━━━━━━
+🤝 『 HERMANOS 』
+━━━━━━━━━━━━━━━━━━━
+• .hermano → Solicitar 🤝
+• .aceptarhermano → Aceptar ✅
+• .rechazarhermano → Rechazar ❌
+• .romperhermandad → Terminar 💔
+• .abrazohermano → Abrazo 🤗
+• .proteger → Proteger 🛡️
+• .chocarhermano → Chocar ✋
+• .entrenarhermano → Entrenar 🥊
+• .relacionhermano → Estado 📊
 
-🤝 *HERMANOS*
-➤ .hermano / .aceptarhermano
-➤ .rechazarhermano / .romperhermandad
-➤ .abrazohermano / .proteger
-➤ .chocarhermano / .entrenarhermano
-➤ .relacionhermano
+━━━━━━━━━━━━━━━━━━━
+💕 『 RELACIONES 』
+━━━━━━━━━━━━━━━━━━━
+• .pareja → Propuesta 💘
+• .aceptar / .rechazar → Respuesta 💬
+• .casarse → Matrimonio 💍
+• .si / .no → Confirmar ✔️❌
+• .terminar / .divorcio → Finalizar 💔
+• .relacion → Estado ❤️
+• .besar → Beso 💋
+• .abrazar → Abrazo 🤗
+• .amor → Nivel 💖
+• .flores → Flores 🌹
+• .regalo → Regalo 🎁
+• .cita → Cita 🍷
 
-💕 *RELACIONES*
-➤ 💘 .pareja / .aceptar / .rechazar
-➤ 💍 .casarse / .si / .no
-➤ 💔 .terminar / .divorcio
-➤ ❤️ .relacion
-➤ 💋 .besar / 🤗 .abrazar
-➤ 💖 .amor / 🌹 .flores
-➤ 🎁 .regalo / 🍷 .cita
+━━━━━━━━━━━━━━━━━━━
+🛡️ 『 SEGURIDAD 』
+━━━━━━━━━━━━━━━━━━━
+• .antilink → Bloquea links 🔗
+• .antilink2 → Modo estricto 🚫
+• .antibot → Anti bots 🤖
+• .antitoxico → Anti insultos ☣️
+• .antifake → Anti fake 👻
 
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━
+📥 『 DESCARGAS 』
+━━━━━━━━━━━━━━━━━━━
+• .apk → Apps 📲
+• .spotify → Música 🎧
+• .fb → Facebook 📘
+• .ig → Instagram 📸
+• .mediafire → Archivos 📂
+• .tiktok → Videos 🎵
 
-🛡️ *SEGURIDAD*
-➤ 🔗 .antilink / .antilink2
-➤ 🤖 .antibot
-➤ ☣️ .antitoxico
-➤ 👻 .antifake
+━━━━━━━━━━━━━━━━━━━
+🎶 『 MÚSICA 』
+━━━━━━━━━━━━━━━━━━━
+• .play → Buscar música 🎵
+• .play2 → Alternativa 🔊
+• .mp3 → Solo audio 🎧
+• .mp2 / .ytmp4 → Video 🎬
 
-📥 *DESCARGAS*
-➤ 📲 .apk
-➤ 🎧 .spotify
-➤ 📘 .fb / 📸 .ig
-➤ 📂 .mediafire
-➤ 🎵 .tiktok
+━━━━━━━━━━━━━━━━━━━
+🖼️ 『 MULTIMEDIA 』
+━━━━━━━━━━━━━━━━━━━
+• .qc → Sticker texto 💬
+• .s → Sticker imagen ✂️
+• .imagen → Buscar imagen 🖼️
+• .google → Buscar info 🌐
 
-🎶 *MÚSICA*
-➤ 🎵 .play / .play2
-➤ 🔊 .mp3
-➤ 🎬 .mp2 / .ytmp4
+━━━━━━━━━━━━━━━━━━━
+🎮 『 JUEGOS 』
+━━━━━━━━━━━━━━━━━━━
+• .trivia → Preguntas 🎯
+• .adivinanza → Adivinar ❓
+• .bandera → País 🏴
+• .capital → Capitales 🏛️
+• .pensar → Respuesta random 🧠
+• .numero → Número 🔢
+• .miau → Fun gato 🐈
+• .top10 → Ranking 🏆
+• .dance → Bailar 💃
+• .plato → Comida 🍝
+• .cornudo → Test 🤡
+• .infiel → Infidelidad 💔
+• .kiss → Beso 💋
+• .zorro → Nivel 🦊
 
-🖼️ *MULTIMEDIA*
-➤ 💬 .qc
-➤ ✂️ .s
-➤ 🖼️ .imagen
-➤ 🌐 .google
+━━━━━━━━━━━━━━━━━━━
+🧰 『 ADMINS 』
+━━━━━━━━━━━━━━━━━━━
+• .del → Borrar 🗑️
+• .k → Expulsar 👢
+• .p → Promover 🅿️
+• .d → Degradar 🅳
+• .mute → Silenciar 🔇
+• .unmute → Activar 🔊
+• .tagall → Mencionar 🏷️
+• .tag → Tag manual 📢
+• .g → Config grupo ⚙️
 
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━
+👑 『 OWNERS 』
+━━━━━━━━━━━━━━━━━━━
+• .autoadmin → Bot admin 🛡️
+• .join → Entrar 🔗
+• .grouplist → Lista 📜
+• .resetuser → Reset 🔄
+• .setprefix → Prefijo ✏️
+• .resetprefix → Restaurar 🧹
+• .restart → Reiniciar 🔁
+• .resetlink → Nuevo link 🪄
+• .update → Actualizar ⚙️
 
-🎮 *JUEGOS*
-➤ 🎯 .trivia / ❓ .adivinanza
-➤ 🏴 .bandera / 🏛️ .capital
-➤ 🧠 .pensar / 🔢 .numero
-➤ 🐈 .miau / 🏆 .top10
-➤ 💃 .dance / 🍝 .plato
-➤ 🤡 .cornudo / 💔 .infiel
-➤ 💋 .kiss / 🦊 .zorro
-
-━━━━━━━━━━━━━━━━━━━━
-
-🧰 *ADMINS*
-➤ 🗑️ .del
-➤ 👢 .k
-➤ 🅿️ .p / 🅳 .d
-➤ 🔇 .mute / .unmute
-➤ 🏷️ .tagall / .tag
-➤ ⚙️ .g
-
-👑 *OWNERS*
-➤ 🛡️ .autoadmin
-➤ 🔗 .join
-➤ 📜 .grouplist
-➤ 🔄 .resetuser
-➤ ✏️ .setprefix / 🧹 .resetprefix
-➤ 🔁 .restart
-➤ 🪄 .resetlink
-➤ ⚙️ .update
-
-━━━━━━━━━━━━━━━━━━━━
-
-🐾 ${botname} activo 24/7 😼  
-✨ _“Un maullido, una orden.”_
+━━━━━━━━━━━━━━━━━━━
+🐾 ${botname} activo 24/7 😼
+💠 _“Dominando grupos como un verdadero felino.”_
+━━━━━━━━━━━━━━━━━━━
 `;
 
     await conn.reply(m.chat, menu.trim(), m);

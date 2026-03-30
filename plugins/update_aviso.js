@@ -1,12 +1,10 @@
-// 📂 plugins/autoupdate-notify.js — FelixCat Auto Update 🚀🐾
+// 📂 plugins/autoupdate-notify.js — FIXED 🚀🐾
 
 import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
 
 const SNAPSHOT = '.last_update_snapshot.json'
-
-// 📢 GRUPO DONDE ENVÍA EL AVISO
 const NOTIFY_TO = '120363424917153708@g.us'
 
 function scanPlugins() {
@@ -21,19 +19,22 @@ function scanPlugins() {
     }))
 }
 
-let handler = async (m, { conn }) => {}
+let handler = async () => {}
 
-// 🔥 SE EJECUTA AUTOMÁTICAMENTE
 handler.all = async function (m, { conn }) {
   if (global._updateChecked) return
   global._updateChecked = true
 
   try {
     let before = []
+    let firstRun = false
+
     if (fs.existsSync(SNAPSHOT)) {
       try {
         before = JSON.parse(fs.readFileSync(SNAPSHOT))
       } catch {}
+    } else {
+      firstRun = true
     }
 
     const now = scanPlugins()
@@ -45,28 +46,32 @@ handler.all = async function (m, { conn }) {
       return b && b.mtime !== n.mtime
     })
 
-    // ❌ Si no hay cambios → no avisa
-    if (!added.length && !removed.length && !modified.length) return
-
-    // 📦 Obtener último commit
+    // 📦 Commit
     let commit = ''
     try {
       commit = execSync('git log -1 --pretty=format:"%h - %s"', { encoding: 'utf8' })
     } catch {
-      commit = 'Sin información de commit'
+      commit = 'Sin info de commit'
     }
 
     let msg = `
-╭━━━〔 🚀 *ACTUALIZACIÓN DETECTADA* 〕━━━╮
+╭━━━〔 🚀 *ESTADO DEL BOT* 〕━━━╮
 ┃ 📦 ${commit}
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-🧩 *Cambios en plugins:*
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 `
 
-    added.forEach(p => msg += `• ➕ ${p.name}\n`)
-    removed.forEach(p => msg += `• ❌ ${p.name} (eliminado)\n`)
-    modified.forEach(p => msg += `• ✏️ ${p.name} (modificado)\n`)
+    if (firstRun) {
+      msg += `\n🟡 Primera ejecución detectada.\n`
+    }
+
+    if (added.length || removed.length || modified.length) {
+      msg += `\n🧩 *Cambios detectados:*\n`
+      added.forEach(p => msg += `• ➕ ${p.name}\n`)
+      removed.forEach(p => msg += `• ❌ ${p.name}\n`)
+      modified.forEach(p => msg += `• ✏️ ${p.name}\n`)
+    } else {
+      msg += `\n🟢 Sin cambios en plugins.\n`
+    }
 
     msg += `
 ━━━━━━━━━━━━━━━━━━━
@@ -76,17 +81,15 @@ handler.all = async function (m, { conn }) {
 • Modificados: ${modified.length}
 • Fecha: ${new Date().toLocaleString()}
 
-🐾 *FelixCat actualizado correctamente* 😼
+🐾 FelixCat listo y funcionando 😼
 `
 
-    // 📢 ENVÍO AL GRUPO
     await conn.sendMessage(NOTIFY_TO, { text: msg })
 
-    // 💾 Guardar snapshot nuevo
     fs.writeFileSync(SNAPSHOT, JSON.stringify(now, null, 2))
 
   } catch (e) {
-    console.error('AutoUpdate Error:', e)
+    console.error(e)
   }
 }
 

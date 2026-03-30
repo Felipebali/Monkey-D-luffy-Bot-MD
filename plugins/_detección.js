@@ -1,4 +1,4 @@
-// ✨ FATÍDICO PLUGIN DETECT — FELIXCAT BOT — FULL STUB SUPPORT ✨
+// ✨ FELIXCAT EVENT DETECT — ESTILO PREMIUM 🐾👑
 import fetch from 'node-fetch'
 let { default: WAMessageStubType } = await import('@whiskeysockets/baileys')
 
@@ -10,7 +10,7 @@ const lidCache = new Map()
 let handler = async function (m, { conn, isAdmin, isOwner }) {
   if (!m.isGroup) return
   if (!isAdmin && !isOwner)
-    return conn.reply(m.chat, '🚫 Solo admins pueden usar este comando.', m)
+    return conn.reply(m.chat, '🚫 Solo administradores pueden usar este comando.', m)
 
   const chat = global.db.data.chats[m.chat]
   if (!chat) return
@@ -19,7 +19,7 @@ let handler = async function (m, { conn, isAdmin, isOwner }) {
 
   await conn.reply(
     m.chat,
-    `✨ *Detector de eventos*\n\nEstado: ${
+    `⚙️ *Sistema de eventos del grupo*\n\nEstado actual: ${
       chat.detect ? '🟢 ACTIVADO' : '🔴 DESACTIVADO'
     }`,
     m
@@ -52,43 +52,58 @@ handler.before = async function (m, { conn, participants }) {
     (await conn.profilePictureUrl(m.chat, 'image').catch(() => null)) ||
     'https://files.catbox.moe/xr2m6u.jpg'
 
-  const nombre = `🌸✨ ¡NUEVO NOMBRE! ✨🌸
+  // ✨ MENSAJES MEJORADOS
 
-@${usuario.split('@')[0]} decidió darle un nuevo nombre.
-💌 Ahora se llama: *${m.messageStubParameters[0]}*`
+  const nombre = `📝 *Nombre actualizado*
 
-  const foto = `🖼️🌷 ¡Foto renovada! 🌷🖼️
+👤 @${usuario.split('@')[0]} cambió el nombre del grupo.
 
-👀 Acción hecha por: @${usuario.split('@')[0]}`
-
-  const newlink = `🔗💫 ¡Enlace del grupo actualizado! 💫🔗
-
-✦ Gracias a: @${usuario.split('@')[0]}`
-
-  const edit = `🔧✨ Configuración del grupo ✨🔧
-
-@${usuario.split('@')[0]} decidió que ${
-    m.messageStubParameters[0] === 'on'
-      ? 'solo los admins 🌟'
-      : 'todos los miembros 🌼'
-  } puedan modificar el grupo.`
-
-  const descripcion = `📝✨ ¡Descripción actualizada! ✨📝
-
-@${usuario.split('@')[0]} modificó la descripción del grupo.
-
-📄 Nueva descripción:
+✨ Nuevo nombre:
 *${m.messageStubParameters[0]}*`
 
-  const admingp = `🌟✨ ¡Admin nuevo! ✨🌟
+  const foto = `🖼️ *Foto del grupo actualizada*
 
-@${users.split('@')[0]} ahora es admin.
-🖇️ Acción de: @${usuario.split('@')[0]}`
+📸 Cambio realizado por:
+@${usuario.split('@')[0]}`
 
-  const noadmingp = `🌸⚡ ¡Admin removido! ⚡🌸
+  const newlink = `🔗 *Enlace del grupo renovado*
 
-@${users.split('@')[0]} ya no es admin.
-🖇️ Acción de: @${usuario.split('@')[0]}`
+⚡ Generado por:
+@${usuario.split('@')[0]}`
+
+  const edit = `⚙️ *Configuración modificada*
+
+👤 @${usuario.split('@')[0]} cambió los permisos del grupo.
+
+📌 Ahora: ${
+    m.messageStubParameters[0] === 'on'
+      ? 'Solo administradores pueden editar 🛡️'
+      : 'Todos los miembros pueden editar 👥'
+  }`
+
+  const descripcion = `📄 *Descripción actualizada*
+
+✏️ Modificada por:
+@${usuario.split('@')[0]}
+
+📝 Nuevo contenido:
+*${m.messageStubParameters[0]}*`
+
+  const admingp = `👑 *Nuevo administrador*
+
+➤ @${users.split('@')[0]} ahora es admin.
+
+📌 Acción realizada por:
+@${usuario.split('@')[0]}`
+
+  const noadmingp = `⚠️ *Administrador removido*
+
+➤ @${users.split('@')[0]} ya no es admin.
+
+📌 Acción realizada por:
+@${usuario.split('@')[0]}`
+
+  // =====================================================
 
   if (m.messageStubType == 21)
     return conn.sendMessage(m.chat, { text: nombre, mentions: [usuario] })

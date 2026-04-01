@@ -2,26 +2,23 @@ import fetch from 'node-fetch'
 
 let handler = async (m, { conn }) => {
 
-  // 📌 Detectar si mencionan al bot
   const botNumber = "59892379658@s.whatsapp.net"
 
-  const mentioned = m.mentionedJid || []
-  const isMentioned = mentioned.includes(botNumber)
+  // ✅ DETECTA MENCIÓN REAL
+  const isMentioned = m.text.includes('@' + botNumber.split('@')[0])
 
   if (!isMentioned) return
 
-  // 🧠 Obtener texto (sin la mención)
   let text = m.text.replace(/@\d+/g, '').trim()
 
-  if (!text) return m.reply("💬 Preguntame algo...")
+  if (!text) return m.reply("💬 *Invócame... humano*")
 
   try {
 
-    // 🔥 LLAMADA A OPENAI
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer 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",
+        "Authorization": "Bearer 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", // 🔥 CAMBIAR
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -29,7 +26,7 @@ let handler = async (m, { conn }) => {
         messages: [
           {
             role: "system",
-            content: "Responde como un personaje anime, divertido, épico y con estilo otaku."
+            content: "Eres un espíritu anime épico, hablas con estilo otaku, divertido, intenso y con frases tipo shonen."
           },
           {
             role: "user",
@@ -41,10 +38,19 @@ let handler = async (m, { conn }) => {
 
     const json = await res.json()
 
-    let reply = json.choices?.[0]?.message?.content || "❌ Error IA"
+    if (!json.choices) {
+      console.log(json)
+      return m.reply("❌ Error en IA (ver consola)")
+    }
+
+    let reply = json.choices[0].message.content
 
     return conn.sendMessage(m.chat, {
-      text: `🤖 *IA FelixCat*\n\n${reply}`,
+      text: `╭━━━〔 🤖 IA FELIXCAT 〕━━━⬣
+┃
+┃ ${reply}
+┃
+╰━━━━━━━━━━━━━━━━⬣`,
       mentions: [m.sender]
     })
 

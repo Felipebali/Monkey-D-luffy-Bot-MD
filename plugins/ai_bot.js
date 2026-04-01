@@ -21,7 +21,7 @@ let handler = async (m, { conn }) => {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": "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",
+        "Authorization": "Bearer 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",
         "Content-Type": "application/json"
       },
       body: JSON.stringify({

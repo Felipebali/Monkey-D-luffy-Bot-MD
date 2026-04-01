@@ -3,7 +3,7 @@ import fetch from 'node-fetch'
 let handler = async (m, { conn }) => {
 
   // 📌 Detectar si mencionan al bot
-  const botNumber = conn.user.jid
+  const botNumber = "59892379658@s.whatsapp.net"
 
   const mentioned = m.mentionedJid || []
   const isMentioned = mentioned.includes(botNumber)

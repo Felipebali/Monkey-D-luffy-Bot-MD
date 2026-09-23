@@ -490,7 +490,6 @@ ${text}
         )
 
 
-      // Evitar proponerse a uno mismo
       if (
         await esMismaPersona(
           conn,
@@ -529,10 +528,6 @@ ${text}
         getUser(targetId)
 
 
-      // ======================================================
-      // ❤️ YA TIENE PAREJA
-      // ======================================================
-
       if (user.pareja) {
 
         return conn.reply(
@@ -556,10 +551,6 @@ No puedes proponer estando en relación.`
         )
       }
 
-
-      // ======================================================
-      // 💔 TARGET YA TIENE PAREJA
-      // ======================================================
 
       if (tu.pareja) {
 
@@ -994,10 +985,6 @@ Responde:
         getUser(proposerId)
 
 
-      // ======================================================
-      // ❤️ COMPARACIÓN CORREGIDA
-      // ======================================================
-
       const siguenSiendoPareja =
         await esMismaPersona(
           conn,
@@ -1282,7 +1269,8 @@ Siguen siendo novios.`
       [
         'besar',
         'abrazar',
-        'amor'
+        'amor',
+        'regalo'
       ].includes(command)
     ) {
 
@@ -1298,18 +1286,16 @@ Siguen siendo novios.`
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
 
 
       // ======================================================
-      // 🎯 TARGET
+      // 🎯 OBTENER TARGET
       // ======================================================
 
       const target =
         getTarget()
-
 
       if (!target) {
         return m.reply(
@@ -1319,7 +1305,7 @@ Siguen siendo novios.`
 
 
       // ======================================================
-      // 🔎 BUSCAR TARGET EN DB
+      // 🔎 BUSCAR TARGET REAL EN LA BASE
       // ======================================================
 
       const targetId =
@@ -1330,15 +1316,16 @@ Siguen siendo novios.`
           m.chat
         ) || target
 
-
       const targetUser =
         getUser(targetId)
 
 
       // ======================================================
-      // ❤️ ¿TARGET ES REALMENTE LA PAREJA?
+      // ❤️ COMPARACIÓN REAL DE IDENTIDAD
       //
-      // ESTA ES LA CORRECCIÓN PRINCIPAL
+      // NO SE COMPARAN LOS JID DIRECTAMENTE.
+      // WhatsApp puede entregar un LID, un JID de teléfono
+      // u otro identificador para la misma persona.
       // ======================================================
 
       const esPareja =
@@ -1351,8 +1338,77 @@ Siguen siendo novios.`
 
 
       // ======================================================
-      // 🚨 TARGET TIENE PAREJA
-      // PERO NO ES EL SENDER
+      // 💕 SI EL TARGET ES SU PAREJA
+      //
+      // ESTA COMPROBACIÓN VA PRIMERO PARA EVITAR QUE EL
+      // MISMO USUARIO SEA DETECTADO COMO "INFIDELIDAD".
+      // ======================================================
+
+      if (esPareja) {
+
+        const suma =
+          command === 'besar'
+            ? 5
+            : command === 'abrazar'
+              ? 3
+              : command === 'amor'
+                ? 10
+                : 15
+
+
+        user.amor =
+          Number(user.amor || 0) + suma
+
+        targetUser.amor =
+          Number(targetUser.amor || 0) + suma
+
+
+        saveDB(db)
+
+
+        const accionTexto = {
+
+          besar:
+            `${tag(sender)} 💋 le dio un beso a su pareja ${tag(target)}.`,
+
+          abrazar:
+            `${tag(sender)} 🤗 abrazó con mucho cariño a su pareja ${tag(target)}.`,
+
+          amor:
+            `${tag(sender)} ❤️ le demostró todo su amor a su pareja ${tag(target)}.`,
+
+          regalo:
+            `${tag(sender)} 🎁 le hizo un regalo a su pareja ${tag(target)}.`
+        }
+
+
+        return conn.reply(
+          m.chat,
+
+          box(
+            '💞 MOMENTO ROMÁNTICO',
+
+            `${accionTexto[command]}
+
+Acción: ${command}
+Amor ganado: +${suma} ❤️
+Nuevo nivel de amor: ❤️ ${user.amor}`
+          ),
+
+          m,
+
+          {
+            mentions: [
+              sender,
+              target
+            ]
+          }
+        )
+      }
+
+
+      // ======================================================
+      // 🚨 EL TARGET TIENE PAREJA
       // ======================================================
 
       if (targetUser.pareja) {
@@ -1393,13 +1449,9 @@ Respeta relaciones ajenas 😾`
 
       // ======================================================
       // 🚨 EL SENDER TIENE PAREJA
-      // PERO EL TARGET NO ES SU PAREJA
       // ======================================================
 
-      if (
-        user.pareja &&
-        !esPareja
-      ) {
+      if (user.pareja) {
 
         return conn.reply(
           m.chat,
@@ -1428,60 +1480,8 @@ Pero su pareja es ${tag(user.pareja)} ❤️`
       // 💔 NO SON PAREJA
       // ======================================================
 
-      if (
-        !user.pareja ||
-        !esPareja
-      ) {
-
-        return m.reply(
-          '💔 No son pareja.'
-        )
-      }
-
-
-      // ======================================================
-      // ❤️ SUMAR AMOR
-      // ======================================================
-
-      const suma =
-        command === 'besar'
-          ? 5
-          : command === 'abrazar'
-            ? 3
-            : 10
-
-
-      user.amor += suma
-
-      targetUser.amor += suma
-
-
-      saveDB(db)
-
-
-      // ======================================================
-      // 💕 RESPUESTA
-      // ======================================================
-
-      return conn.reply(
-        m.chat,
-
-        box(
-          '💞 MOMENTO ROMÁNTICO',
-
-          `${tag(sender)} 💕 ${tag(target)}
-Acción: ${command}
-Nuevo nivel de amor: ❤️ ${user.amor}`
-        ),
-
-        m,
-
-        {
-          mentions: [
-            sender,
-            target
-          ]
-        }
+      return m.reply(
+        '💔 No son pareja.'
       )
     }
 
@@ -1657,6 +1657,7 @@ handler.command = [
   'amor',
   'besar',
   'abrazar',
+  'regalo',
   'listapareja',
   'clearship'
 ]

@@ -123,12 +123,13 @@ async function obtenerIdentidades(conn, jid, chat) {
     if (!original)
       return identidades
 
-
-    // JID original
     identidades.add(original)
 
 
-    // Número
+    // ========================================================
+    // 📱 NÚMERO
+    // ========================================================
+
     const numero =
       obtenerNumero(conn, original)
 
@@ -226,7 +227,6 @@ async function obtenerIdentidades(conn, jid, chat) {
         const participantes =
           metadata?.participants || []
 
-
         for (const participante of participantes) {
 
           const campos = [
@@ -236,9 +236,7 @@ async function obtenerIdentidades(conn, jid, chat) {
             participante?.phoneNumber
           ].filter(Boolean)
 
-
           let coincide = false
-
 
           for (const campo of campos) {
 
@@ -248,17 +246,14 @@ async function obtenerIdentidades(conn, jid, chat) {
             if (!limpio)
               continue
 
-
             if (limpio === original) {
 
               coincide = true
               break
             }
 
-
             const numeroCampo =
               obtenerNumero(conn, limpio)
-
 
             if (
               numero &&
@@ -271,10 +266,8 @@ async function obtenerIdentidades(conn, jid, chat) {
             }
           }
 
-
           if (!coincide)
             continue
-
 
           for (const campo of campos) {
 
@@ -283,7 +276,6 @@ async function obtenerIdentidades(conn, jid, chat) {
 
             if (limpio)
               identidades.add(limpio)
-
 
             const num =
               obtenerNumero(conn, limpio)
@@ -297,7 +289,6 @@ async function obtenerIdentidades(conn, jid, chat) {
               )
             }
           }
-
 
           break
         }
@@ -325,14 +316,12 @@ async function esMismaPersona(
   if (!a || !b)
     return false
 
-
   const identidadesA =
     await obtenerIdentidades(
       conn,
       a,
       chat
     )
-
 
   const identidadesB =
     await obtenerIdentidades(
@@ -341,13 +330,11 @@ async function esMismaPersona(
       chat
     )
 
-
   for (const identidad of identidadesA) {
 
     if (identidadesB.has(identidad))
       return true
   }
-
 
   return false
 }
@@ -367,12 +354,11 @@ async function buscarUsuarioId(
   if (!jid)
     return null
 
-
   const limpio =
     limpiarJid(conn, jid)
 
 
-  // Primero coincidencia exacta
+  // Coincidencia exacta
   if (
     limpio &&
     db[limpio]
@@ -381,7 +367,7 @@ async function buscarUsuarioId(
   }
 
 
-  // Después identidad
+  // Coincidencia por identidad
   for (const id of Object.keys(db)) {
 
     if (
@@ -395,7 +381,6 @@ async function buscarUsuarioId(
       return id
     }
   }
-
 
   return null
 }
@@ -429,6 +414,13 @@ const crearUsuario = () => ({
 
 // ============================================================
 // 🤝 COMPROBAR SI DOS USUARIOS SON PAREJA
+//
+// ESTA ES LA ÚNICA LÓGICA UTILIZADA POR:
+//
+// .amor
+// .besar
+// .abrazar
+// .regalo
 // ============================================================
 
 async function comprobarPareja(
@@ -442,13 +434,17 @@ async function comprobarPareja(
   chat
 ) {
 
+  if (!senderId || !targetId)
+    return false
+
+
   // ==========================================================
-  // 1️⃣ PAREJA DEL SENDER
+  // 1️⃣ PAREJA DEL SENDER → TARGET
   // ==========================================================
 
   if (senderUser?.pareja) {
 
-    // ID exacto
+    // Comparación directa
     if (
       senderUser.pareja === target ||
       senderUser.pareja === targetId
@@ -457,7 +453,7 @@ async function comprobarPareja(
     }
 
 
-    // Identidad
+    // Comparación por identidad WhatsApp
     if (
       await esMismaPersona(
         conn,
@@ -491,12 +487,24 @@ async function comprobarPareja(
         chat
       )
 
-
     if (
       parejaId &&
       (
         parejaId === target ||
         parejaId === targetId
+      )
+    ) {
+      return true
+    }
+
+
+    if (
+      parejaId &&
+      await esMismaPersona(
+        conn,
+        parejaId,
+        target,
+        chat
       )
     ) {
       return true
@@ -519,13 +527,13 @@ async function comprobarPareja(
 
   // ==========================================================
   // 2️⃣ COMPROBACIÓN INVERSA
+  // TARGET → SENDER
   // ==========================================================
 
   if (targetUser?.pareja) {
 
     if (
-      targetUser.pareja === senderId ||
-      targetUser.pareja === chat
+      targetUser.pareja === senderId
     ) {
       return true
     }
@@ -541,19 +549,6 @@ async function comprobarPareja(
     ) {
       return true
     }
-
-
-    // También comprobar con el sender original
-    const senderOriginal =
-      await esMismaPersona(
-        conn,
-        targetUser.pareja,
-        senderId,
-        chat
-      )
-
-    if (senderOriginal)
-      return true
 
 
     const parejaId =
@@ -587,7 +582,7 @@ async function comprobarPareja(
 
 
   // ==========================================================
-  // 3️⃣ BUSCAR LA RELACIÓN DIRECTAMENTE EN LA DB
+  // 3️⃣ ÚLTIMO RESPALDO: TODA LA DB
   // ==========================================================
 
   for (const id of Object.keys(db)) {
@@ -599,43 +594,9 @@ async function comprobarPareja(
       continue
 
 
-    // ¿Este registro corresponde al target?
-    let esTarget =
-      id === target ||
-      id === targetId
-
-
-    if (!esTarget) {
-
-      esTarget =
-        await esMismaPersona(
-          conn,
-          id,
-          target,
-          chat
-        )
-    }
-
-
-    if (!esTarget) {
-
-      esTarget =
-        await esMismaPersona(
-          conn,
-          id,
-          targetId,
-          chat
-        )
-    }
-
-
-    if (!esTarget)
-      continue
-
-
-    // ¿La pareja del target es el sender?
+    // ¿El registro corresponde al sender?
     let esSender =
-      registro.pareja === senderId
+      id === senderId
 
 
     if (!esSender) {
@@ -643,33 +604,78 @@ async function comprobarPareja(
       esSender =
         await esMismaPersona(
           conn,
-          registro.pareja,
+          id,
           senderId,
           chat
         )
     }
 
 
-    if (!esSender) {
+    if (!esSender)
+      continue
 
-      const parejaId =
-        await buscarUsuarioId(
-          conn,
-          db,
-          registro.pareja,
-          chat
-        )
 
-      if (
-        parejaId === senderId
-      ) {
-        esSender = true
-      }
+    // ¿La pareja corresponde al target?
+    if (
+      registro.pareja === target ||
+      registro.pareja === targetId
+    ) {
+      return true
     }
 
 
-    if (esSender)
+    if (
+      await esMismaPersona(
+        conn,
+        registro.pareja,
+        target,
+        chat
+      )
+    ) {
       return true
+    }
+
+
+    if (
+      await esMismaPersona(
+        conn,
+        registro.pareja,
+        targetId,
+        chat
+      )
+    ) {
+      return true
+    }
+
+
+    const parejaId =
+      await buscarUsuarioId(
+        conn,
+        db,
+        registro.pareja,
+        chat
+      )
+
+
+    if (
+      parejaId === target ||
+      parejaId === targetId
+    ) {
+      return true
+    }
+
+
+    if (
+      parejaId &&
+      await esMismaPersona(
+        conn,
+        parejaId,
+        targetId,
+        chat
+      )
+    ) {
+      return true
+    }
   }
 
 
@@ -694,17 +700,14 @@ let handler = async (
     const db =
       loadDB()
 
-
     const sender =
       limpiarJid(
         conn,
         m.sender
       )
 
-
     const ahora =
       Date.now()
-
 
     const ownersJid =
       getOwnersJid()
@@ -719,13 +722,11 @@ let handler = async (
       if (!id)
         return null
 
-
       if (!db[id]) {
 
         db[id] =
           crearUsuario()
       }
-
 
       return db[id]
     }
@@ -740,13 +741,11 @@ let handler = async (
       if (!id)
         return '@usuario'
 
-
       const numero =
         obtenerNumero(
           conn,
           id
         )
-
 
       return '@' + (
         numero ||
@@ -768,13 +767,11 @@ let handler = async (
           ms / 86400000
         )
 
-
       const horas =
         Math.floor(
           (ms % 86400000) /
           3600000
         )
-
 
       return `${dias} día(s) y ${horas} hora(s)`
     }
@@ -808,7 +805,6 @@ ${text}
         )
       }
 
-
       if (
         m.quoted?.sender
       ) {
@@ -817,7 +813,6 @@ ${text}
           m.quoted.sender
         )
       }
-
 
       return null
     }
@@ -834,12 +829,10 @@ ${text}
       const target =
         getTarget()
 
-
       if (!target)
         return m.reply(
           '💌 Menciona o responde a alguien.'
         )
-
 
       if (
         await esMismaPersona(
@@ -855,7 +848,6 @@ ${text}
         )
       }
 
-
       const senderId =
         await buscarUsuarioId(
           conn,
@@ -863,7 +855,6 @@ ${text}
           sender,
           m.chat
         ) || sender
-
 
       const targetId =
         await buscarUsuarioId(
@@ -873,10 +864,8 @@ ${text}
           m.chat
         ) || target
 
-
       const user =
         getUser(senderId)
-
 
       const tu =
         getUser(targetId)
@@ -936,9 +925,7 @@ Respeta relaciones ajenas.`
       tu.propuestaFecha =
         ahora
 
-
       saveDB(db)
-
 
       return conn.reply(
         m.chat,
@@ -980,20 +967,16 @@ Responde:
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
-
 
       if (!user.propuesta)
         return m.reply(
           '💭 No tienes propuestas.'
         )
 
-
       const proposer =
         user.propuesta
-
 
       const proposerId =
         await buscarUsuarioId(
@@ -1002,7 +985,6 @@ Responde:
           proposer,
           m.chat
         ) || proposer
-
 
       const proposerUser =
         getUser(proposerId)
@@ -1025,13 +1007,11 @@ Responde:
       proposerUser.estado =
         'novios'
 
-
       user.pareja =
         proposerId
 
       proposerUser.pareja =
         senderId
-
 
       user.relacionFecha =
         ahora
@@ -1039,16 +1019,13 @@ Responde:
       proposerUser.relacionFecha =
         ahora
 
-
       user.propuesta =
         null
 
       proposerUser.propuesta =
         null
 
-
       saveDB(db)
-
 
       return conn.reply(
         m.chat,
@@ -1089,27 +1066,21 @@ Deben esperar 7 días para casarse.`
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
-
 
       if (!user.propuesta)
         return m.reply(
           '❌ No tienes propuestas.'
         )
 
-
       const proposer =
         user.propuesta
-
 
       user.propuesta =
         null
 
-
       saveDB(db)
-
 
       return conn.reply(
         m.chat,
@@ -1148,22 +1119,18 @@ Deben esperar 7 días para casarse.`
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
-
 
       if (!user.pareja)
         return m.reply(
           '💔 No tienes pareja.'
         )
 
-
       const estado =
         user.matrimonioFecha
           ? '💍 Casados'
           : '💑 Novios'
-
 
       const tiempoJuntos =
         user.relacionFecha
@@ -1172,7 +1139,6 @@ Deben esperar 7 días para casarse.`
               user.relacionFecha
             )
           : 'Desconocido'
-
 
       return conn.reply(
         m.chat,
@@ -1214,33 +1180,27 @@ Nivel de amor: ❤️ ${user.amor}`
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
-
 
       if (!user.pareja)
         return m.reply(
           '💔 No tienes pareja.'
         )
 
-
       if (user.matrimonioFecha)
         return m.reply(
           '💍 Ya están casados.'
         )
-
 
       if (!user.relacionFecha)
         return m.reply(
           '❌ No se pudo determinar cuándo comenzó la relación.'
         )
 
-
       const tiempoRelacion =
         ahora -
         user.relacionFecha
-
 
       if (
         tiempoRelacion <
@@ -1252,7 +1212,6 @@ Nivel de amor: ❤️ ${user.amor}`
             SIETE_DIAS -
             tiempoRelacion
           )
-
 
         return conn.reply(
           m.chat,
@@ -1276,7 +1235,6 @@ Faltan ${faltan}.`
         )
       }
 
-
       const parejaId =
         await buscarUsuarioId(
           conn,
@@ -1285,10 +1243,8 @@ Faltan ${faltan}.`
           m.chat
         ) || user.pareja
 
-
       const pareja =
         getUser(parejaId)
-
 
       pareja.propuestaMatrimonio =
         senderId
@@ -1296,9 +1252,7 @@ Faltan ${faltan}.`
       pareja.propuestaMatrimonioFecha =
         ahora
 
-
       saveDB(db)
-
 
       return conn.reply(
         m.chat,
@@ -1340,20 +1294,16 @@ Responde:
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
-
 
       if (!user.propuestaMatrimonio)
         return m.reply(
           '❌ No tienes propuestas.'
         )
 
-
       const proposer =
         user.propuestaMatrimonio
-
 
       const proposerId =
         await buscarUsuarioId(
@@ -1363,10 +1313,8 @@ Responde:
           m.chat
         ) || proposer
 
-
       const proposerUser =
         getUser(proposerId)
-
 
       const siguenSiendoPareja =
         await comprobarPareja(
@@ -1380,7 +1328,6 @@ Responde:
           m.chat
         )
 
-
       if (!siguenSiendoPareja) {
 
         return m.reply(
@@ -1388,13 +1335,11 @@ Responde:
         )
       }
 
-
       user.matrimonioFecha =
         ahora
 
       proposerUser.matrimonioFecha =
         ahora
-
 
       user.propuestaMatrimonio =
         null
@@ -1402,9 +1347,7 @@ Responde:
       proposerUser.propuestaMatrimonio =
         null
 
-
       saveDB(db)
-
 
       return conn.reply(
         m.chat,
@@ -1444,27 +1387,21 @@ Ahora están oficialmente casados 💖`
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
-
 
       if (!user.propuestaMatrimonio)
         return m.reply(
           '❌ No tienes propuestas.'
         )
 
-
       const proposer =
         user.propuestaMatrimonio
-
 
       user.propuestaMatrimonio =
         null
 
-
       saveDB(db)
-
 
       return conn.reply(
         m.chat,
@@ -1503,22 +1440,18 @@ Ahora están oficialmente casados 💖`
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
-
 
       if (!user.pareja)
         return m.reply(
           '❌ No tienes pareja.'
         )
 
-
       if (user.matrimonioFecha)
         return m.reply(
           '❌ Están casados, usa .divorciar para separarse.'
         )
-
 
       const exId =
         await buscarUsuarioId(
@@ -1528,10 +1461,8 @@ Ahora están oficialmente casados 💖`
           m.chat
         ) || user.pareja
 
-
       const pareja =
         getUser(exId)
-
 
       user.pareja =
         null
@@ -1539,13 +1470,11 @@ Ahora están oficialmente casados 💖`
       pareja.pareja =
         null
 
-
       user.estado =
         'soltero'
 
       pareja.estado =
         'soltero'
-
 
       user.relacionFecha =
         null
@@ -1553,16 +1482,13 @@ Ahora están oficialmente casados 💖`
       pareja.relacionFecha =
         null
 
-
       user.amor =
         0
 
       pareja.amor =
         0
 
-
       saveDB(db)
-
 
       return conn.reply(
         m.chat,
@@ -1602,16 +1528,13 @@ Ahora ambos están solteros.`
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
-
 
       if (!user.matrimonioFecha)
         return m.reply(
           '❌ No estás casado.'
         )
-
 
       const parejaId =
         await buscarUsuarioId(
@@ -1621,10 +1544,8 @@ Ahora ambos están solteros.`
           m.chat
         ) || user.pareja
 
-
       const pareja =
         getUser(parejaId)
-
 
       user.matrimonioFecha =
         null
@@ -1632,16 +1553,13 @@ Ahora ambos están solteros.`
       pareja.matrimonioFecha =
         null
 
-
       user.estado =
         'novios'
 
       pareja.estado =
         'novios'
 
-
       saveDB(db)
-
 
       return conn.reply(
         m.chat,
@@ -1667,6 +1585,13 @@ Siguen siendo novios.`
 
     // ========================================================
     // 💕 INTERACCIONES
+    //
+    // .amor
+    // .besar
+    // .abrazar
+    // .regalo
+    //
+    // TODOS UTILIZAN EXACTAMENTE LA MISMA LÓGICA
     // ========================================================
 
     if (
@@ -1686,14 +1611,11 @@ Siguen siendo novios.`
           m.chat
         ) || sender
 
-
       const user =
         getUser(senderId)
 
-
       const target =
         getTarget()
-
 
       if (!target) {
 
@@ -1701,7 +1623,6 @@ Siguen siendo novios.`
           '💌 Menciona o responde a alguien.'
         )
       }
-
 
       const targetId =
         await buscarUsuarioId(
@@ -1711,13 +1632,12 @@ Siguen siendo novios.`
           m.chat
         ) || target
 
-
       const targetUser =
         getUser(targetId)
 
 
       // ======================================================
-      // ❤️ ESTA ES LA ÚNICA COMPROBACIÓN PARA LOS 4 COMANDOS
+      // ❤️ ÚNICA COMPROBACIÓN
       // ======================================================
 
       const sonPareja =
@@ -1735,37 +1655,34 @@ Siguen siendo novios.`
 
       // ======================================================
       // 💞 SON PAREJA
+      //
+      // ESTE BLOQUE ES EL MISMO PARA LOS 4 COMANDOS.
+      // SOLO CAMBIA LA CANTIDAD DE AMOR Y EL TEXTO.
       // ======================================================
 
       if (sonPareja) {
 
-        let suma = 0
+        const suma = {
 
-        if (command === 'amor')
-          suma = 10
+          amor: 10,
 
-        if (command === 'besar')
-          suma = 5
+          besar: 5,
 
-        if (command === 'abrazar')
-          suma = 3
+          abrazar: 3,
 
-        if (command === 'regalo')
-          suma = 15
+          regalo: 15
+
+        }[command]
 
 
         user.amor =
           Number(user.amor || 0) + suma
 
-
         targetUser.amor =
           Number(targetUser.amor || 0) + suma
 
 
-        // ==================================================
-        // 🔧 REPARAR LOS IDs DE LA RELACIÓN
-        // ==================================================
-
+        // Mantener siempre la relación enlazada.
         user.pareja =
           targetId
 
@@ -1776,38 +1693,25 @@ Siguen siendo novios.`
         saveDB(db)
 
 
-        let texto = ''
+        const texto = {
 
+          amor:
+            `${tag(sender)} ❤️ le demostró todo su amor a su pareja ${tag(target)}.`,
 
-        if (command === 'amor') {
+          besar:
+            `${tag(sender)} 💋 le dio un beso a su pareja ${tag(target)}.`,
 
-          texto =
-            `${tag(sender)} ❤️ le demostró todo su amor a su pareja ${tag(target)}.`
-        }
+          abrazar:
+            `${tag(sender)} 🤗 abrazó con mucho cariño a su pareja ${tag(target)}.`,
 
-
-        if (command === 'besar') {
-
-          texto =
-            `${tag(sender)} 💋 le dio un beso a su pareja ${tag(target)}.`
-        }
-
-
-        if (command === 'abrazar') {
-
-          texto =
-            `${tag(sender)} 🤗 abrazó con mucho cariño a su pareja ${tag(target)}.`
-        }
-
-
-        if (command === 'regalo') {
-
-          texto =
+          regalo:
             `${tag(sender)} 🎁 le hizo un regalo a su pareja ${tag(target)}.`
-        }
+
+        }[command]
 
 
         return conn.reply(
+
           m.chat,
 
           box(
@@ -1833,40 +1737,67 @@ Nuevo nivel de amor: ❤️ ${user.amor}`
 
 
       // ======================================================
-      // 🚨 TARGET TIENE OTRA PAREJA
+      // 🚨 NO SON PAREJA
+      //
+      // RECIÉN DESPUÉS DE FALLAR LA COMPROBACIÓN ANTERIOR
+      // SE COMPRUEBA SI HAY OTRA RELACIÓN.
       // ======================================================
 
       if (targetUser.pareja) {
 
-        return conn.reply(
-          m.chat,
+        const parejaDelTarget =
+          await buscarUsuarioId(
+            conn,
+            db,
+            targetUser.pareja,
+            m.chat
+          ) || targetUser.pareja
 
-          box(
-            '🚨 PERSONA EN RELACIÓN',
 
-            `${tag(target)} está en pareja con ${tag(targetUser.pareja)} ❤️
+        const esParejaDelSender =
+          parejaDelTarget === senderId ||
+          await esMismaPersona(
+            conn,
+            parejaDelTarget,
+            senderId,
+            m.chat
+          )
+
+
+        if (!esParejaDelSender) {
+
+          return conn.reply(
+
+            m.chat,
+
+            box(
+              '🚨 PERSONA EN RELACIÓN',
+
+              `${tag(target)} está en pareja con ${tag(targetUser.pareja)} ❤️
 Respeta relaciones ajenas 😾`
-          ),
+            ),
 
-          m,
+            m,
 
-          {
-            mentions: [
-              target,
-              targetUser.pareja
-            ]
-          }
-        )
+            {
+              mentions: [
+                target,
+                targetUser.pareja
+              ]
+            }
+          )
+        }
       }
 
 
       // ======================================================
-      // 🚨 SENDER TIENE PAREJA
+      // 🚨 SENDER TIENE OTRA PAREJA
       // ======================================================
 
       if (user.pareja) {
 
         return conn.reply(
+
           m.chat,
 
           box(
@@ -1922,7 +1853,6 @@ Pero su pareja es ${tag(user.pareja)} ❤️`
               sender
             )
           )
-
 
         if (!esOwner) {
 
@@ -1984,7 +1914,6 @@ Nivel de amor: ❤️ ${user.amor}
 
 `
 
-
           mentions.push(
             id,
             user.pareja
@@ -2040,7 +1969,6 @@ Nivel de amor: ❤️ ${user.amor}
               sender
             )
           )
-
 
         if (!esOwner) {
 

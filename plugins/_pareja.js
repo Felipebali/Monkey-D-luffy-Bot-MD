@@ -43,6 +43,7 @@ let handler = async (m, { conn, command }) => {
         amor: 0
       }
     }
+
     return db[id]
   }
 
@@ -58,39 +59,87 @@ let handler = async (m, { conn, command }) => {
 ${text}
 ╰━━━━━━━━━━━━━━━━⬣`
 
+  // ============================================================
+  // 🎯 OBTENER DESTINATARIO
+  // ============================================================
+
   const getTarget = () => {
-    if (m.mentionedJid?.length) return m.mentionedJid[0]
-    if (m.quoted?.sender) return conn.decodeJid(m.quoted.sender)
+
+    if (m.mentionedJid?.length)
+      return conn.decodeJid(m.mentionedJid[0])
+
+    if (m.quoted?.sender)
+      return conn.decodeJid(m.quoted.sender)
+
     return null
   }
 
+  // ============================================================
   // 🔧 NORMALIZAR JID
+  // ============================================================
+
   const normalizarJid = (jid) => {
-    if (!jid) return null
+
+    if (!jid)
+      return null
 
     try {
-      return conn.decodeJid(jid)
-        .replace(/:\d+@/, '@')
-        .trim()
+
+      let id = String(jid)
+
+      // Quitar información de dispositivo
+      id = id.replace(/:\d+(?=@)/, '')
+
+      // Quitar @s.whatsapp.net / @lid
+      id = id.split('@')[0]
+
+      // Dejar solamente números
+      id = id.replace(/\D/g, '')
+
+      return id || null
+
     } catch {
-      return jid
+      return null
     }
+  }
+
+  // ============================================================
+  // 🆔 OBTENER JID ESTÁNDAR
+  // ============================================================
+
+  const jidNormal = (jid) => {
+
+    if (!jid)
+      return null
+
+    const numero = normalizarJid(jid)
+
+    if (!numero)
+      return null
+
+    return numero + '@s.whatsapp.net'
   }
 
   /* 💘 PAREJA */
   if (command === 'pareja') {
+
     const target = getTarget()
 
     if (!target)
       return m.reply('💌 Menciona o responde a alguien.')
 
-    if (normalizarJid(target) === normalizarJid(sender))
+    if (
+      normalizarJid(target) ===
+      normalizarJid(sender)
+    ) {
       return m.reply('😹 No puedes proponerte a ti mismo.')
+    }
 
     const user = getUser(sender)
     const tu = getUser(target)
 
-    if (user.pareja)
+    if (user.pareja) {
+
       return conn.reply(
         m.chat,
         box(
@@ -99,10 +148,17 @@ ${text}
 No puedes proponer estando en relación.`
         ),
         m,
-        { mentions: [sender, user.pareja] }
+        {
+          mentions: [
+            sender,
+            user.pareja
+          ]
+        }
       )
+    }
 
-    if (tu.pareja)
+    if (tu.pareja) {
+
       return conn.reply(
         m.chat,
         box(
@@ -111,8 +167,14 @@ No puedes proponer estando en relación.`
 Respeta relaciones ajenas.`
         ),
         m,
-        { mentions: [target, tu.pareja] }
+        {
+          mentions: [
+            target,
+            tu.pareja
+          ]
+        }
       )
+    }
 
     tu.propuesta = sender
     tu.propuestaFecha = ahora
@@ -129,12 +191,18 @@ Responde:
 ✨ *.rechazar*`
       ),
       m,
-      { mentions: [sender, target] }
+      {
+        mentions: [
+          sender,
+          target
+        ]
+      }
     )
   }
 
   /* 💖 ACEPTAR */
   if (command === 'aceptar') {
+
     const user = getUser(sender)
 
     if (!user.propuesta)
@@ -143,8 +211,14 @@ Responde:
     const proposer = user.propuesta
     const proposerUser = getUser(proposer)
 
-    if (user.pareja || proposerUser.pareja)
-      return m.reply('❌ Uno de los dos ya tiene pareja.')
+    if (
+      user.pareja ||
+      proposerUser.pareja
+    ) {
+      return m.reply(
+        '❌ Uno de los dos ya tiene pareja.'
+      )
+    }
 
     user.estado = 'novios'
     proposerUser.estado = 'novios'
@@ -169,12 +243,18 @@ Ahora son novios 💑
 Deben esperar 7 días para casarse.`
       ),
       m,
-      { mentions: [sender, proposer] }
+      {
+        mentions: [
+          sender,
+          proposer
+        ]
+      }
     )
   }
 
   /* ❌ RECHAZAR */
   if (command === 'rechazar') {
+
     const user = getUser(sender)
 
     if (!user.propuesta)
@@ -193,22 +273,32 @@ Deben esperar 7 días para casarse.`
         `${tag(sender)} ha rechazado a ${tag(proposer)}.`
       ),
       m,
-      { mentions: [sender, proposer] }
+      {
+        mentions: [
+          sender,
+          proposer
+        ]
+      }
     )
   }
 
   /* 💑 RELACION */
   if (command === 'relacion') {
+
     const user = getUser(sender)
 
     if (!user.pareja)
       return m.reply('💔 No tienes pareja.')
 
-    const estado = user.matrimonioFecha
-      ? '💍 Casados'
-      : '💑 Novios'
+    const estado =
+      user.matrimonioFecha
+        ? '💍 Casados'
+        : '💑 Novios'
 
-    const tiempoJuntos = tiempo(ahora - user.relacionFecha)
+    const tiempoJuntos =
+      tiempo(
+        ahora - user.relacionFecha
+      )
 
     return conn.reply(
       m.chat,
@@ -220,12 +310,18 @@ Tiempo juntos: ${tiempoJuntos}
 Nivel de amor: ❤️ ${user.amor}`
       ),
       m,
-      { mentions: [sender, user.pareja] }
+      {
+        mentions: [
+          sender,
+          user.pareja
+        ]
+      }
     )
   }
 
   /* 💍 CASARSE */
   if (command === 'casarse') {
+
     const user = getUser(sender)
 
     if (!user.pareja)
@@ -234,10 +330,15 @@ Nivel de amor: ❤️ ${user.amor}`
     if (user.matrimonioFecha)
       return m.reply('💍 Ya están casados.')
 
-    const tiempoRelacion = ahora - user.relacionFecha
+    const tiempoRelacion =
+      ahora - user.relacionFecha
 
     if (tiempoRelacion < SIETE_DIAS) {
-      const faltan = tiempo(SIETE_DIAS - tiempoRelacion)
+
+      const faltan =
+        tiempo(
+          SIETE_DIAS - tiempoRelacion
+        )
 
       return conn.reply(
         m.chat,
@@ -248,11 +349,17 @@ Deben esperar 7 días.
 Faltan ${faltan}.`
         ),
         m,
-        { mentions: [sender, user.pareja] }
+        {
+          mentions: [
+            sender,
+            user.pareja
+          ]
+        }
       )
     }
 
-    const pareja = getUser(user.pareja)
+    const pareja =
+      getUser(user.pareja)
 
     pareja.propuestaMatrimonio = sender
     pareja.propuestaMatrimonioFecha = ahora
@@ -269,25 +376,37 @@ Responde:
 ✨ *.no*`
       ),
       m,
-      { mentions: [sender, user.pareja] }
+      {
+        mentions: [
+          sender,
+          user.pareja
+        ]
+      }
     )
   }
 
   /* 💍 SI */
   if (command === 'si') {
+
     const user = getUser(sender)
 
     if (!user.propuestaMatrimonio)
       return m.reply('❌ No tienes propuestas.')
 
-    const proposer = user.propuestaMatrimonio
-    const proposerUser = getUser(proposer)
+    const proposer =
+      user.propuestaMatrimonio
+
+    const proposerUser =
+      getUser(proposer)
 
     if (
       normalizarJid(user.pareja) !==
       normalizarJid(proposer)
-    )
-      return m.reply('❌ Ya no son pareja.')
+    ) {
+      return m.reply(
+        '❌ Ya no son pareja.'
+      )
+    }
 
     user.matrimonioFecha = ahora
     proposerUser.matrimonioFecha = ahora
@@ -305,18 +424,25 @@ Responde:
 Ahora están oficialmente casados 💖`
       ),
       m,
-      { mentions: [sender, proposer] }
+      {
+        mentions: [
+          sender,
+          proposer
+        ]
+      }
     )
   }
 
   /* ❌ NO */
   if (command === 'no') {
+
     const user = getUser(sender)
 
     if (!user.propuestaMatrimonio)
       return m.reply('❌ No tienes propuestas.')
 
-    const proposer = user.propuestaMatrimonio
+    const proposer =
+      user.propuestaMatrimonio
 
     user.propuestaMatrimonio = null
 
@@ -329,24 +455,34 @@ Ahora están oficialmente casados 💖`
         `${tag(sender)} ha rechazado casarse con ${tag(proposer)}.`
       ),
       m,
-      { mentions: [sender, proposer] }
+      {
+        mentions: [
+          sender,
+          proposer
+        ]
+      }
     )
   }
 
   /* 💔 TERMINAR */
   if (command === 'terminar') {
+
     const user = getUser(sender)
 
     if (!user.pareja)
       return m.reply('❌ No tienes pareja.')
 
-    if (user.matrimonioFecha)
+    if (user.matrimonioFecha) {
       return m.reply(
         '❌ Están casados, usa .divorciar para separarse.'
       )
+    }
 
-    const exId = user.pareja
-    const pareja = getUser(exId)
+    const exId =
+      user.pareja
+
+    const pareja =
+      getUser(exId)
 
     user.pareja = null
     pareja.pareja = null
@@ -370,18 +506,26 @@ Ahora están oficialmente casados 💖`
 Ahora ambos están solteros.`
       ),
       m,
-      { mentions: [sender, exId] }
+      {
+        mentions: [
+          sender,
+          exId
+        ]
+      }
     )
   }
 
   /* 💔 DIVORCIAR */
   if (command === 'divorciar') {
-    const user = getUser(sender)
+
+    const user =
+      getUser(sender)
 
     if (!user.matrimonioFecha)
       return m.reply('❌ No estás casado.')
 
-    const pareja = getUser(user.pareja)
+    const pareja =
+      getUser(user.pareja)
 
     user.matrimonioFecha = null
     pareja.matrimonioFecha = null
@@ -399,33 +543,80 @@ Ahora ambos están solteros.`
 Siguen siendo novios.`
       ),
       m,
-      { mentions: [sender, user.pareja] }
+      {
+        mentions: [
+          sender,
+          user.pareja
+        ]
+      }
     )
   }
 
-  /* 💕 INTERACCIONES */
-  if (['besar', 'abrazar', 'amor', 'regalo'].includes(command)) {
+  /* ============================================================
+     💕 INTERACCIONES
+     ============================================================ */
 
-    const user = getUser(sender)
-    const target = getTarget()
+  if (
+    [
+      'besar',
+      'abrazar',
+      'amor',
+      'regalo'
+    ].includes(command)
+  ) {
+
+    const user =
+      getUser(sender)
+
+    const target =
+      getTarget()
 
     if (!target)
-      return m.reply('💌 Menciona o responde a alguien.')
+      return m.reply(
+        '💌 Menciona o responde a alguien.'
+      )
 
-    const senderId = normalizarJid(sender)
-    const targetId = normalizarJid(target)
-    const parejaId = normalizarJid(user.pareja)
+    /*
+     * IMPORTANTE:
+     * Las comparaciones se hacen SOLO por número.
+     * Esto evita problemas entre:
+     *
+     * 123456789@s.whatsapp.net
+     * 123456789:1@s.whatsapp.net
+     * @lid
+     * JID decodificado
+     */
 
-    const targetUser = getUser(targetId)
+    const senderNumero =
+      normalizarJid(sender)
 
+    const targetNumero =
+      normalizarJid(target)
+
+    const parejaNumero =
+      normalizarJid(user.pareja)
+
+    const targetUser =
+      getUser(target)
+
+    // ==========================================================
     // ❤️ ES SU PROPIA PAREJA
-    if (parejaId && parejaId === targetId) {
+    // ==========================================================
+
+    if (
+      parejaNumero &&
+      targetNumero &&
+      parejaNumero === targetNumero
+    ) {
 
       const suma =
-        command === 'besar' ? 5 :
-        command === 'abrazar' ? 3 :
-        command === 'amor' ? 10 :
-        5
+        command === 'besar'
+          ? 5
+          : command === 'abrazar'
+            ? 3
+            : command === 'amor'
+              ? 10
+              : 5
 
       user.amor += suma
       targetUser.amor += suma
@@ -436,53 +627,91 @@ Siguen siendo novios.`
         m.chat,
         box(
           '💞 MOMENTO ROMÁNTICO',
-          `${tag(senderId)} 💕 ${tag(targetId)}
+          `${tag(sender)} 💕 ${tag(target)}
 Acción: ${command}
 Nuevo nivel de amor: ❤️ ${user.amor}`
         ),
         m,
-        { mentions: [senderId, targetId] }
+        {
+          mentions: [
+            sender,
+            target
+          ]
+        }
       )
     }
 
-    // 🚨 TIENE PAREJA PERO LO HACE CON OTRA PERSONA
-    if (parejaId && parejaId !== targetId) {
+    // ==========================================================
+    // 🚨 INFIDELIDAD
+    // ==========================================================
+
+    /*
+     * SOLO se ejecuta si:
+     *
+     * tiene pareja
+     * Y
+     * la persona mencionada NO es su pareja
+     */
+
+    if (
+      parejaNumero &&
+      targetNumero &&
+      parejaNumero !== targetNumero
+    ) {
 
       return conn.reply(
         m.chat,
         box(
           '🚨 INFIDELIDAD DETECTADA',
-          `${tag(senderId)} intentó ${command} a ${tag(targetId)} 😾
-Pero su pareja es ${tag(parejaId)} ❤️`
+          `${tag(sender)} intentó ${command} a ${tag(target)} 😾
+Pero su pareja es ${tag(user.pareja)} ❤️`
         ),
         m,
-        { mentions: [senderId, targetId, parejaId] }
+        {
+          mentions: [
+            sender,
+            target,
+            user.pareja
+          ]
+        }
       )
     }
 
-    // 🚨 EL TARGET TIENE OTRA PAREJA
-    const targetParejaId = normalizarJid(targetUser.pareja)
+    // ==========================================================
+    // 🚨 TARGET TIENE PAREJA
+    // ==========================================================
+
+    const targetParejaNumero =
+      normalizarJid(targetUser.pareja)
 
     if (
-      targetParejaId &&
-      targetParejaId !== senderId
+      targetParejaNumero &&
+      targetParejaNumero !== senderNumero
     ) {
 
       return conn.reply(
         m.chat,
         box(
           '🚨 PERSONA EN RELACIÓN',
-          `${tag(targetId)} está en pareja con ${tag(targetParejaId)} ❤️
+          `${tag(target)} está en pareja con ${tag(targetUser.pareja)} ❤️
 Respeta relaciones ajenas 😾`
         ),
         m,
-        { mentions: [targetId, targetParejaId] }
+        {
+          mentions: [
+            target,
+            targetUser.pareja
+          ]
+        }
       )
     }
 
+    // ==========================================================
     // 💔 NO SON PAREJA
+    // ==========================================================
+
     return m.reply(
-      `💔 ${tag(senderId)} y ${tag(targetId)} no son pareja.`
+      `💔 ${tag(sender)} y ${tag(target)} no son pareja.`
     )
   }
 
@@ -499,15 +728,24 @@ Respeta relaciones ajenas 😾`
 
       const user = db[id]
 
-      if (user.pareja && id < user.pareja) {
+      if (
+        user.pareja &&
+        normalizarJid(id) <
+        normalizarJid(user.pareja)
+      ) {
 
-        const estado = user.matrimonioFecha
-          ? '💍 Casados'
-          : '💑 Novios'
+        const estado =
+          user.matrimonioFecha
+            ? '💍 Casados'
+            : '💑 Novios'
 
-        const tiempoJuntos = user.relacionFecha
-          ? tiempo(ahora - user.relacionFecha)
-          : 'Desconocido'
+        const tiempoJuntos =
+          user.relacionFecha
+            ? tiempo(
+                ahora -
+                user.relacionFecha
+              )
+            : 'Desconocido'
 
         texto += `╭─────────────⬣
 💖 ${tag(id)} ❤️ ${tag(user.pareja)}
@@ -516,7 +754,10 @@ Tiempo juntos: ${tiempoJuntos}
 Nivel de amor: ❤️ ${user.amor}
 ╰─────────────⬣\n\n`
 
-        mentions.push(id, user.pareja)
+        mentions.push(
+          id,
+          user.pareja
+        )
       }
     }
 
@@ -525,9 +766,14 @@ Nivel de amor: ❤️ ${user.amor}
 
     return conn.reply(
       m.chat,
-      box('💞 PAREJAS ACTIVAS', texto.trim()),
+      box(
+        '💞 PAREJAS ACTIVAS',
+        texto.trim()
+      ),
       m,
-      { mentions }
+      {
+        mentions
+      }
     )
   }
 
@@ -554,7 +800,9 @@ Nivel de amor: ❤️ ${user.amor}
 
     saveDB(db)
 
-    return m.reply('🧹 Todas las parejas fueron eliminadas.')
+    return m.reply(
+      '🧹 Todas las parejas fueron eliminadas.'
+    )
   }
 }
 

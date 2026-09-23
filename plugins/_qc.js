@@ -1,17 +1,17 @@
 // 📂 plugins/qc.js — FelixCat_Bot 💬
-import { sticker } from "../lib/sticker.js"
-import axios from "axios"
+
+import { sticker } from '../lib/sticker.js'
+import axios from 'axios'
 
 let handler = async (m, { conn, text }) => {
   try {
 
     // ============================================================
-    // 📝 OBTENER TEXTO
+    // 📝 TEXTO
     // ============================================================
 
     let frase = text?.trim()
 
-    // Si no hay texto, intentar obtener el texto del mensaje citado
     if (!frase && m.quoted?.text) {
       frase = m.quoted.text.trim()
     }
@@ -20,27 +20,23 @@ let handler = async (m, { conn, text }) => {
       return conn.sendMessage(
         m.chat,
         {
-          text: "❌ Escribí un texto o citá un mensaje para crear el sticker."
+          text: '❌ Escribí un texto o citá un mensaje para crear el sticker.'
         },
-        {
-          quoted: m
-        }
+        { quoted: m }
       )
     }
 
     // ============================================================
-    // 🔢 LÍMITE DE CARACTERES
+    // 🔢 LÍMITE
     // ============================================================
 
     if (frase.length > 50) {
       return conn.sendMessage(
         m.chat,
         {
-          text: "❌ El texto no puede superar los 50 caracteres."
+          text: '❌ El texto no puede superar los 50 caracteres.'
         },
-        {
-          quoted: m
-        }
+        { quoted: m }
       )
     }
 
@@ -54,16 +50,15 @@ let handler = async (m, { conn, text }) => {
       m.quoted?.name ||
       m.pushName ||
       m.name ||
-      "Usuario"
+      'Usuario'
 
-    // Evitar nombres demasiado largos
     nombre = String(nombre).substring(0, 50)
 
     // ============================================================
-    // 🖼️ FOTO DE PERFIL
+    // 🖼️ FOTO
     // ============================================================
 
-    let pp = "https://i.ibb.co/dyk5QdQ/1212121212121212.png"
+    let pp = 'https://i.ibb.co/dyk5QdQ/1212121212121212.png'
 
     try {
 
@@ -71,26 +66,29 @@ let handler = async (m, { conn, text }) => {
 
         const url = await conn.profilePictureUrl(
           userJid,
-          "image"
+          'image'
         )
 
-        if (typeof url === "string" && url.startsWith("http")) {
+        if (
+          typeof url === 'string' &&
+          url.startsWith('http')
+        ) {
           pp = url
         }
       }
 
-    } catch (e) {
-      console.log("[QC] No se pudo obtener foto de perfil.")
+    } catch {
+      console.log('[QC] Foto de perfil no disponible.')
     }
 
     // ============================================================
-    // 📦 OBJETO PARA LA API
+    // 📦 PAYLOAD
     // ============================================================
 
-    const obj = {
-      type: "quote",
-      format: "png",
-      backgroundColor: "#000000",
+    const payload = {
+      type: 'quote',
+      format: 'png',
+      backgroundColor: '#000000',
       width: 512,
       height: 768,
       scale: 2,
@@ -103,6 +101,7 @@ let handler = async (m, { conn, text }) => {
           from: {
             id: 1,
             name: nombre,
+
             photo: {
               url: pp
             }
@@ -116,57 +115,113 @@ let handler = async (m, { conn, text }) => {
     }
 
     // ============================================================
-    // 🌐 GENERAR IMAGEN
+    // 🌐 API
     // ============================================================
 
     const response = await axios.post(
-      "https://bot.lyo.su/quote/generate",
-      obj,
+      'https://quote.yuri.ly/quote/generate',
+      payload,
       {
         headers: {
-          "Content-Type": "application/json"
+          'Content-Type': 'application/json',
+          'User-Agent': 'FelixCat-Bot'
         },
 
-        timeout: 15000,
+        timeout: 30000,
 
-        // Evita respuestas gigantes inesperadas
-        maxContentLength: 10 * 1024 * 1024,
-        maxBodyLength: 10 * 1024 * 1024
+        maxContentLength: 15 * 1024 * 1024,
+        maxBodyLength: 15 * 1024 * 1024
       }
     )
 
     // ============================================================
-    // 🔍 COMPROBAR RESPUESTA
+    // 🔍 RESPUESTA
     // ============================================================
 
-    const image = response?.data?.result?.image
+    const data = response?.data
+
+    console.log('[QC] Respuesta API:', {
+      ok: data?.ok,
+      type: data?.type,
+      ext: data?.ext,
+      hasImage: !!data?.image,
+      hasResultImage: !!data?.result?.image
+    })
+
+    // La API actual devuelve image directamente.
+    // Compatibilidad con APIs antiguas: result.image
+    const image =
+      data?.image ||
+      data?.result?.image
 
     if (!image) {
-      throw new Error("La API no devolvió ninguna imagen.")
+
+      console.error(
+        '[QC] Respuesta completa:',
+        data
+      )
+
+      throw new Error(
+        'La API no devolvió una imagen.'
+      )
     }
 
     // ============================================================
     // 🖼️ BASE64 → BUFFER
     // ============================================================
 
-    const buffer = Buffer.from(image, "base64")
+    let buffer
 
-    if (!buffer || !buffer.length) {
-      throw new Error("La imagen recibida está vacía.")
+    if (Buffer.isBuffer(image)) {
+
+      buffer = image
+
+    } else if (typeof image === 'string') {
+
+      // Por si viene como data:image/png;base64,...
+      const base64 = image.includes(',')
+        ? image.split(',').pop()
+        : image
+
+      buffer = Buffer.from(
+        base64,
+        'base64'
+      )
+
+    } else {
+
+      throw new Error(
+        'Formato de imagen desconocido.'
+      )
     }
+
+    if (!buffer?.length) {
+      throw new Error(
+        'El buffer generado está vacío.'
+      )
+    }
+
+    console.log(
+      `[QC] Imagen recibida: ${buffer.length} bytes`
+    )
 
     // ============================================================
     // 🏷️ CONVERTIR A STICKER
     // ============================================================
 
-    const stiker = await sticker(buffer, false)
+    const stiker = await sticker(
+      buffer,
+      false
+    )
 
     if (!stiker) {
-      throw new Error("No se pudo convertir la imagen en sticker.")
+      throw new Error(
+        'La función sticker() no devolvió datos.'
+      )
     }
 
     // ============================================================
-    // 📤 ENVIAR STICKER
+    // 📤 ENVIAR
     // ============================================================
 
     return await conn.sendMessage(
@@ -181,14 +236,18 @@ let handler = async (m, { conn, text }) => {
 
   } catch (e) {
 
-    console.error("❌ QC ERROR:", e)
+    console.error(
+      '❌ QC ERROR:',
+      e?.response?.data || e
+    )
 
     return conn.sendMessage(
       m.chat,
       {
         text:
-          "⚠️ *El generador de stickers está temporalmente caído.*\n\n" +
-          "🔄 Probá de nuevo en unos minutos."
+          '⚠️ *No se pudo generar el sticker.*\n\n' +
+          '🔄 La API de citas puede estar temporalmente caída. ' +
+          'Probá nuevamente en unos minutos.'
       },
       {
         quoted: m
@@ -198,17 +257,17 @@ let handler = async (m, { conn, text }) => {
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN DEL PLUGIN
+// ⚙️ CONFIGURACIÓN
 // ============================================================
 
-handler.command = ["qc"]
+handler.command = ['qc']
 
 handler.help = [
-  "qc <texto>"
+  'qc <texto>'
 ]
 
 handler.tags = [
-  "sticker"
+  'sticker'
 ]
 
 handler.group = false

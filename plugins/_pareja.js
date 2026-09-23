@@ -1262,7 +1262,7 @@ Siguen siendo novios.`
 
 
     // ========================================================
-    // 💕 INTERACCIONES
+    // 💕 INTERACCIONES — PAREJA REAL
     // ========================================================
 
     if (
@@ -1273,10 +1273,6 @@ Siguen siendo novios.`
         'regalo'
       ].includes(command)
     ) {
-
-      // ======================================================
-      // 👤 OBTENER USUARIO REAL
-      // ======================================================
 
       const senderId =
         await buscarUsuarioId(
@@ -1289,11 +1285,6 @@ Siguen siendo novios.`
       const user =
         getUser(senderId)
 
-
-      // ======================================================
-      // 🎯 OBTENER TARGET
-      // ======================================================
-
       const target =
         getTarget()
 
@@ -1302,11 +1293,6 @@ Siguen siendo novios.`
           '💌 Menciona o responde a alguien.'
         )
       }
-
-
-      // ======================================================
-      // 🔎 BUSCAR TARGET REAL EN LA BASE
-      // ======================================================
 
       const targetId =
         await buscarUsuarioId(
@@ -1321,30 +1307,251 @@ Siguen siendo novios.`
 
 
       // ======================================================
-      // ❤️ COMPARACIÓN REAL DE IDENTIDAD
-      //
-      // NO SE COMPARAN LOS JID DIRECTAMENTE.
-      // WhatsApp puede entregar un LID, un JID de teléfono
-      // u otro identificador para la misma persona.
+      // ❤️ COMPROBAR SI SON PAREJA
       // ======================================================
 
-      const esPareja =
-        await esMismaPersona(
-          conn,
-          user.pareja,
-          target,
-          m.chat
-        )
+      let sonPareja = false
 
 
       // ======================================================
-      // 💕 SI EL TARGET ES SU PAREJA
-      //
-      // ESTA COMPROBACIÓN VA PRIMERO PARA EVITAR QUE EL
-      // MISMO USUARIO SEA DETECTADO COMO "INFIDELIDAD".
+      // 1️⃣ LA PAREJA DEL SENDER ES EL TARGET
       // ======================================================
 
-      if (esPareja) {
+      if (user.pareja) {
+
+        if (
+          user.pareja === target ||
+          user.pareja === targetId
+        ) {
+          sonPareja = true
+        }
+
+        if (!sonPareja) {
+
+          sonPareja =
+            await esMismaPersona(
+              conn,
+              user.pareja,
+              target,
+              m.chat
+            )
+        }
+
+        if (!sonPareja) {
+
+          sonPareja =
+            await esMismaPersona(
+              conn,
+              user.pareja,
+              targetId,
+              m.chat
+            )
+        }
+
+        if (!sonPareja) {
+
+          const parejaId =
+            await buscarUsuarioId(
+              conn,
+              db,
+              user.pareja,
+              m.chat
+            )
+
+          if (
+            parejaId === target ||
+            parejaId === targetId
+          ) {
+            sonPareja = true
+          }
+
+          if (!sonPareja && parejaId) {
+
+            sonPareja =
+              await esMismaPersona(
+                conn,
+                parejaId,
+                targetId,
+                m.chat
+              )
+          }
+        }
+      }
+
+
+      // ======================================================
+      // 2️⃣ COMPROBACIÓN INVERSA
+      // ======================================================
+
+      if (!sonPareja && targetUser.pareja) {
+
+        if (
+          targetUser.pareja === sender ||
+          targetUser.pareja === senderId
+        ) {
+          sonPareja = true
+        }
+
+        if (!sonPareja) {
+
+          sonPareja =
+            await esMismaPersona(
+              conn,
+              targetUser.pareja,
+              sender,
+              m.chat
+            )
+        }
+
+        if (!sonPareja) {
+
+          sonPareja =
+            await esMismaPersona(
+              conn,
+              targetUser.pareja,
+              senderId,
+              m.chat
+            )
+        }
+
+        if (!sonPareja) {
+
+          const parejaId =
+            await buscarUsuarioId(
+              conn,
+              db,
+              targetUser.pareja,
+              m.chat
+            )
+
+          if (
+            parejaId === sender ||
+            parejaId === senderId
+          ) {
+            sonPareja = true
+          }
+
+          if (!sonPareja && parejaId) {
+
+            sonPareja =
+              await esMismaPersona(
+                conn,
+                parejaId,
+                senderId,
+                m.chat
+              )
+          }
+        }
+      }
+
+
+      // ======================================================
+      // 3️⃣ ÚLTIMO RESPALDO: BUSCAR EN TODA LA DB
+      // ======================================================
+
+      if (!sonPareja) {
+
+        for (const id of Object.keys(db)) {
+
+          const registro =
+            db[id]
+
+          if (!registro?.pareja)
+            continue
+
+
+          let esTarget =
+            id === target ||
+            id === targetId
+
+
+          if (!esTarget) {
+
+            esTarget =
+              await esMismaPersona(
+                conn,
+                id,
+                target,
+                m.chat
+              )
+          }
+
+
+          if (!esTarget) {
+
+            esTarget =
+              await esMismaPersona(
+                conn,
+                id,
+                targetId,
+                m.chat
+              )
+          }
+
+
+          if (!esTarget)
+            continue
+
+
+          let esSender =
+            registro.pareja === sender ||
+            registro.pareja === senderId
+
+
+          if (!esSender) {
+
+            esSender =
+              await esMismaPersona(
+                conn,
+                registro.pareja,
+                sender,
+                m.chat
+              )
+          }
+
+
+          if (!esSender) {
+
+            esSender =
+              await esMismaPersona(
+                conn,
+                registro.pareja,
+                senderId,
+                m.chat
+              )
+          }
+
+
+          if (!esSender) {
+
+            const parejaId =
+              await buscarUsuarioId(
+                conn,
+                db,
+                registro.pareja,
+                m.chat
+              )
+
+            esSender =
+              parejaId === sender ||
+              parejaId === senderId
+          }
+
+
+          if (esSender) {
+
+            sonPareja = true
+            break
+          }
+        }
+      }
+
+
+      // ======================================================
+      // 💞 SON PAREJA → PERMITIR TODAS LAS INTERACCIONES
+      // ======================================================
+
+      if (sonPareja) {
 
         const suma =
           command === 'besar'
@@ -1361,6 +1568,16 @@ Siguen siendo novios.`
 
         targetUser.amor =
           Number(targetUser.amor || 0) + suma
+
+
+        // Reparar automáticamente los IDs
+        if (targetId) {
+          user.pareja = targetId
+        }
+
+        if (senderId) {
+          targetUser.pareja = senderId
+        }
 
 
         saveDB(db)
@@ -1408,18 +1625,38 @@ Nuevo nivel de amor: ❤️ ${user.amor}`
 
 
       // ======================================================
-      // 🚨 EL TARGET TIENE PAREJA
+      // 🚨 EL TARGET TIENE OTRA PAREJA
       // ======================================================
 
       if (targetUser.pareja) {
 
-        const targetParejaEsSender =
-          await esMismaPersona(
-            conn,
-            targetUser.pareja,
-            sender,
-            m.chat
-          )
+        let targetParejaEsSender =
+          targetUser.pareja === sender ||
+          targetUser.pareja === senderId
+
+
+        if (!targetParejaEsSender) {
+
+          targetParejaEsSender =
+            await esMismaPersona(
+              conn,
+              targetUser.pareja,
+              sender,
+              m.chat
+            )
+        }
+
+
+        if (!targetParejaEsSender) {
+
+          targetParejaEsSender =
+            await esMismaPersona(
+              conn,
+              targetUser.pareja,
+              senderId,
+              m.chat
+            )
+        }
 
 
         if (!targetParejaEsSender) {

@@ -366,6 +366,7 @@ async function buscarUsuarioId(
     limpio &&
     db[limpio]
   ) {
+
     return limpio
   }
 
@@ -480,6 +481,7 @@ async function comprobarPareja(
       parejaReal === targetId ||
       parejaReal === target
     ) {
+
       return true
     }
 
@@ -492,6 +494,7 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
     }
 
@@ -504,6 +507,7 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
     }
   }
@@ -528,6 +532,7 @@ async function comprobarPareja(
       parejaReal === senderReal ||
       parejaReal === senderId
     ) {
+
       return true
     }
 
@@ -540,6 +545,7 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
     }
 
@@ -552,6 +558,7 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
     }
   }
@@ -599,6 +606,7 @@ async function comprobarPareja(
       parejaReal === targetId ||
       parejaReal === target
     ) {
+
       return true
     }
 
@@ -611,6 +619,7 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
     }
 
@@ -623,6 +632,7 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
     }
   }
@@ -1603,7 +1613,7 @@ Siguen siendo novios.`
     // .abrazar
     // .regalo
     //
-    // LOS 4 USAN EXACTAMENTE LA MISMA LÓGICA.
+    // LOS 4 FUNCIONAN EXACTAMENTE IGUAL QUE .AMOR
     // ========================================================
 
     if (
@@ -1635,7 +1645,7 @@ Siguen siendo novios.`
       // ======================================================
       // 🎯 TARGET
       //
-      // EXACTAMENTE IGUAL PARA LOS 4:
+      // EXACTAMENTE IGUAL:
       // MENCIONADO > CITADO
       // ======================================================
 
@@ -1656,7 +1666,7 @@ Siguen siendo novios.`
 
 
       // ======================================================
-      // 🔎 USUARIO DEL TARGET
+      // 🔎 USUARIO REAL DEL TARGET
       // ======================================================
 
       const targetId =
@@ -1675,14 +1685,15 @@ Siguen siendo novios.`
       // ======================================================
       // ❤️ COMPROBAR PAREJA
       //
-      // Primero sender → target.
-      // Después target → sender.
-      //
-      // NO se usa comprobarPareja() aquí.
+      // ESTA ES LA MISMA LÓGICA PARA LOS 4 COMANDOS.
       // ======================================================
 
       let sonPareja = false
 
+
+      // ======================================================
+      // ❤️ sender.pareja → target
+      // ======================================================
 
       if (user?.pareja) {
 
@@ -1703,6 +1714,10 @@ Siguen siendo novios.`
           )
       }
 
+
+      // ======================================================
+      // ❤️ target.pareja → sender
+      // ======================================================
 
       if (
         !sonPareja &&
@@ -1824,104 +1839,13 @@ Nuevo nivel de amor: ❤️ ${user.amor}`
 
 
       // ======================================================
-      // 🚨 TARGET TIENE OTRA PAREJA
-      // ======================================================
-
-      if (targetUser?.pareja) {
-
-        const parejaDelTarget =
-          await buscarUsuarioId(
-            conn,
-            db,
-            targetUser.pareja,
-            m.chat
-          ) || targetUser.pareja
-
-
-        const esParejaDelSender =
-          parejaDelTarget === senderId ||
-          parejaDelTarget === sender ||
-          await esMismaPersona(
-            conn,
-            parejaDelTarget,
-            sender,
-            m.chat
-          ) ||
-          await esMismaPersona(
-            conn,
-            parejaDelTarget,
-            senderId,
-            m.chat
-          )
-
-
-        if (!esParejaDelSender) {
-
-          return conn.reply(
-
-            m.chat,
-
-            box(
-              '🚨 PERSONA EN RELACIÓN',
-
-              `${tag(target)} está en pareja con ${tag(targetUser.pareja)} ❤️
-Respeta relaciones ajenas 😾`
-            ),
-
-            m,
-
-            {
-              mentions: [
-                target,
-                targetUser.pareja
-              ]
-            }
-          )
-        }
-      }
-
-
-      // ======================================================
-      // 🚨 SENDER TIENE OTRA PAREJA
-      // ======================================================
-
-      if (user?.pareja) {
-
-        const parejaActual =
-          await buscarUsuarioId(
-            conn,
-            db,
-            user.pareja,
-            m.chat
-          ) || user.pareja
-
-
-        return conn.reply(
-
-          m.chat,
-
-          box(
-            '🚨 INFIDELIDAD DETECTADA',
-
-            `${tag(sender)} intentó ${command} a ${tag(target)} 😾
-Pero su pareja es ${tag(parejaActual)} ❤️`
-          ),
-
-          m,
-
-          {
-            mentions: [
-              sender,
-              target,
-              parejaActual
-            ]
-          }
-        )
-      }
-
-
-      // ======================================================
       // 💔 NO SON PAREJA
+      //
+      // IMPORTANTE:
+      // NO hay una comprobación diferente para .besar,
+      // .abrazar ni .regalo.
+      //
+      // Los cuatro terminan exactamente igual.
       // ======================================================
 
       return conn.reply(

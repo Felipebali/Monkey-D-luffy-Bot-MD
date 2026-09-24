@@ -1,17 +1,24 @@
 // 📂 plugins/menuj.js — FelixCat_Bot
+
 let handler = async (m, { conn }) => {
+
   try {
-    const chatSettings = global.db.data.chats[m.chat] || {};
-    const gamesEnabled = chatSettings.games !== false; // Por defecto activados
+
+    const chatSettings =
+      global.db.data.chats[m.chat] || {}
+
+    const gamesEnabled =
+      chatSettings.games !== false
 
     let menuText = `╔═════════════════════╗
 🎮  MINI-JUEGOS FELIXCAT 🐾
 ╚═════════════════════╝
 Estado: ${gamesEnabled ? '🟢 Activados' : '🔴 Desactivados'}
 ────────────────────────────
-`;
+`
 
     if (gamesEnabled) {
+
       menuText += `
 🌟 *Juego Especial y Viral:*
 🐾 *.therian* → Descubre tu animal interior PRO 🐲✨
@@ -42,31 +49,57 @@ Estado: ${gamesEnabled ? '🟢 Activados' : '🔴 Desactivados'}
 
 💅 *.trolo <@user>* → Test de trolez (versión 2.1)
 🧢 *.cornudo <@user>* / *.cornuda <@user>* → Test de cornudez (versión 2.1)
+💚 *.fiel <@user>* → Test de fidelidad (versión 2.1)
 💔 *.infiel <@user>* → Test de infidelidad (versión 2.1)
 🔥 *.zorra <@user>* / *.zorro <@user>* → Test de zorreada (versión 2.1)
 😈 *.puta <@user>* → Comando divertido/insulto gracioso
 😂 *.puto <@user>* → Comando divertido/insulto gracioso
 🎉 *.sortear [premio]* → Sortea participantes del grupo
 ────────────────────────────
-`;
+`
+
     } else {
-      menuText += `⚠️ *Mini-juegos desactivados.*  
+
+      menuText += `⚠️ *Mini-juegos desactivados.*
 Menciona a un admin para activarlos 🔴
 ────────────────────────────
-`;
+`
     }
 
-    menuText += `👑 *Powered by FelixCat 🐾*`;
+    menuText +=
+      `👑 *Powered by FelixCat 🐾*`
 
-    await conn.sendMessage(m.chat, { text: menuText }, { quoted: m });
+    await conn.sendMessage(
+      m.chat,
+      {
+        text: menuText
+      },
+      {
+        quoted: m
+      }
+    )
 
   } catch (e) {
-    console.error(e);
-    await conn.reply(m.chat, '✖️ Error al mostrar el menú de mini-juegos.', m);
+
+    console.error(e)
+
+    await conn.reply(
+      m.chat,
+      '✖️ Error al mostrar el menú de mini-juegos.',
+      m
+    )
   }
-};
+}
 
-handler.command = ['menuj', 'mj'];
-handler.group = true;
+// ============================================================
+// 📌 COMANDOS
+// ============================================================
 
-export default handler;
+handler.command = [
+  'menuj',
+  'mj'
+]
+
+handler.group = true
+
+export default handler

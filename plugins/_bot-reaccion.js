@@ -1,62 +1,83 @@
-// 📂 plugins/bot-reaccion.js
-// 🤖 Reacciona automáticamente cuando alguien escribe "bot"
-
-const emojis = [
-  '🤖', '🐾', '😎', '😂', '🤣',
-  '❤️', '💀', '👀', '🔥', '😏',
-  '🙄', '😹', '🥰', '😈', '🤨',
-  '💯', '✨', '🫡', '😭', '💅'
-]
-
-function randomEmoji() {
-  return emojis[Math.floor(Math.random() * emojis.length)]
-}
+// plugins/bot-reaccion.js
+// 🤖 Activador: palabra "bot" (sin prefijo)
+// Reacciona con un emoji aleatorio al mensaje que contiene "bot"
 
 let handler = async (m, { conn }) => {
   try {
-    // Solo grupos
+
+    // 👥 SOLO GRUPOS
     if (!m.isGroup) return
 
-    // No reaccionar a mensajes enviados por el propio bot
-    if (m.fromMe) return
-
-    // Obtener texto del mensaje
-    const texto = String(
-      m.text ||
-      m.body ||
-      m.message?.conversation ||
-      m.message?.extendedTextMessage?.text ||
-      ''
-    ).trim()
+    // 📝 Obtener texto del mensaje
+    const texto = String(m.text || '').trim()
 
     if (!texto) return
 
-    // Detectar "bot" como palabra independiente
-    const contieneBot = /(^|\s)bot(?=$|\s|[.,!?¿¡:;'"()[\]{}])/i.test(texto)
+    // 🔎 Detectar "bot" como palabra independiente
+    // Funciona con:
+    // bot
+    // BOT
+    // Bot
+    // hola bot
+    // che bot 😂
+    // bot, ayudame
+    const contieneBot =
+      /(^|\s)bot(?=$|\s|[.,!?¿¡:;'"()[\]{}])/i.test(texto)
 
     if (!contieneBot) return
 
-    // Emoji aleatorio
-    const emoji = randomEmoji()
+    // 🤖 Emojis disponibles
+    const emojis = [
+      '🤖',
+      '🐾',
+      '😎',
+      '😂',
+      '🤣',
+      '❤️',
+      '💀',
+      '👀',
+      '🔥',
+      '😏',
+      '🙄',
+      '😹',
+      '🥰',
+      '😈',
+      '🤨',
+      '💯',
+      '✨',
+      '🫡',
+      '😭',
+      '💅'
+    ]
 
-    // Reaccionar al mensaje
-    await conn.sendMessage(
-      m.chat,
-      {
-        react: {
-          text: emoji,
-          key: m.key
-        }
+    // 🎲 Emoji aleatorio
+    const emoji =
+      emojis[Math.floor(Math.random() * emojis.length)]
+
+    // 🤖 Reaccionar al mensaje
+    await conn.sendMessage(m.chat, {
+      react: {
+        text: emoji,
+        key: m.key
       }
-    )
+    })
 
-  } catch (error) {
-    console.error('❌ Error en bot-reaccion.js:', error)
+  } catch (e) {
+    console.error('❌ Error en bot-reaccion:', e)
   }
 }
 
-// Importante para que el loader lo procese
-handler.all = true
+// ============================================================
+// 🔎 DETECTAR "bot" SIN PREFIJO
+// ============================================================
+
+handler.customPrefix =
+  /(^|\s)bot(?=$|\s|[.,!?¿¡:;'"()[\]{}])/i
+
+// No necesita comando con .
+handler.command = new RegExp()
+
+// Solo grupos
 handler.group = true
 
 export default handler

@@ -1,104 +1,45 @@
 // 📂 plugins/bot-reaccion.js
-// 🤖 FelixCat_Bot — Reacción automática al mencionar "bot"
+// 🤖 Reacciona automáticamente cuando alguien escribe "bot"
 
 const emojis = [
-  '🤖',
-  '🐾',
-  '😎',
-  '😂',
-  '🤣',
-  '❤️',
-  '💀',
-  '👀',
-  '🔥',
-  '😏',
-  '🙄',
-  '😹',
-  '🥰',
-  '😈',
-  '🤨',
-  '💯',
-  '✨',
-  '🫡',
-  '😭',
-  '💅'
+  '🤖', '🐾', '😎', '😂', '🤣',
+  '❤️', '💀', '👀', '🔥', '😏',
+  '🙄', '😹', '🥰', '😈', '🤨',
+  '💯', '✨', '🫡', '😭', '💅'
 ]
 
-// ============================================================
-// 🎲 EMOJI ALEATORIO
-// ============================================================
-
-const randomEmoji = () => {
-  return emojis[
-    Math.floor(
-      Math.random() * emojis.length
-    )
-  ]
+function randomEmoji() {
+  return emojis[Math.floor(Math.random() * emojis.length)]
 }
 
-// ============================================================
-// 🤖 HANDLER
-// ============================================================
-
 let handler = async (m, { conn }) => {
-
   try {
-
     // Solo grupos
-    if (!m.isGroup)
-      return
+    if (!m.isGroup) return
 
-    // Evitar que el bot reaccione a sí mismo
-    if (m.fromMe)
-      return
+    // No reaccionar a mensajes enviados por el propio bot
+    if (m.fromMe) return
 
     // Obtener texto del mensaje
-    const text =
-      String(
-        m.text ||
-        m.body ||
-        ''
-      ).trim()
+    const texto = String(
+      m.text ||
+      m.body ||
+      m.message?.conversation ||
+      m.message?.extendedTextMessage?.text ||
+      ''
+    ).trim()
 
-    if (!text)
-      return
+    if (!texto) return
 
-    // ========================================================
-    // 🔎 DETECTAR "BOT"
-    // ========================================================
+    // Detectar "bot" como palabra independiente
+    const contieneBot = /(^|\s)bot(?=$|\s|[.,!?¿¡:;'"()[\]{}])/i.test(texto)
 
-    // Detecta:
-    // bot
-    // Bot
-    // BOT
-    // "bot"
-    // bot?
-    // bot!
-    // hola bot
-    // bot responde
-    //
-    // Pero evita palabras como:
-    // botella
-    // robot
-    // botánico
+    if (!contieneBot) return
 
-    const contieneBot =
-      /(^|\s)bot(?=$|\s|[.,!?¿¡:;'"()])/i.test(text)
+    // Emoji aleatorio
+    const emoji = randomEmoji()
 
-    if (!contieneBot)
-      return
-
-    // ========================================================
-    // 🎲 ELEGIR EMOJI
-    // ========================================================
-
-    const emoji =
-      randomEmoji()
-
-    // ========================================================
-    // ❤️ REACCIONAR
-    // ========================================================
-
+    // Reaccionar al mensaje
     await conn.sendMessage(
       m.chat,
       {
@@ -110,31 +51,12 @@ let handler = async (m, { conn }) => {
     )
 
   } catch (error) {
-
-    console.error(
-      '❌ Error en bot-reaccion.js:',
-      error
-    )
+    console.error('❌ Error en bot-reaccion.js:', error)
   }
 }
 
-// ============================================================
-// 🚫 SIN PREFIJO
-// ============================================================
-
-// Esto permite que el plugin se ejecute
-// sin escribir .bot
-
-handler.customPrefix =
-  /(^|\s)bot(?=$|\s|[.,!?¿¡:;'"()])/i
-
-// ============================================================
-// 📌 IMPORTANTE
-// ============================================================
-
-// No necesita comando con prefijo.
-handler.command = []
-
+// Importante para que el loader lo procese
+handler.all = true
 handler.group = true
 
 export default handler

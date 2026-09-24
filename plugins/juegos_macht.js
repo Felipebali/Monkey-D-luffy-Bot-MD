@@ -16,7 +16,9 @@ const handler = async (m, { conn, args, command }) => {
     // ========================================================
 
     if (!m.isGroup)
-      return m.reply('❌ Este comando solo funciona en grupos.')
+      return m.reply(
+        '❌ Este comando solo funciona en grupos.'
+      )
 
     // ========================================================
     // 🎮 COMPROBAR GAMES
@@ -40,7 +42,9 @@ const handler = async (m, { conn, args, command }) => {
       await conn.groupMetadata(m.chat)
 
     if (!metadata)
-      return m.reply('❌ No pude obtener los datos del grupo.')
+      return m.reply(
+        '❌ No pude obtener los datos del grupo.'
+      )
 
     const groupName =
       metadata.subject || 'este grupo'
@@ -185,6 +189,7 @@ const handler = async (m, { conn, args, command }) => {
         .toLowerCase() === 'all'
     ) {
 
+      // 🎲 Mezclar participantes
       participants =
         [...participants]
           .sort(
@@ -195,6 +200,12 @@ const handler = async (m, { conn, args, command }) => {
         `💘 *MATCH GENERAL EN ${groupName.toUpperCase()}* 💘\n\n`
 
       const mentions = []
+
+      let numeroPareja = 1
+
+      // ======================================================
+      // 💞 CREAR PAREJAS
+      // ======================================================
 
       for (
         let i = 0;
@@ -208,23 +219,42 @@ const handler = async (m, { conn, args, command }) => {
         const p2 =
           participants[i + 1]
 
+        // ====================================================
+        // 💞 PAREJA COMPLETA
+        // ====================================================
+
         if (p2) {
 
           const pct =
             porcentaje()
 
           msg +=
-            `💞 @${p1.split('@')[0]} ❤️ @${p2.split('@')[0]} — *${pct}% compatibles*\n`
+            `╭━━━〔 💞 PAREJA ${numeroPareja} 〕━━━⬣\n` +
+            `👤 @${p1.split('@')[0]}\n` +
+            `❤️ @${p2.split('@')[0]}\n` +
+            `💘 Compatibilidad: *${pct}%*\n` +
+            `╰━━━━━━━━━━━━━━━━⬣\n\n`
 
           mentions.push(
             p1,
             p2
           )
 
-        } else {
+          numeroPareja++
+
+        }
+
+        // ====================================================
+        // 😿 PARTICIPANTE SIN PAREJA
+        // ====================================================
+
+        else {
 
           msg +=
-            `😿 @${p1.split('@')[0]} se quedó sin pareja 💔\n`
+            `╭━━━〔 😿 SIN PAREJA 〕━━━⬣\n` +
+            `👤 @${p1.split('@')[0]}\n` +
+            `💔 Se quedó sin pareja esta ronda.\n` +
+            `╰━━━━━━━━━━━━━━━━⬣\n\n`
 
           mentions.push(
             p1
@@ -232,8 +262,16 @@ const handler = async (m, { conn, args, command }) => {
         }
       }
 
+      // ======================================================
+      // 💘 FRASE FINAL
+      // ======================================================
+
       msg +=
-        `\n${pickRandom(frases)}`
+        pickRandom(frases)
+
+      // ======================================================
+      // 💘 REACCIÓN
+      // ======================================================
 
       await conn.sendMessage(
         m.chat,
@@ -244,6 +282,10 @@ const handler = async (m, { conn, args, command }) => {
           }
         }
       )
+
+      // ======================================================
+      // 📤 ENVIAR RESULTADO
+      // ======================================================
 
       return conn.sendMessage(
         m.chat,
@@ -280,6 +322,10 @@ const handler = async (m, { conn, args, command }) => {
           ? conn.decodeJid(m.sender)
           : m.sender
 
+      // ======================================================
+      // 🚫 NO HACER MATCH CONSIGO MISMO
+      // ======================================================
+
       if (
         author === mentioned
       ) {
@@ -299,6 +345,10 @@ const handler = async (m, { conn, args, command }) => {
         `@${author.split('@')[0]} ❤️ @${mentioned.split('@')[0]} — *${pct}% compatibles*\n\n` +
         pickRandom(frases)
 
+      // ======================================================
+      // 💘 REACCIÓN
+      // ======================================================
+
       await conn.sendMessage(
         m.chat,
         {
@@ -308,6 +358,10 @@ const handler = async (m, { conn, args, command }) => {
           }
         }
       )
+
+      // ======================================================
+      // 📤 ENVIAR RESULTADO
+      // ======================================================
 
       return conn.sendMessage(
         m.chat,
@@ -346,8 +400,16 @@ const handler = async (m, { conn, args, command }) => {
       )
     }
 
+    // ========================================================
+    // 🎲 ELEGIR PRIMERA PERSONA
+    // ========================================================
+
     const p1 =
       pickRandom(pool)
+
+    // ========================================================
+    // 🎲 ELEGIR SEGUNDA PERSONA
+    // ========================================================
 
     const posibles =
       pool.filter(
@@ -358,13 +420,25 @@ const handler = async (m, { conn, args, command }) => {
     const p2 =
       pickRandom(posibles)
 
+    // ========================================================
+    // 📊 PORCENTAJE
+    // ========================================================
+
     const pct =
       porcentaje()
+
+    // ========================================================
+    // 💘 MENSAJE
+    // ========================================================
 
     const msg =
       `💞 *MATCH ALEATORIO EN ${groupName}* 💞\n\n` +
       `@${p1.split('@')[0]} ❤️ @${p2.split('@')[0]} — *${pct}% compatibles*\n\n` +
       pickRandom(frases)
+
+    // ========================================================
+    // 💘 REACCIÓN
+    // ========================================================
 
     await conn.sendMessage(
       m.chat,
@@ -375,6 +449,10 @@ const handler = async (m, { conn, args, command }) => {
         }
       }
     )
+
+    // ========================================================
+    // 📤 ENVIAR RESULTADO
+    // ========================================================
 
     return conn.sendMessage(
       m.chat,

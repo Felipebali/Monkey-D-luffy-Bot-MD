@@ -1,109 +1,428 @@
-// 📂 plugins/match.js — FULL COMPATIBLE CON CUALQUIER LOADER
-console.log('[Plugin] match cargado');
+// 📂 plugins/match.js
+// 💘 Sistema MATCH — FelixCat_Bot
 
-let handler = async (m, { conn, args, command }) => {
+console.log('[Plugin] match.js cargado')
+
+// ============================================================
+// 🎯 HANDLER
+// ============================================================
+
+const handler = async (m, { conn, args, command }) => {
+
   try {
-    const chat = global.db.data.chats[m.chat] || {};
-    if (!chat.games) return;
-    if (!m.isGroup) return;
 
-    // 📋 Obtener participantes
-    const groupMetadata = await conn.groupMetadata(m.chat);
-    let participants = groupMetadata.participants.map(p => p.id);
-    const groupName = groupMetadata.subject || 'este grupo';
+    // ========================================================
+    // 👥 SOLO GRUPOS
+    // ========================================================
 
-    // 🛡 Filtrar dueños y bot
-    const botNumber = conn.user?.id.split(':')[0];
-    const owners = ['59898719147', '59896026646'];
+    if (!m.isGroup)
+      return m.reply('❌ Este comando solo funciona en grupos.')
 
-    participants = participants.filter(p => {
-      const num = p.replace(/@s\.whatsapp\.net$/, '');
-      return num !== botNumber && !owners.includes(num);
-    });
+    // ========================================================
+    // 🎮 COMPROBAR GAMES
+    // ========================================================
 
-    if (participants.length < 2) return;
+    const chat =
+      global.db?.data?.chats?.[m.chat]
 
-    // 🎲 Random helper
-    const pickRandom = arr => arr[Math.floor(Math.random() * arr.length)];
+    if (
+      chat &&
+      chat.games === false
+    ) {
+      return
+    }
 
-    // 📊 Porcentaje random
-    const porcentaje = () => Math.floor(Math.random() * 101);
+    // ========================================================
+    // 📋 METADATA DEL GRUPO
+    // ========================================================
 
-    // ✨ Frases
+    const metadata =
+      await conn.groupMetadata(m.chat)
+
+    if (!metadata)
+      return m.reply('❌ No pude obtener los datos del grupo.')
+
+    const groupName =
+      metadata.subject || 'este grupo'
+
+    // ========================================================
+    // 👥 PARTICIPANTES
+    // ========================================================
+
+    let participants =
+      (metadata.participants || [])
+        .map(p =>
+          p.id ||
+          p.jid ||
+          p.lid
+        )
+        .filter(Boolean)
+
+    // ========================================================
+    // 🤖 BOT
+    // ========================================================
+
+    const botJid =
+      conn.user?.id
+        ? conn.decodeJid
+          ? conn.decodeJid(conn.user.id)
+          : conn.user.id
+        : null
+
+    const botNumber =
+      botJid
+        ? botJid
+            .split('@')[0]
+            .split(':')[0]
+        : null
+
+    // ========================================================
+    // 👑 OWNERS
+    // ========================================================
+
+    const owners = [
+      '59898719147',
+      '59896026646'
+    ]
+
+    // ========================================================
+    // 🛡 FILTRAR BOT Y OWNERS
+    // ========================================================
+
+    participants =
+      participants.filter(jid => {
+
+        const numero =
+          String(jid)
+            .split('@')[0]
+            .split(':')[0]
+            .replace(/\D/g, '')
+
+        if (!numero)
+          return false
+
+        if (
+          botNumber &&
+          numero === botNumber
+        ) {
+          return false
+        }
+
+        if (
+          owners.includes(numero)
+        ) {
+          return false
+        }
+
+        return true
+      })
+
+    // ========================================================
+    // 👥 MÍNIMO
+    // ========================================================
+
+    if (participants.length < 2) {
+
+      return m.reply(
+        '❌ No hay suficientes participantes para hacer un match.'
+      )
+    }
+
+    // ========================================================
+    // 🎲 RANDOM
+    // ========================================================
+
+    const pickRandom = array =>
+      array[
+        Math.floor(
+          Math.random() * array.length
+        )
+      ]
+
+    // ========================================================
+    // 📊 PORCENTAJE
+    // ========================================================
+
+    const porcentaje = () =>
+      Math.floor(
+        Math.random() * 101
+      )
+
+    // ========================================================
+    // 💘 FRASES
+    // ========================================================
+
     const frases = [
+
       '💘 *El destino los ha unido.*',
+
       '❤️ *El amor está en el aire.*',
+
       '💞 *Una pareja que haría historia.*',
+
       '💖 *Cupido hizo de las suyas.*',
+
       '💝 *Romance felino detectado.*'
-    ];
 
-    // 📌 1) MATCH ALL (pares con porcentaje)
-    if (args[0] && args[0].toLowerCase() === 'all') {
-      participants = participants.sort(() => Math.random() - 0.5);
-      let msg = `💘 *MATCH GENERAL EN ${groupName.toUpperCase()}* 💘\n\n`;
-      let mentions = [];
+    ]
 
-      for (let i = 0; i < participants.length; i += 2) {
-        if (participants[i + 1]) {
-          const pct = porcentaje();
-          msg += `💞 @${participants[i].split('@')[0]} ❤️ @${participants[i + 1].split('@')[0]} — *${pct}% compatibles*\n`;
-          mentions.push(participants[i], participants[i + 1]);
+    // ========================================================
+    // 💘 COMANDO
+    // ========================================================
+
+    const cmd =
+      String(command || '')
+        .trim()
+        .toLowerCase()
+
+    // ========================================================
+    // 💘 MATCH ALL
+    // ========================================================
+
+    if (
+      args?.[0] &&
+      String(args[0])
+        .toLowerCase() === 'all'
+    ) {
+
+      participants =
+        [...participants]
+          .sort(
+            () => Math.random() - 0.5
+          )
+
+      let msg =
+        `💘 *MATCH GENERAL EN ${groupName.toUpperCase()}* 💘\n\n`
+
+      const mentions = []
+
+      for (
+        let i = 0;
+        i < participants.length;
+        i += 2
+      ) {
+
+        const p1 =
+          participants[i]
+
+        const p2 =
+          participants[i + 1]
+
+        if (p2) {
+
+          const pct =
+            porcentaje()
+
+          msg +=
+            `💞 @${p1.split('@')[0]} ❤️ @${p2.split('@')[0]} — *${pct}% compatibles*\n`
+
+          mentions.push(
+            p1,
+            p2
+          )
+
         } else {
-          msg += `😿 @${participants[i].split('@')[0]} se quedó sin pareja 💔\n`;
-          mentions.push(participants[i]);
+
+          msg +=
+            `😿 @${p1.split('@')[0]} se quedó sin pareja 💔\n`
+
+          mentions.push(
+            p1
+          )
         }
       }
 
-      msg += `\n${pickRandom(frases)}`;
-      await conn.sendMessage(m.chat, { react: { text: '💘', key: m.key } });
-      await conn.sendMessage(m.chat, { text: msg, mentions }, { quoted: m });
-      return;
+      msg +=
+        `\n${pickRandom(frases)}`
+
+      await conn.sendMessage(
+        m.chat,
+        {
+          react: {
+            text: '💘',
+            key: m.key
+          }
+        }
+      )
+
+      return conn.sendMessage(
+        m.chat,
+        {
+          text: msg,
+          mentions
+        },
+        {
+          quoted: m
+        }
+      )
     }
 
-    // 📌 2) MATCH @usuario → autor ❤️ mencionado (con porcentaje)
-    let mentioned = m.mentionedJid && m.mentionedJid[0];
+    // ========================================================
+    // 💞 MATCH @USUARIO
+    // ========================================================
+
+    const mentioned =
+      Array.isArray(m.mentionedJid) &&
+      m.mentionedJid.length
+        ? (
+            conn.decodeJid
+              ? conn.decodeJid(
+                  m.mentionedJid[0]
+                )
+              : m.mentionedJid[0]
+          )
+        : null
+
     if (mentioned) {
-      const author = m.sender;
-      if (mentioned === author)
-        return conn.reply(m.chat, "😂 No podés hacer match con vos mismo.", m);
 
-      const pct = porcentaje();
-      const msg = `💞 *MATCH ENTRE USUARIOS EN ${groupName}* 💞\n\n` +
-                  `@${author.split('@')[0]} ❤️ @${mentioned.split('@')[0]} — *${pct}% compatibles*\n\n` +
-                  pickRandom(frases);
+      const author =
+        conn.decodeJid
+          ? conn.decodeJid(m.sender)
+          : m.sender
 
-      await conn.sendMessage(m.chat, { react: { text: '💘', key: m.key } });
-      await conn.sendMessage(m.chat, { text: msg, mentions: [author, mentioned] }, { quoted: m });
-      return;
+      if (
+        author === mentioned
+      ) {
+
+        return conn.reply(
+          m.chat,
+          '😂 No podés hacer match con vos mismo.',
+          m
+        )
+      }
+
+      const pct =
+        porcentaje()
+
+      const msg =
+        `💞 *MATCH ENTRE USUARIOS EN ${groupName}* 💞\n\n` +
+        `@${author.split('@')[0]} ❤️ @${mentioned.split('@')[0]} — *${pct}% compatibles*\n\n` +
+        pickRandom(frases)
+
+      await conn.sendMessage(
+        m.chat,
+        {
+          react: {
+            text: '💘',
+            key: m.key
+          }
+        }
+      )
+
+      return conn.sendMessage(
+        m.chat,
+        {
+          text: msg,
+          mentions: [
+            author,
+            mentioned
+          ]
+        },
+        {
+          quoted: m
+        }
+      )
     }
 
-    // 📌 3) MATCH NORMAL → 2 random (autor no participa)
-    const pool = participants.filter(p => p !== m.sender);
-    if (pool.length < 2) return;
+    // ========================================================
+    // 💘 MATCH NORMAL
+    // ========================================================
 
-    const p1 = pickRandom(pool);
-    const p2 = pickRandom(pool.filter(p => p !== p1));
-    const pct = porcentaje();
+    const author =
+      conn.decodeJid
+        ? conn.decodeJid(m.sender)
+        : m.sender
 
-    const msg = `💞 *MATCH ALEATORIO EN ${groupName}* 💞\n\n` +
-                `@${p1.split('@')[0]} ❤️ @${p2.split('@')[0]} — *${pct}% compatibles*\n\n${pickRandom(frases)}`;
+    const pool =
+      participants.filter(
+        p =>
+          p !== author
+      )
 
-    await conn.sendMessage(m.chat, { react: { text: '💘', key: m.key } });
-    await conn.sendMessage(m.chat, { text: msg, mentions: [p1, p2] }, { quoted: m });
+    if (pool.length < 2) {
 
-  } catch (e) {
-    console.error(e);
+      return m.reply(
+        '❌ No hay suficientes personas para hacer un match.'
+      )
+    }
+
+    const p1 =
+      pickRandom(pool)
+
+    const posibles =
+      pool.filter(
+        p =>
+          p !== p1
+      )
+
+    const p2 =
+      pickRandom(posibles)
+
+    const pct =
+      porcentaje()
+
+    const msg =
+      `💞 *MATCH ALEATORIO EN ${groupName}* 💞\n\n` +
+      `@${p1.split('@')[0]} ❤️ @${p2.split('@')[0]} — *${pct}% compatibles*\n\n` +
+      pickRandom(frases)
+
+    await conn.sendMessage(
+      m.chat,
+      {
+        react: {
+          text: '💘',
+          key: m.key
+        }
+      }
+    )
+
+    return conn.sendMessage(
+      m.chat,
+      {
+        text: msg,
+        mentions: [
+          p1,
+          p2
+        ]
+      },
+      {
+        quoted: m
+      }
+    )
+
+  } catch (error) {
+
+    console.error(
+      '❌ Error en match.js:',
+      error
+    )
+
+    return m.reply(
+      '❌ Ocurrió un error ejecutando el comando .match'
+    )
   }
-};
+}
 
-// 🔥 Compatibilidad máxima con cualquier loader
-handler.help = ['match', 'macht'];
-handler.tags = ['fun', 'juego'];
-handler.group = true;
-handler.command = ['match', 'macht'];
-handler.command = handler.command || /^(match|macht)$/i;
-handler.customPrefix = null;
-handler.register = true;
+// ============================================================
+// 📌 CONFIGURACIÓN DEL PLUGIN
+// ============================================================
 
-export default handler;
+handler.help = [
+  'match',
+  'match all',
+  'match @usuario'
+]
+
+handler.tags = [
+  'fun',
+  'juego'
+]
+
+handler.command = [
+  'match',
+  'macht'
+]
+
+handler.group = true
+
+export default handler

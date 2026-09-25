@@ -5,18 +5,15 @@
 // .setpareja @usuario1 @usuario2
 // .setpareja 598XXXXXXXX 598XXXXXXXX
 //
-// La relación queda guardada en:
-// ./database/parejas.json
-//
-// Luego las acciones:
+// 🚫 NO permite parejas repetidas.
+// 🚫 NO rompe relaciones existentes.
+// ❤️ Compatible con:
 // .amor
 // .cita
 // .besar
 // .abrazar
 // .regalo
 // .flores
-//
-// reconocerán automáticamente la pareja.
 
 import fs from 'fs'
 import path from 'path'
@@ -65,7 +62,7 @@ const saveDB = data => {
 }
 
 // ============================================================
-// 👑 OBTENER OWNERS
+// 👑 OWNERS
 // ============================================================
 
 function getOwnersJid() {
@@ -138,7 +135,10 @@ function obtenerNumero(conn, jid) {
         return null
 
     const id =
-        normalizarJid(conn, jid)
+        normalizarJid(
+            conn,
+            jid
+        )
 
     if (!id)
         return null
@@ -150,6 +150,112 @@ function obtenerNumero(conn, jid) {
             .replace(/\D/g, '')
 
     return numero || null
+}
+
+// ============================================================
+// 👥 COMPARAR DOS PERSONAS
+// ============================================================
+
+function mismaPersona(conn, jid1, jid2) {
+
+    if (!jid1 || !jid2)
+        return false
+
+    const a =
+        normalizarJid(
+            conn,
+            jid1
+        )
+
+    const b =
+        normalizarJid(
+            conn,
+            jid2
+        )
+
+    if (!a || !b)
+        return false
+
+    // JID exacto
+    if (a === b)
+        return true
+
+    // Comparación por número
+    const numeroA =
+        obtenerNumero(
+            conn,
+            a
+        )
+
+    const numeroB =
+        obtenerNumero(
+            conn,
+            b
+        )
+
+    if (
+        numeroA &&
+        numeroB &&
+        numeroA === numeroB
+    ) {
+        return true
+    }
+
+    return false
+}
+
+// ============================================================
+// 🔎 BUSCAR REGISTRO DE UNA PERSONA
+// ============================================================
+
+function buscarUsuario(db, conn, jid) {
+
+    if (!jid)
+        return null
+
+    const limpio =
+        normalizarJid(
+            conn,
+            jid
+        )
+
+    // Coincidencia exacta
+    if (
+        limpio &&
+        db[limpio]
+    ) {
+        return limpio
+    }
+
+    // Coincidencia por número
+    const numero =
+        obtenerNumero(
+            conn,
+            limpio
+        )
+
+    if (!numero)
+        return null
+
+    for (
+        const id of Object.keys(db)
+    ) {
+
+        const numeroDB =
+            obtenerNumero(
+                conn,
+                id
+            )
+
+        if (
+            numeroDB &&
+            numeroDB === numero
+        ) {
+            return id
+        }
+    }
+
+    return null
 }
 
 // ============================================================
@@ -189,10 +295,12 @@ async function obtenerUsuarios(
     }
 
     // ========================================================
-    // 💬 USUARIO CITADO
+    // 💬 CITADO
     // ========================================================
 
-    if (m.quoted?.sender) {
+    if (
+        m.quoted?.sender
+    ) {
 
         const citado =
             normalizarJid(
@@ -294,6 +402,27 @@ function crearUsuario() {
 }
 
 // ============================================================
+// 🏷️ TAG
+// ============================================================
+
+function tag(conn, jid) {
+
+    const numero =
+        obtenerNumero(
+            conn,
+            jid
+        )
+
+    return '@' +
+        (
+            numero ||
+            String(jid)
+                .split('@')[0]
+                .split(':')[0]
+        )
+}
+
+// ============================================================
 // 🤖 HANDLER
 // ============================================================
 
@@ -321,26 +450,13 @@ let handler = async (
             getOwnersJid()
 
         const esOwner =
-            owners.some(owner => {
-
-                const numeroOwner =
-                    obtenerNumero(
-                        conn,
-                        owner
-                    )
-
-                const numeroSender =
-                    obtenerNumero(
-                        conn,
-                        sender
-                    )
-
-                return (
-                    numeroOwner &&
-                    numeroSender &&
-                    numeroOwner === numeroSender
+            owners.some(owner =>
+                mismaPersona(
+                    conn,
+                    owner,
+                    sender
                 )
-            })
+            )
 
         if (!esOwner) {
 
@@ -350,7 +466,7 @@ let handler = async (
         }
 
         // ====================================================
-        // 💾 CARGAR DATABASE
+        // 💾 DATABASE
         // ====================================================
 
         const db =
@@ -367,7 +483,9 @@ let handler = async (
                 text
             )
 
-        if (users.length < 2) {
+        if (
+            users.length < 2
+        ) {
 
             return m.reply(
 `💡 *USO DE .setpareja*
@@ -399,9 +517,11 @@ Debes indicar dos usuarios.
         // ====================================================
 
         if (
-            user1 === user2 ||
-            obtenerNumero(conn, user1) ===
-            obtenerNumero(conn, user2)
+            mismaPersona(
+                conn,
+                user1,
+                user2
+            )
         ) {
 
             return m.reply(
@@ -410,79 +530,161 @@ Debes indicar dos usuarios.
         }
 
         // ====================================================
-        // 👤 CREAR REGISTROS
+        // 🔎 BUSCAR REGISTROS REALES
         // ====================================================
 
-        if (!db[user1])
-            db[user1] = crearUsuario()
+        const id1 =
+            buscarUsuario(
+                db,
+                conn,
+                user1
+            )
 
-        if (!db[user2])
-            db[user2] = crearUsuario()
+        const id2 =
+            buscarUsuario(
+                db,
+                conn,
+                user2
+            )
+
+        const real1 =
+            id1 || user1
+
+        const real2 =
+            id2 || user2
+
+        // ====================================================
+        // 👤 CREAR SI NO EXISTE
+        // ====================================================
+
+        if (!db[real1])
+            db[real1] =
+                crearUsuario()
+
+        if (!db[real2])
+            db[real2] =
+                crearUsuario()
 
         const u1 =
-            db[user1]
+            db[real1]
 
         const u2 =
-            db[user2]
-
-        const ahora =
-            Date.now()
+            db[real2]
 
         // ====================================================
-        // 💔 LIMPIAR PAREJA ANTERIOR DE USER 1
+        // ❤️ YA SON PAREJA
+        // ====================================================
+
+        if (
+            u1.pareja &&
+            mismaPersona(
+                conn,
+                u1.pareja,
+                real2
+            )
+        ) {
+
+            return conn.reply(
+                m.chat,
+
+`╭━━━〔 💞 YA SON PAREJA 〕━━━⬣
+👤 ${tag(conn, real1)} ❤️ ${tag(conn, real2)}
+
+Esta pareja ya está registrada.
+
+❤️ Nivel de amor: ${Number(u1.amor || 0)}
+💑 Estado: ${u1.estado || 'novios'}
+╰━━━━━━━━━━━━━━━━⬣`,
+                m,
+                {
+                    mentions: [
+                        real1,
+                        real2
+                    ]
+                }
+            )
+        }
+
+        // ====================================================
+        // 💔 USER 1 YA TIENE PAREJA
         // ====================================================
 
         if (u1.pareja) {
 
-            const anterior =
-                u1.pareja
+            const parejaId =
+                buscarUsuario(
+                    db,
+                    conn,
+                    u1.pareja
+                ) || u1.pareja
 
-            if (db[anterior]) {
+            return conn.reply(
+                m.chat,
 
-                db[anterior].pareja = null
-                db[anterior].estado = 'soltero'
-                db[anterior].relacionFecha = null
-                db[anterior].matrimonioFecha = null
-                db[anterior].amor = 0
-                db[anterior].propuesta = null
-                db[anterior].propuestaFecha = null
-                db[anterior].propuestaMatrimonio = null
-                db[anterior].propuestaMatrimonioFecha = null
-            }
+`╭━━━〔 💔 YA TIENE PAREJA 〕━━━⬣
+👤 ${tag(conn, real1)}
+
+Ya está en pareja con:
+❤️ ${tag(conn, parejaId)}
+
+❌ No se puede crear otra pareja.
+╰━━━━━━━━━━━━━━━━⬣`,
+                m,
+                {
+                    mentions: [
+                        real1,
+                        parejaId
+                    ]
+                }
+            )
         }
 
         // ====================================================
-        // 💔 LIMPIAR PAREJA ANTERIOR DE USER 2
+        // 💔 USER 2 YA TIENE PAREJA
         // ====================================================
 
         if (u2.pareja) {
 
-            const anterior =
-                u2.pareja
+            const parejaId =
+                buscarUsuario(
+                    db,
+                    conn,
+                    u2.pareja
+                ) || u2.pareja
 
-            if (db[anterior]) {
+            return conn.reply(
+                m.chat,
 
-                db[anterior].pareja = null
-                db[anterior].estado = 'soltero'
-                db[anterior].relacionFecha = null
-                db[anterior].matrimonioFecha = null
-                db[anterior].amor = 0
-                db[anterior].propuesta = null
-                db[anterior].propuestaFecha = null
-                db[anterior].propuestaMatrimonio = null
-                db[anterior].propuestaMatrimonioFecha = null
-            }
+`╭━━━〔 💔 YA TIENE PAREJA 〕━━━⬣
+👤 ${tag(conn, real2)}
+
+Ya está en pareja con:
+❤️ ${tag(conn, parejaId)}
+
+❌ No se puede crear otra pareja.
+╰━━━━━━━━━━━━━━━━⬣`,
+                m,
+                {
+                    mentions: [
+                        real2,
+                        parejaId
+                    ]
+                }
+            )
         }
 
         // ====================================================
-        // ❤️ CREAR RELACIÓN MUTUA
+        // ❤️ CREAR PAREJA
         // ====================================================
 
+        const ahora =
+            Date.now()
+
         u1.pareja =
-            user2
+            real2
 
         u2.pareja =
-            user1
+            real1
 
         u1.estado =
             'novios'
@@ -496,10 +698,6 @@ Debes indicar dos usuarios.
         u2.relacionFecha =
             ahora
 
-        // ====================================================
-        // 💍 NO CASADOS
-        // ====================================================
-
         u1.matrimonioFecha =
             null
 
@@ -507,7 +705,7 @@ Debes indicar dos usuarios.
             null
 
         // ====================================================
-        // ❤️ REINICIAR AMOR
+        // ❤️ AMOR INICIAL
         // ====================================================
 
         u1.amor =
@@ -551,50 +749,28 @@ Debes indicar dos usuarios.
         saveDB(db)
 
         // ====================================================
-        // 🏷️ TAG
+        // 🎉 RESPUESTA
         // ====================================================
 
-        const tag = jid => {
+        return conn.reply(
+            m.chat,
 
-            const numero =
-                obtenerNumero(
-                    conn,
-                    jid
-                )
-
-            return '@' +
-                (
-                    numero ||
-                    String(jid)
-                        .split('@')[0]
-                )
-        }
-
-        // ====================================================
-        // 💞 RESPUESTA
-        // ====================================================
-
-        const mensaje =
 `╭━━━〔 👑 PAREJA FORZADA 〕━━━⬣
-👤 ${tag(user1)} ❤️ ${tag(user2)}
+👤 ${tag(conn, real1)} ❤️ ${tag(conn, real2)}
 
 💞 Ahora son pareja oficialmente.
 
 💑 Estado: Novios
 ❤️ Amor: 0
 
-🔗 La pareja quedó vinculada al sistema.
-✨ Las acciones románticas ya están habilitadas.
-╰━━━━━━━━━━━━━━━━⬣`
-
-        return conn.reply(
-            m.chat,
-            mensaje,
+🔗 Pareja vinculada al sistema.
+💕 Las acciones románticas están habilitadas.
+╰━━━━━━━━━━━━━━━━⬣`,
             m,
             {
                 mentions: [
-                    user1,
-                    user2
+                    real1,
+                    real2
                 ]
             }
         )

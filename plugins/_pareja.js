@@ -1512,9 +1512,11 @@ Siguen siendo novios.`
     // 💕 INTERACCIONES
     //
     // .amor
+    // .cita
     // .besar
     // .abrazar
     // .regalo
+    // .flores
     //
     // TODOS USAN EXACTAMENTE LA MISMA LÓGICA
     // ========================================================
@@ -1525,6 +1527,12 @@ Siguen siendo novios.`
         puntos: 10,
         emoji: '❤️',
         texto: 'le demostró todo su amor a su pareja'
+      },
+
+      cita: {
+        puntos: 12,
+        emoji: '🌹',
+        texto: 'tuvo una cita romántica con su pareja'
       },
 
       besar: {
@@ -1543,6 +1551,12 @@ Siguen siendo novios.`
         puntos: 15,
         emoji: '🎁',
         texto: 'le hizo un regalo a su pareja'
+      },
+
+      flores: {
+        puntos: 8,
+        emoji: '💐',
+        texto: 'le regaló flores a su pareja'
       }
 
     }
@@ -1574,7 +1588,7 @@ Siguen siendo novios.`
       //
       // MENCIONADO > CITADO
       //
-      // LOS 4 COMANDOS USAN EL MISMO TARGET
+      // TODOS LOS COMANDOS USAN EL MISMO TARGET
       // ======================================================
 
       let target = null
@@ -1935,11 +1949,15 @@ handler.command = [
 
   'amor',
 
+  'cita',
+
   'besar',
 
   'abrazar',
 
   'regalo',
+
+  'flores',
 
   'listapareja',
 

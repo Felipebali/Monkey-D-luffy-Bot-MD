@@ -5,8 +5,13 @@
 // .setpareja @usuario1 @usuario2
 // .setpareja 598XXXXXXXX 598XXXXXXXX
 //
+// .terminarforzada @usuario
+// .terminarforzada @usuario1 @usuario2
+//
 // 🚫 NO permite parejas repetidas.
 // 🚫 NO rompe relaciones existentes.
+// 💔 Permite terminar parejas creadas por .setpareja.
+//
 // ❤️ Compatible con:
 // .amor
 // .cita
@@ -466,7 +471,185 @@ let handler = async (
         }
 
         // ====================================================
-        // 💾 DATABASE
+        // 💔 TERMINAR PAREJA FORZADA
+        // ====================================================
+
+        const comando =
+            String(m.text || '')
+                .trim()
+                .toLowerCase()
+
+        if (
+            comando === 'terminarforzada' ||
+            comando.startsWith('terminarforzada ')
+        ) {
+
+            const db =
+                loadDB()
+
+            // ==================================================
+            // 👥 OBTENER USUARIO
+            // ==================================================
+
+            const users =
+                await obtenerUsuarios(
+                    m,
+                    conn,
+                    text
+                )
+
+            if (!users.length) {
+
+                return m.reply(
+`╭━━━〔 💔 TERMINAR PAREJA FORZADA 〕━━━⬣
+
+❌ Debes indicar un usuario.
+
+📌 Uso:
+
+.terminarforzada @usuario
+
+También puedes citar al usuario.
+
+╰━━━━━━━━━━━━━━━━⬣`
+                )
+            }
+
+            // ==================================================
+            // 🔎 BUSCAR USUARIO
+            // ==================================================
+
+            const usuarioId =
+                buscarUsuario(
+                    db,
+                    conn,
+                    users[0]
+                )
+
+            if (
+                !usuarioId ||
+                !db[usuarioId]
+            ) {
+
+                return m.reply(
+                    '❌ Ese usuario no tiene una relación registrada.'
+                )
+            }
+
+            const usuario =
+                db[usuarioId]
+
+            // ==================================================
+            // 💔 COMPROBAR PAREJA
+            // ==================================================
+
+            if (!usuario.pareja) {
+
+                return m.reply(
+`╭━━━〔 💔 SIN PAREJA 〕━━━⬣
+
+👤 ${tag(conn, usuarioId)}
+
+❌ Este usuario no tiene pareja actualmente.
+
+╰━━━━━━━━━━━━━━━━⬣`
+                )
+            }
+
+            // ==================================================
+            // 🔎 BUSCAR PAREJA
+            // ==================================================
+
+            const parejaId =
+                buscarUsuario(
+                    db,
+                    conn,
+                    usuario.pareja
+                ) || usuario.pareja
+
+            const pareja =
+                db[parejaId]
+
+            // ==================================================
+            // 💾 GUARDAR MENCIONES
+            // ==================================================
+
+            const menciones = [
+                usuarioId,
+                parejaId
+            ]
+
+            // ==================================================
+            // 🧹 LIMPIAR USUARIO
+            // ==================================================
+
+            usuario.pareja = null
+            usuario.estado = 'soltero'
+            usuario.relacionFecha = null
+            usuario.matrimonioFecha = null
+
+            usuario.propuesta = null
+            usuario.propuestaFecha = null
+            usuario.propuestaMatrimonio = null
+            usuario.propuestaMatrimonioFecha = null
+
+            usuario.amor = 0
+
+            // ==================================================
+            // 🧹 LIMPIAR PAREJA
+            // ==================================================
+
+            if (pareja) {
+
+                pareja.pareja = null
+                pareja.estado = 'soltero'
+                pareja.relacionFecha = null
+                pareja.matrimonioFecha = null
+
+                pareja.propuesta = null
+                pareja.propuestaFecha = null
+                pareja.propuestaMatrimonio = null
+                pareja.propuestaMatrimonioFecha = null
+
+                pareja.amor = 0
+            }
+
+            // ==================================================
+            // 💾 GUARDAR
+            // ==================================================
+
+            saveDB(db)
+
+            // ==================================================
+            // 💔 RESPUESTA
+            // ==================================================
+
+            return conn.reply(
+                m.chat,
+
+`╭━━━〔 💔 PAREJA TERMINADA 〕━━━⬣
+
+👤 ${tag(conn, usuarioId)}
+💔
+👤 ${tag(conn, parejaId)}
+
+La pareja forzada fue terminada correctamente.
+
+🧹 Relación eliminada.
+❤️ Amor reiniciado.
+💑 Ambos vuelven a estar solteros.
+
+╰━━━━━━━━━━━━━━━━⬣`,
+
+                m,
+                {
+                    mentions: menciones
+                }
+            )
+        }
+
+        // ====================================================
+        // 💾 CARGAR DATABASE
         // ====================================================
 
         const db =
@@ -595,6 +778,7 @@ Esta pareja ya está registrada.
 ❤️ Nivel de amor: ${Number(u1.amor || 0)}
 💑 Estado: ${u1.estado || 'novios'}
 ╰━━━━━━━━━━━━━━━━⬣`,
+
                 m,
                 {
                     mentions: [
@@ -629,6 +813,7 @@ Ya está en pareja con:
 
 ❌ No se puede crear otra pareja.
 ╰━━━━━━━━━━━━━━━━⬣`,
+
                 m,
                 {
                     mentions: [
@@ -663,6 +848,7 @@ Ya está en pareja con:
 
 ❌ No se puede crear otra pareja.
 ╰━━━━━━━━━━━━━━━━⬣`,
+
                 m,
                 {
                     mentions: [
@@ -765,7 +951,9 @@ Ya está en pareja con:
 
 🔗 Pareja vinculada al sistema.
 💕 Las acciones románticas están habilitadas.
+
 ╰━━━━━━━━━━━━━━━━⬣`,
+
             m,
             {
                 mentions: [
@@ -783,7 +971,7 @@ Ya está en pareja con:
         )
 
         return m.reply(
-            '❌ Ocurrió un error al establecer la pareja.'
+            '❌ Ocurrió un error al procesar la pareja.'
         )
     }
 }
@@ -793,7 +981,8 @@ Ya está en pareja con:
 // ============================================================
 
 handler.command = [
-    'setpareja'
+    'setpareja',
+    'terminarforzada'
 ]
 
 handler.rowner = true

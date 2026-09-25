@@ -15,7 +15,7 @@ let handler = async (m, { conn, isAdmin, isOwner }) => {
     const command = body.slice(1).split(' ')[0].toLowerCase()
 
     // ✅ Comandos permitidos aunque esté activo
-    const permitidos = ['modoadmin', 'menu']
+    const permitidos = ['modoadmin', 'menu', 'bot']
 
     if (permitidos.includes(command)) return
 

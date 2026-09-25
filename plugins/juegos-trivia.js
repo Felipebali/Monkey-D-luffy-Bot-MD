@@ -1,14 +1,16 @@
-// 📂 plugins/trivia.js — FelixCat_Bot
-// 🎯 Juego de Trivia
-// ✅ Responder citando el mensaje de la trivia
+// 📂 plugins/trivia.js
+// 🎯 FelixCat_Bot — Trivia simple
+// ✅ Sin handler.all
+// ✅ Sin dfail
+// ✅ Sin permisos
+// ✅ Responde citando la pregunta
 // ⏳ 30 segundos
-// 🔢 También acepta responder con el número de la opción
 
 console.log('[Plugin] trivia cargado')
 
-const activeTrivia = {}
+const activeTrivia = new Map()
 
-const preguntasTrivia = [
+const preguntas = [
   {
     pregunta: '¿Cuál es el planeta más grande del sistema solar?',
     opciones: ['Marte', 'Júpiter', 'Saturno', 'Neptuno'],
@@ -85,22 +87,12 @@ const preguntasTrivia = [
     respuesta: 'Italia'
   },
   {
-    pregunta: '¿Quién es reconocido como inventor del teléfono?',
-    opciones: [
-      'Nikola Tesla',
-      'Alexander Graham Bell',
-      'Thomas Edison',
-      'Einstein'
-    ],
-    respuesta: 'Alexander Graham Bell'
-  },
-  {
     pregunta: '¿Cuál es la capital de Canadá?',
     opciones: ['Toronto', 'Ottawa', 'Vancouver', 'Montreal'],
     respuesta: 'Ottawa'
   },
   {
-    pregunta: '¿Qué vitamina se obtiene principalmente mediante la exposición al sol?',
+    pregunta: '¿Qué vitamina se obtiene principalmente mediante el sol?',
     opciones: ['Vitamina A', 'Vitamina C', 'Vitamina D', 'Vitamina B12'],
     respuesta: 'Vitamina D'
   },
@@ -122,7 +114,7 @@ const preguntasTrivia = [
 ]
 
 // ============================================================
-// 🧹 NORMALIZAR RESPUESTAS
+// 🧹 NORMALIZAR TEXTO
 // ============================================================
 
 function normalizar(texto) {
@@ -134,10 +126,10 @@ function normalizar(texto) {
 }
 
 // ============================================================
-// 🔎 OBTENER ID DEL MENSAJE CITADO
+// 🔎 BUSCAR ID DEL MENSAJE CITADO
 // ============================================================
 
-function getQuotedId(m) {
+function obtenerIdCitado(m) {
   return (
     m?.quoted?.id ||
     m?.quoted?.key?.id ||
@@ -148,128 +140,123 @@ function getQuotedId(m) {
 }
 
 // ============================================================
-// 🎯 HANDLER
+// 🎯 HANDLER PRINCIPAL
 // ============================================================
 
-let handler = async (m, { conn }) => {
+const handler = async (m, { conn }) => {
   try {
 
     if (!m.isGroup) return
 
+    const chatId = m.chat
+
     // ========================================================
-    // 💬 COMPROBAR SI ES UNA RESPUESTA A UNA TRIVIA
+    // 📝 SI ES UNA RESPUESTA A UNA TRIVIA ACTIVA
     // ========================================================
 
-    const juego = activeTrivia[m.chat]
+    const juego = activeTrivia.get(chatId)
 
     if (juego) {
 
-      const quotedId = getQuotedId(m)
+      const citado = obtenerIdCitado(m)
 
-      // Solamente procesamos mensajes citando la trivia
-      if (quotedId && quotedId === juego.msgId) {
+      // No está citando la pregunta
+      if (citado && citado === juego.msgId) {
 
-        const respuestaUsuario = normalizar(m.text)
+        const texto = normalizar(m.text)
 
-        let respuestaFinal = respuestaUsuario
+        let respuesta = texto
 
         // ====================================================
-        // 🔢 SI RESPONDE CON 1, 2, 3 O 4
+        // 🔢 ACEPTAR 1 / 2 / 3 / 4
         // ====================================================
 
-        if (/^[1-4]$/.test(respuestaUsuario)) {
+        if (/^[1-4]$/.test(texto)) {
 
-          const numero = Number(respuestaUsuario)
+          const numero = Number(texto)
 
-          if (
-            numero >= 1 &&
-            numero <= juego.opciones.length
-          ) {
-            respuestaFinal = normalizar(
+          if (numero <= juego.opciones.length) {
+            respuesta = normalizar(
               juego.opciones[numero - 1]
             )
           }
         }
 
-        const respuestaCorrecta =
-          normalizar(juego.respuesta)
-
         // ====================================================
-        // ✅ CORRECTO
+        // ✅ CORRECTA
         // ====================================================
 
-        if (respuestaFinal === respuestaCorrecta) {
+        if (respuesta === normalizar(juego.respuesta)) {
 
-          clearTimeout(juego.timeout)
+          clearTimeout(juego.timer)
 
-          const nombre =
-            m.pushName ||
-            'Usuario'
-
-          await conn.reply(
-            m.chat,
-
-            `╭━━━〔 🎉 TRIVIA 〕━━━⬣
-┃
-┃ ✅ ¡CORRECTO!
-┃
-┃ 🏆 @${m.sender.split('@')[0]}
-┃
-┃ 💡 Respuesta:
-┃ *${juego.respuesta}*
-┃
-╰━━━━━━━━━━━━━━━━⬣`,
-
-            m,
-
+          await conn.sendMessage(
+            chatId,
             {
+              text:
+                `╭━━━〔 🎉 TRIVIA 〕━━━⬣\n` +
+                `┃\n` +
+                `┃ ✅ ¡CORRECTO!\n` +
+                `┃\n` +
+                `┃ 🏆 @${String(m.sender).split('@')[0]}\n` +
+                `┃\n` +
+                `┃ 💡 Respuesta:\n` +
+                `┃ *${juego.respuesta}*\n` +
+                `┃\n` +
+                `╰━━━━━━━━━━━━━━━━⬣`,
               mentions: [m.sender]
             }
           )
 
-          delete activeTrivia[m.chat]
+          activeTrivia.delete(chatId)
 
-          return
+        } else {
+
+          // ==================================================
+          // ❌ INCORRECTA
+          // ==================================================
+
+          await conn.sendMessage(
+            chatId,
+            {
+              text:
+                `❌ *Incorrecto, ${m.pushName || 'usuario'}.*\n\n` +
+                `💡 La trivia sigue activa.\n` +
+                `⏳ Intentá nuevamente citando la pregunta.`
+            }
+          )
         }
-
-        // ====================================================
-        // ❌ INCORRECTO
-        // ====================================================
-
-        await conn.reply(
-          m.chat,
-          `❌ *Incorrecto, ${m.pushName || 'usuario'}.*\n\n` +
-          `💡 La trivia sigue activa.\n` +
-          `⏳ Todavía podés intentar nuevamente.`,
-          m
-        )
 
         return
       }
     }
 
     // ========================================================
-    // 🎮 COMANDO .TRIVIA
+    // 🎲 COMPROBAR SI ES .TRIVIA
     // ========================================================
 
-    const chat =
-      global.db?.data?.chats?.[m.chat]
+    const texto = String(m.text || '').trim()
 
-    // Si existe la configuración y está desactivada
-    if (chat && chat.games === false) {
+    if (!/^\.trivia$/i.test(texto)) {
       return
     }
 
     // ========================================================
-    // 🚫 YA EXISTE UNA TRIVIA
+    // 🚫 YA HAY UNA TRIVIA
     // ========================================================
 
-    if (activeTrivia[m.chat]) {
+    if (activeTrivia.has(chatId)) {
 
-      return m.reply(
-        `⚠️ *Ya hay una trivia activa.*\n\n` +
-        `📝 Respondé citando la pregunta actual.`
+      await conn.sendMessage(
+        chatId,
+        {
+          text:
+            '⚠️ Ya hay una trivia activa.\n\n' +
+            '📝 Respondé citando la pregunta actual.'
+        }
       )
+
+      return
     }
 
     // ========================================================
@@ -277,18 +264,17 @@ let handler = async (m, { conn }) => {
     // ========================================================
 
     const pregunta =
-      preguntasTrivia[
+      preguntas[
         Math.floor(
-          Math.random() *
-          preguntasTrivia.length
+          Math.random() * preguntas.length
         )
       ]
 
     // ========================================================
-    // 📝 CONSTRUIR TRIVIA
+    // 📝 CREAR MENSAJE
     // ========================================================
 
-    const texto =
+    const textoTrivia =
       `╭━━━〔 🎯 TRIVIA 〕━━━⬣\n` +
       `┃\n` +
       `┃ ❓ *${pregunta.pregunta}*\n` +
@@ -305,126 +291,110 @@ let handler = async (m, { conn }) => {
       `╰━━━━━━━━━━━━━━━━⬣`
 
     // ========================================================
-    // 📤 ENVIAR MENSAJE
+    // 📤 ENVIAR
     // ========================================================
 
-    const enviado =
-      await conn.sendMessage(
-        m.chat,
-        {
-          text: texto
-        },
-        {
-          quoted: m
-        }
-      )
+    const enviado = await conn.sendMessage(
+      chatId,
+      {
+        text: textoTrivia
+      },
+      {
+        quoted: m
+      }
+    )
 
     // ========================================================
-    // 🆔 OBTENER ID
+    // 🆔 GUARDAR ID
     // ========================================================
 
-    const msgId =
-      enviado?.key?.id
+    const msgId = enviado?.key?.id
 
     if (!msgId) {
 
       console.error(
-        '❌ Trivia: no se pudo obtener msgId.'
+        '[Trivia] No se pudo obtener el ID del mensaje.'
       )
 
-      return m.reply(
-        '❌ No pude iniciar la trivia correctamente.'
-      )
+      return
     }
 
     // ========================================================
-    // 💾 GUARDAR JUEGO
+    // 💾 GUARDAR TRIVIA
     // ========================================================
 
-    activeTrivia[m.chat] = {
-
-      pregunta: pregunta.pregunta,
-
-      opciones: pregunta.opciones,
-
-      respuesta: pregunta.respuesta,
-
+    const juegoNuevo = {
       msgId: msgId,
-
-      timeout: null
+      pregunta: pregunta.pregunta,
+      opciones: pregunta.opciones,
+      respuesta: pregunta.respuesta,
+      timer: null
     }
 
-    console.log(
-      `[Trivia] ${m.chat} → ${msgId}`
-    )
+    activeTrivia.set(chatId, juegoNuevo)
 
     // ========================================================
-    // ⏰ TEMPORIZADOR
+    // ⏰ 30 SEGUNDOS
     // ========================================================
 
-    activeTrivia[m.chat].timeout =
-      setTimeout(async () => {
+    juegoNuevo.timer = setTimeout(
+      async () => {
 
         try {
 
-          const juego =
-            activeTrivia[m.chat]
+          const juegoActual =
+            activeTrivia.get(chatId)
 
-          if (!juego) return
+          if (!juegoActual) return
 
-          await conn.reply(
-            m.chat,
-
-            `╭━━━〔 ⏰ TIEMPO AGOTADO 〕━━━⬣
-┃
-┃ ❌ Nadie respondió correctamente.
-┃
-┃ ✅ La respuesta era:
-┃ *${juego.respuesta}*
-┃
-╰━━━━━━━━━━━━━━━━⬣`
+          await conn.sendMessage(
+            chatId,
+            {
+              text:
+                `╭━━━〔 ⏰ TIEMPO AGOTADO 〕━━━⬣\n` +
+                `┃\n` +
+                `┃ ❌ Se terminó el tiempo.\n` +
+                `┃\n` +
+                `┃ ✅ La respuesta era:\n` +
+                `┃ *${juegoActual.respuesta}*\n` +
+                `┃\n` +
+                `╰━━━━━━━━━━━━━━━━⬣`
+            }
           )
 
-          delete activeTrivia[m.chat]
+          activeTrivia.delete(chatId)
 
         } catch (error) {
 
           console.error(
-            '❌ Error finalizando trivia:',
+            '[Trivia] Error en temporizador:',
             error
           )
 
-          delete activeTrivia[m.chat]
+          activeTrivia.delete(chatId)
         }
 
-      }, 30000)
+      },
+      30000
+    )
 
   } catch (error) {
 
     console.error(
-      '❌ Error en trivia:',
+      '[Trivia] Error:',
       error
     )
   }
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN
+// ⚙️ CONFIGURACIÓN FELIXCAT
 // ============================================================
 
 handler.help = ['trivia']
-
-handler.tags = [
-  'fun',
-  'juego'
-]
-
-handler.command = [
-  'trivia'
-]
-
+handler.tags = ['fun', 'juego']
+handler.command = ['trivia']
 handler.group = true
-
 handler.register = true
 
 export default handler

@@ -3,22 +3,11 @@
 // 🔗 Compatible con plugins/parejas.js
 //
 // .setpareja @usuario1 @usuario2
-// .setpareja 598XXXXXXXX 598XXXXXXXX
-//
 // .terminarforzada @usuario
-// .terminarforzada @usuario1 @usuario2
 //
 // 🚫 NO permite parejas repetidas.
 // 🚫 NO rompe relaciones existentes.
-// 💔 Permite terminar parejas creadas por .setpareja.
-//
-// ❤️ Compatible con:
-// .amor
-// .cita
-// .besar
-// .abrazar
-// .regalo
-// .flores
+// 💔 .terminarforzada elimina una pareja forzada.
 
 import fs from 'fs'
 import path from 'path'
@@ -92,8 +81,7 @@ function getOwnersJid() {
             if (!numero)
                 return null
 
-            return numero +
-                '@s.whatsapp.net'
+            return numero + '@s.whatsapp.net'
 
         })
         .filter(Boolean)
@@ -158,7 +146,7 @@ function obtenerNumero(conn, jid) {
 }
 
 // ============================================================
-// 👥 COMPARAR DOS PERSONAS
+// 👥 COMPARAR PERSONAS
 // ============================================================
 
 function mismaPersona(conn, jid1, jid2) {
@@ -181,11 +169,9 @@ function mismaPersona(conn, jid1, jid2) {
     if (!a || !b)
         return false
 
-    // JID exacto
     if (a === b)
         return true
 
-    // Comparación por número
     const numeroA =
         obtenerNumero(
             conn,
@@ -198,19 +184,15 @@ function mismaPersona(conn, jid1, jid2) {
             b
         )
 
-    if (
+    return Boolean(
         numeroA &&
         numeroB &&
         numeroA === numeroB
-    ) {
-        return true
-    }
-
-    return false
+    )
 }
 
 // ============================================================
-// 🔎 BUSCAR REGISTRO DE UNA PERSONA
+// 🔎 BUSCAR USUARIO
 // ============================================================
 
 function buscarUsuario(db, conn, jid) {
@@ -224,7 +206,6 @@ function buscarUsuario(db, conn, jid) {
             jid
         )
 
-    // Coincidencia exacta
     if (
         limpio &&
         db[limpio]
@@ -232,7 +213,6 @@ function buscarUsuario(db, conn, jid) {
         return limpio
     }
 
-    // Coincidencia por número
     const numero =
         obtenerNumero(
             conn,
@@ -242,9 +222,7 @@ function buscarUsuario(db, conn, jid) {
     if (!numero)
         return null
 
-    for (
-        const id of Object.keys(db)
-    ) {
+    for (const id of Object.keys(db)) {
 
         const numeroDB =
             obtenerNumero(
@@ -284,9 +262,7 @@ async function obtenerUsuarios(
         m.mentionedJid.length
     ) {
 
-        for (
-            const jid of m.mentionedJid
-        ) {
+        for (const jid of m.mentionedJid) {
 
             const limpio =
                 normalizarJid(
@@ -303,9 +279,7 @@ async function obtenerUsuarios(
     // 💬 CITADO
     // ========================================================
 
-    if (
-        m.quoted?.sender
-    ) {
+    if (m.quoted?.sender) {
 
         const citado =
             normalizarJid(
@@ -329,9 +303,7 @@ async function obtenerUsuarios(
 
         if (numeros) {
 
-            for (
-                const numero of numeros
-            ) {
+            for (const numero of numeros) {
 
                 try {
 
@@ -367,15 +339,9 @@ async function obtenerUsuarios(
         }
     }
 
-    // ========================================================
-    // 🧹 ELIMINAR DUPLICADOS
-    // ========================================================
-
-    users = [
+    return [
         ...new Set(users)
     ]
-
-    return users
 }
 
 // ============================================================
@@ -385,23 +351,14 @@ async function obtenerUsuarios(
 function crearUsuario() {
 
     return {
-
         pareja: null,
-
         estado: 'soltero',
-
         propuesta: null,
-
         propuestaFecha: null,
-
         propuestaMatrimonio: null,
-
         propuestaMatrimonioFecha: null,
-
         relacionFecha: null,
-
         matrimonioFecha: null,
-
         amor: 0
     }
 }
@@ -442,7 +399,7 @@ let handler = async (
     try {
 
         // ====================================================
-        // 👑 COMPROBAR OWNER
+        // 👑 OWNER
         // ====================================================
 
         const sender =
@@ -464,32 +421,32 @@ let handler = async (
             )
 
         if (!esOwner) {
-
             return m.reply(
                 '❌ Solo el dueño puede usar este comando.'
             )
         }
 
         // ====================================================
-        // 💔 TERMINAR PAREJA FORZADA
+        // 🔥 OBTENER COMANDO REAL
         // ====================================================
 
         const comando =
             String(m.text || '')
                 .trim()
+                .split(/\s+/)[0]
+                .replace(/^[.!#/]/, '')
                 .toLowerCase()
 
-        if (
-            comando === 'terminarforzada' ||
-            comando.startsWith('terminarforzada ')
-        ) {
+        // ====================================================
+        // 💔 TERMINAR PAREJA FORZADA
+        // IMPORTANTE:
+        // ESTA PARTE SE EJECUTA ANTES DE SETPAREJA
+        // ====================================================
+
+        if (comando === 'terminarforzada') {
 
             const db =
                 loadDB()
-
-            // ==================================================
-            // 👥 OBTENER USUARIO
-            // ==================================================
 
             const users =
                 await obtenerUsuarios(
@@ -505,11 +462,9 @@ let handler = async (
 
 ❌ Debes indicar un usuario.
 
-📌 Uso:
+📌 Ejemplo:
 
 .terminarforzada @usuario
-
-También puedes citar al usuario.
 
 ╰━━━━━━━━━━━━━━━━⬣`
                 )
@@ -532,7 +487,7 @@ También puedes citar al usuario.
             ) {
 
                 return m.reply(
-                    '❌ Ese usuario no tiene una relación registrada.'
+                    '❌ Ese usuario no tiene una pareja registrada.'
                 )
             }
 
@@ -540,7 +495,7 @@ También puedes citar al usuario.
                 db[usuarioId]
 
             // ==================================================
-            // 💔 COMPROBAR PAREJA
+            // 💔 NO TIENE PAREJA
             // ==================================================
 
             if (!usuario.pareja) {
@@ -571,7 +526,7 @@ También puedes citar al usuario.
                 db[parejaId]
 
             // ==================================================
-            // 💾 GUARDAR MENCIONES
+            // 💾 GUARDAR JID
             // ==================================================
 
             const menciones = [
@@ -587,12 +542,10 @@ También puedes citar al usuario.
             usuario.estado = 'soltero'
             usuario.relacionFecha = null
             usuario.matrimonioFecha = null
-
             usuario.propuesta = null
             usuario.propuestaFecha = null
             usuario.propuestaMatrimonio = null
             usuario.propuestaMatrimonioFecha = null
-
             usuario.amor = 0
 
             // ==================================================
@@ -605,12 +558,10 @@ También puedes citar al usuario.
                 pareja.estado = 'soltero'
                 pareja.relacionFecha = null
                 pareja.matrimonioFecha = null
-
                 pareja.propuesta = null
                 pareja.propuestaFecha = null
                 pareja.propuestaMatrimonio = null
                 pareja.propuestaMatrimonioFecha = null
-
                 pareja.amor = 0
             }
 
@@ -649,8 +600,12 @@ La pareja forzada fue terminada correctamente.
         }
 
         // ====================================================
-        // 💾 CARGAR DATABASE
+        // ❤️ SETPAREJA
         // ====================================================
+
+        if (comando !== 'setpareja') {
+            return
+        }
 
         const db =
             loadDB()
@@ -666,9 +621,7 @@ La pareja forzada fue terminada correctamente.
                 text
             )
 
-        if (
-            users.length < 2
-        ) {
+        if (users.length < 2) {
 
             return m.reply(
 `💡 *USO DE .setpareja*
@@ -684,10 +637,6 @@ Debes indicar dos usuarios.
 .setpareja @usuario1 59898765432`
             )
         }
-
-        // ====================================================
-        // 💕 USUARIOS
-        // ====================================================
 
         const user1 =
             users[0]
@@ -713,7 +662,7 @@ Debes indicar dos usuarios.
         }
 
         // ====================================================
-        // 🔎 BUSCAR REGISTROS REALES
+        // 🔎 BUSCAR REGISTROS
         // ====================================================
 
         const id1 =
@@ -771,12 +720,16 @@ Debes indicar dos usuarios.
                 m.chat,
 
 `╭━━━〔 💞 YA SON PAREJA 〕━━━⬣
-👤 ${tag(conn, real1)} ❤️ ${tag(conn, real2)}
+
+👤 ${tag(conn, real1)}
+❤️
+👤 ${tag(conn, real2)}
 
 Esta pareja ya está registrada.
 
 ❤️ Nivel de amor: ${Number(u1.amor || 0)}
 💑 Estado: ${u1.estado || 'novios'}
+
 ╰━━━━━━━━━━━━━━━━⬣`,
 
                 m,
@@ -806,12 +759,14 @@ Esta pareja ya está registrada.
                 m.chat,
 
 `╭━━━〔 💔 YA TIENE PAREJA 〕━━━⬣
+
 👤 ${tag(conn, real1)}
 
 Ya está en pareja con:
 ❤️ ${tag(conn, parejaId)}
 
 ❌ No se puede crear otra pareja.
+
 ╰━━━━━━━━━━━━━━━━⬣`,
 
                 m,
@@ -841,12 +796,14 @@ Ya está en pareja con:
                 m.chat,
 
 `╭━━━〔 💔 YA TIENE PAREJA 〕━━━⬣
+
 👤 ${tag(conn, real2)}
 
 Ya está en pareja con:
 ❤️ ${tag(conn, parejaId)}
 
 ❌ No se puede crear otra pareja.
+
 ╰━━━━━━━━━━━━━━━━⬣`,
 
                 m,
@@ -890,10 +847,6 @@ Ya está en pareja con:
         u2.matrimonioFecha =
             null
 
-        // ====================================================
-        // ❤️ AMOR INICIAL
-        // ====================================================
-
         u1.amor =
             0
 
@@ -904,29 +857,17 @@ Ya está en pareja con:
         // 🧹 LIMPIAR PROPUESTAS
         // ====================================================
 
-        u1.propuesta =
-            null
+        u1.propuesta = null
+        u2.propuesta = null
 
-        u2.propuesta =
-            null
+        u1.propuestaFecha = null
+        u2.propuestaFecha = null
 
-        u1.propuestaFecha =
-            null
+        u1.propuestaMatrimonio = null
+        u2.propuestaMatrimonio = null
 
-        u2.propuestaFecha =
-            null
-
-        u1.propuestaMatrimonio =
-            null
-
-        u2.propuestaMatrimonio =
-            null
-
-        u1.propuestaMatrimonioFecha =
-            null
-
-        u2.propuestaMatrimonioFecha =
-            null
+        u1.propuestaMatrimonioFecha = null
+        u2.propuestaMatrimonioFecha = null
 
         // ====================================================
         // 💾 GUARDAR
@@ -942,7 +883,10 @@ Ya está en pareja con:
             m.chat,
 
 `╭━━━〔 👑 PAREJA FORZADA 〕━━━⬣
-👤 ${tag(conn, real1)} ❤️ ${tag(conn, real2)}
+
+👤 ${tag(conn, real1)}
+❤️
+👤 ${tag(conn, real2)}
 
 💞 Ahora son pareja oficialmente.
 

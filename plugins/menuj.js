@@ -1,3 +1,4 @@
+```js
 // 📂 plugins/menuj.js — FelixCat_Bot
 
 let handler = async (m, { conn }) => {
@@ -36,6 +37,7 @@ Estado: ${gamesEnabled ? '🟢 Activados' : '🔴 Desactivados'}
 ✨ *.consejo* → Te da un consejo aleatorio
 💭 *.pensar <pregunta>* → Bola mágica que responde tu pregunta
 🔢 *.numero* → Genera un número aleatorio
+🎲 *.mayormenor* → Juego de Mayor o Menor
 👑 *.top10* → Top 10 divertidos del grupo
 🍽️ *.plato* → Adivina la opción correcta
 ❤️ *.match* → Empareja dos personas al azar 💞

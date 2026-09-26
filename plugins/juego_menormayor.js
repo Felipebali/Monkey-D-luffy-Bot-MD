@@ -14,6 +14,7 @@ let handler = async (m, { conn, command }) => {
         }
 
         const usuario = m.sender;
+        const mencion = '@' + usuario.split('@')[0];
 
         // ─────────────────────────────
         // 🎲 INICIAR JUEGO
@@ -26,6 +27,8 @@ let handler = async (m, { conn, command }) => {
                     text:
 `🎲 *MAYOR O MENOR - FELIXCAT*
 
+👤 ${mencion}
+
 🔢 Número actual:
 > ${partidas[usuario].numero}
 
@@ -34,7 +37,8 @@ let handler = async (m, { conn, command }) => {
 ¿Será mayor o menor?
 
 ⬆️ *.mayor*
-⬇️ *.menor*`
+⬇️ *.menor*`,
+                    mentions: [usuario]
                 });
             }
 
@@ -49,6 +53,8 @@ let handler = async (m, { conn, command }) => {
             const mensaje =
 `✨ 🎲 *MAYOR O MENOR - FELIXCAT* 🎲 ✨
 
+👤 ${mencion}
+
 🔢 Número inicial:
 > ${numero}
 
@@ -62,7 +68,8 @@ let handler = async (m, { conn, command }) => {
 🌟 ¡A ver hasta dónde llegás! 😸`;
 
             return await conn.sendMessage(m.chat, {
-                text: mensaje
+                text: mensaje,
+                mentions: [usuario]
             });
         }
 
@@ -73,9 +80,10 @@ let handler = async (m, { conn, command }) => {
         if (!partidas[usuario]) {
             return await conn.sendMessage(m.chat, {
                 text:
-`❌ *No tienes una partida activa.*
+`❌ ${mencion}, no tienes una partida activa.
 
-🎲 Usa *.mayormenor* para comenzar.`
+🎲 Usa *.mayormenor* para comenzar.`,
+                mentions: [usuario]
             });
         }
 
@@ -86,22 +94,19 @@ let handler = async (m, { conn, command }) => {
         // ─────────────────────────────
 
         const anterior = partida.numero;
-
         const nuevoNumero = Math.floor(Math.random() * 100) + 1;
 
         // ─────────────────────────────
-        // 🎯 COMPROBAR RESPUESTA
+        // 🎯 NÚMEROS IGUALES
         // ─────────────────────────────
 
-        const esMayor = nuevoNumero > anterior;
-        const eligioMayor = command === 'mayor';
-
-        // Si son iguales, no cuenta como mayor ni menor
         if (nuevoNumero === anterior) {
 
             return await conn.sendMessage(m.chat, {
                 text:
 `🎲 *¡NÚMEROS IGUALES!*
+
+👤 ${mencion}
 
 🔢 ${anterior} → ${nuevoNumero}
 
@@ -110,10 +115,17 @@ let handler = async (m, { conn, command }) => {
 🔥 Tu racha continúa en: *${partida.racha}*
 
 ⬆️ *.mayor*
-⬇️ *.menor*`
+⬇️ *.menor*`,
+                mentions: [usuario]
             });
         }
 
+        // ─────────────────────────────
+        // 🎯 COMPROBAR RESPUESTA
+        // ─────────────────────────────
+
+        const esMayor = nuevoNumero > anterior;
+        const eligioMayor = command === 'mayor';
         const gano = eligioMayor === esMayor;
 
         // ─────────────────────────────
@@ -128,6 +140,8 @@ let handler = async (m, { conn, command }) => {
             const mensaje =
 `🎉 *¡CORRECTO!* 🎉
 
+👤 ${mencion}
+
 🔢 ${anterior} → *${nuevoNumero}*
 
 ${eligioMayor ? '⬆️' : '⬇️'} Elegiste:
@@ -136,7 +150,7 @@ ${eligioMayor ? '⬆️' : '⬇️'} Elegiste:
 🔥 Racha actual:
 *${partida.racha}*
 
-😸 ¡Muy bien!
+😸 ¡Muy bien, ${mencion}!
 
 ¿Seguimos?
 
@@ -144,7 +158,8 @@ ${eligioMayor ? '⬆️' : '⬇️'} Elegiste:
 ⬇️ *.menor*`;
 
             return await conn.sendMessage(m.chat, {
-                text: mensaje
+                text: mensaje,
+                mentions: [usuario]
             });
         }
 
@@ -159,6 +174,8 @@ ${eligioMayor ? '⬆️' : '⬇️'} Elegiste:
         const mensaje =
 `💀 *¡PERDISTE!* 💀
 
+👤 ${mencion}
+
 🔢 ${anterior} → *${nuevoNumero}*
 
 ${eligioMayor ? '⬆️' : '⬇️'} Elegiste:
@@ -167,12 +184,13 @@ ${eligioMayor ? '⬆️' : '⬇️'} Elegiste:
 🔥 Racha final:
 *${rachaFinal}*
 
-🎲 ¡Inténtalo nuevamente!
+🎲 ¡Buen intento, ${mencion}! 😸
 
 👉 *.mayormenor*`;
 
         await conn.sendMessage(m.chat, {
-            text: mensaje
+            text: mensaje,
+            mentions: [usuario]
         });
 
     } catch (e) {

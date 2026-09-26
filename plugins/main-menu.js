@@ -1,5 +1,5 @@
-```js id="7q4m2p"
-// 📂 plugins/menu.js
+```js
+// 📂 plugins/main-menu.js
 // 🐾 FELIXCAT-BOT — FUTURISTIC INTERFACE
 
 const botname = global.botname || 'FelixCat-Bot'
@@ -36,7 +36,6 @@ let handler = async (m, { conn }) => {
 │
 └──────────────────────────────────
 
-
 ╭━━━〔 𝟎𝟏 • 𝐌𝐀𝐈𝐍 〕━━━╮
 
   › 🏠 .menu
@@ -47,7 +46,6 @@ let handler = async (m, { conn }) => {
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-
 ╭━━━〔 𝟎𝟐 • 𝐔𝐒𝐄𝐑 〕━━━╮
 
   › 🪪 .perfil
@@ -56,7 +54,6 @@ let handler = async (m, { conn }) => {
   › 🚻 .genero
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
-
 
 ╭━━━〔 𝟎𝟑 • 𝐒𝐎𝐂𝐈𝐀𝐋 〕━━━╮
 
@@ -72,7 +69,6 @@ let handler = async (m, { conn }) => {
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-
 ╭━━━〔 𝟎𝟒 • 𝐋𝐎𝐕𝐄 〕━━━╮
 
   ♥ .pareja
@@ -81,8 +77,8 @@ let handler = async (m, { conn }) => {
   ❌ .rechazar
 
   💍 .casarse
-  ✔ .si
-  ✖ .no
+  ✔️ .si
+  ✖️ .no
 
   💔 .terminar
   💔 .divorciar
@@ -97,7 +93,6 @@ let handler = async (m, { conn }) => {
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-
 ╭━━━〔 𝟎𝟓 • 𝐒𝐄𝐂𝐔𝐑𝐈𝐓𝐘 〕━━━╮
 
   🔗 .antilink
@@ -107,7 +102,6 @@ let handler = async (m, { conn }) => {
   👻 .antifake
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
-
 
 ╭━━━〔 𝟎𝟔 • 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐒 〕━━━╮
 
@@ -120,7 +114,6 @@ let handler = async (m, { conn }) => {
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-
 ╭━━━〔 𝟎𝟕 • 𝐌𝐔𝐒𝐈𝐂 〕━━━╮
 
   🎵 .play
@@ -131,7 +124,6 @@ let handler = async (m, { conn }) => {
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-
 ╭━━━〔 𝟎𝟖 • 𝐌𝐄𝐃𝐈𝐀 〕━━━╮
 
   💬 .qc
@@ -140,7 +132,6 @@ let handler = async (m, { conn }) => {
   🌐 .google
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
-
 
 ╭━━━〔 𝟎𝟗 • 𝐆𝐀𝐌𝐄𝐒 〕━━━╮
 
@@ -161,7 +152,6 @@ let handler = async (m, { conn }) => {
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-
 ╭━━━〔 𝟏𝟎 • 𝐀𝐃𝐌𝐈𝐍 〕━━━╮
 
   🗑️ .del
@@ -175,7 +165,6 @@ let handler = async (m, { conn }) => {
   ⚙️ .g
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
-
 
 ╭━━━〔 𝟏𝟏 • 𝐎𝐖𝐍𝐄𝐑 〕━━━╮
 
@@ -191,14 +180,13 @@ let handler = async (m, { conn }) => {
 
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-
 ╔══════════════════════════════════╗
 ║                                  ║
 ║       🟢 𝐅𝐄𝐋𝐈𝐗𝐂𝐀𝐓 𝐎𝐍𝐋𝐈𝐍𝐄      ║
 ║                                  ║
 ║       ⚡ 𝐔𝐋𝐓𝐑𝐀 𝐌𝐎𝐃𝐄 ⚡         ║
 ║                                  ║
-║     「 🐾 NEVER STOP 」           ║
+║       「 🐾 NEVER STOP 」         ║
 ║                                  ║
 ╚══════════════════════════════════╝
 
@@ -215,7 +203,7 @@ let handler = async (m, { conn }) => {
     })
 
   } catch (err) {
-    console.error('❌ Error en menu.js:', err)
+    console.error('❌ Error en main-menu.js:', err)
 
     await conn.reply(
       m.chat,

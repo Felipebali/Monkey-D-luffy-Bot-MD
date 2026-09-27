@@ -32,7 +32,7 @@ let handler = async (m, { conn }) => {
   if (!global.riddleGame) global.riddleGame = {};
 
   const msg = await conn.sendMessage(m.chat, {
-    text: `🧩 *ADIVINANZA FELIXCAT* 🐾\n\n${adivinanza.pregunta}\n\n💬 *Responde citando este mensaje con tu respuesta.*\n⏱️ *Tienes 30 segundos!*`
+    text: `🧩 *ADIVINANZA WHATSAPP-BOT* 🐾\n\n${adivinanza.pregunta}\n\n💬 *Responde citando este mensaje con tu respuesta.*\n⏱️ *Tienes 30 segundos!*`
   }, { quoted: m });
 
   global.riddleGame[m.chat] = {

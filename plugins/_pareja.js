@@ -32,7 +32,8 @@ const saveDB = data => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2))
 }
 
-const SIETE_DIAS = 7 * 24 * 60 * 60 * 1000
+// 💍 TIEMPO MÍNIMO PARA CASARSE: 3 DÍAS
+const TRES_DIAS = 3 * 24 * 60 * 60 * 1000
 
 // ============================================================
 // 👑 OWNERS
@@ -438,10 +439,6 @@ async function comprobarPareja(
   if (!senderId || !targetId)
     return false
 
-  // ==========================================================
-  // RESOLVER IDENTIDADES
-  // ==========================================================
-
   const senderReal =
     await buscarUsuarioId(
       conn,
@@ -457,10 +454,6 @@ async function comprobarPareja(
       targetId,
       chat
     ) || targetId
-
-  // ==========================================================
-  // sender.pareja → target
-  // ==========================================================
 
   if (senderUser?.pareja) {
 
@@ -503,10 +496,6 @@ async function comprobarPareja(
     }
   }
 
-  // ==========================================================
-  // target.pareja → sender
-  // ==========================================================
-
   if (targetUser?.pareja) {
 
     const parejaReal =
@@ -546,10 +535,6 @@ async function comprobarPareja(
       return true
     }
   }
-
-  // ==========================================================
-  // RESPALDO
-  // ==========================================================
 
   for (const id of Object.keys(db)) {
 
@@ -627,10 +612,6 @@ let handler = async (
 ) => {
 
   try {
-
-    // ========================================================
-    // 🔧 NORMALIZAR COMANDO
-    // ========================================================
 
     command =
       String(command || '')
@@ -727,7 +708,6 @@ ${text}
 
     // ========================================================
     // 🎯 TARGET
-    // MENCIONADO > CITADO
     // ========================================================
 
     const getTarget = () => {
@@ -989,7 +969,7 @@ novios. 💑
 disfruten cada momento.
 
 ⏳ Podrán casarse después
-de 7 días. 💍`
+de 3 días. 💍`
         ),
 
         m,
@@ -1153,14 +1133,18 @@ Nivel de amor: ❤️ ${user.amor}`
         ahora -
         user.relacionFecha
 
+      // ======================================================
+      // 💍 AHORA SON 3 DÍAS
+      // ======================================================
+
       if (
         tiempoRelacion <
-        SIETE_DIAS
+        TRES_DIAS
       ) {
 
         const faltan =
           tiempo(
-            SIETE_DIAS -
+            TRES_DIAS -
             tiempoRelacion
           )
 
@@ -1171,7 +1155,7 @@ Nivel de amor: ❤️ ${user.amor}`
             '⏳ AÚN NO PUEDEN CASARSE',
 
             `${tag(sender)} ❤️ ${tag(user.pareja)}
-Deben esperar 7 días.
+Deben esperar 3 días.
 Faltan ${faltan}.`
           ),
 
@@ -1322,7 +1306,7 @@ con ${tag(user.pareja)}.
 
           `🥹 ${tag(sender)} y ${tag(proposer)}
 
-        💍 “SÍ” 💍
+💍 “SÍ” 💍
 
 ❤️ Desde este momento quedan
 oficialmente casados.
@@ -1561,15 +1545,6 @@ Siguen siendo novios.`
 
     // ========================================================
     // 💕 INTERACCIONES
-    //
-    // .amor
-    // .cita
-    // .besar
-    // .abrazar
-    // .regalo
-    // .flores
-    //
-    // TODOS USAN EXACTAMENTE LA MISMA LÓGICA
     // ========================================================
 
     const acciones = {
@@ -1619,10 +1594,6 @@ Siguen siendo novios.`
       )
     ) {
 
-      // ======================================================
-      // 👤 SENDER REAL
-      // ======================================================
-
       const senderId =
         await buscarUsuarioId(
           conn,
@@ -1633,14 +1604,6 @@ Siguen siendo novios.`
 
       const user =
         getUser(senderId)
-
-      // ======================================================
-      // 🎯 TARGET
-      //
-      // MENCIONADO > CITADO
-      //
-      // TODOS LOS COMANDOS USAN EL MISMO TARGET
-      // ======================================================
 
       let target = null
 
@@ -1676,10 +1639,6 @@ ${m.prefix || '.'}${command} @usuario`
         )
       }
 
-      // ======================================================
-      // 🔎 TARGET REAL
-      // ======================================================
-
       const targetId =
         await buscarUsuarioId(
           conn,
@@ -1690,10 +1649,6 @@ ${m.prefix || '.'}${command} @usuario`
 
       const targetUser =
         getUser(targetId)
-
-      // ======================================================
-      // ❤️ COMPROBAR PAREJA
-      // ======================================================
 
       const sonPareja =
         await comprobarPareja(
@@ -1706,10 +1661,6 @@ ${m.prefix || '.'}${command} @usuario`
           targetUser,
           m.chat
         )
-
-      // ======================================================
-      // 💔 NO SON PAREJA
-      // ======================================================
 
       if (!sonPareja) {
 
@@ -1733,16 +1684,8 @@ ${m.prefix || '.'}${command} @usuario`
         )
       }
 
-      // ======================================================
-      // ❤️ DATOS DE LA ACCIÓN
-      // ======================================================
-
       const accion =
         acciones[command]
-
-      // ======================================================
-      // 💞 SUMAR AMOR A LOS DOS
-      // ======================================================
 
       user.amor =
         Number(user.amor || 0) +
@@ -1752,18 +1695,12 @@ ${m.prefix || '.'}${command} @usuario`
         Number(targetUser.amor || 0) +
         accion.puntos
 
-      // ======================================================
-      // 🔗 REPARAR ENLACES SI FALTAN
-      // ======================================================
-
       if (!user.pareja) {
-
         user.pareja =
           targetId
       }
 
       if (!targetUser.pareja) {
-
         targetUser.pareja =
           senderId
       }
@@ -1774,15 +1711,7 @@ ${m.prefix || '.'}${command} @usuario`
       targetUser.estado =
         targetUser.estado || 'novios'
 
-      // ======================================================
-      // 💾 GUARDAR
-      // ======================================================
-
       saveDB(db)
-
-      // ======================================================
-      // 💬 RESPUESTA
-      // ======================================================
 
       return conn.reply(
         m.chat,

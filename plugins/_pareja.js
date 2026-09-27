@@ -32,7 +32,10 @@ const saveDB = data => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2))
 }
 
+// ============================================================
 // 💍 TIEMPO MÍNIMO PARA CASARSE: 3 DÍAS
+// ============================================================
+
 const TRES_DIAS = 3 * 24 * 60 * 60 * 1000
 
 // ============================================================
@@ -40,6 +43,7 @@ const TRES_DIAS = 3 * 24 * 60 * 60 * 1000
 // ============================================================
 
 function getOwnersJid() {
+
   return (global.owner || [])
     .map(v => {
 
@@ -49,12 +53,14 @@ function getOwnersJid() {
       if (typeof v !== 'string')
         return null
 
-      const numero = v.replace(/[^0-9]/g, '')
+      const numero =
+        v.replace(/[^0-9]/g, '')
 
       if (!numero)
         return null
 
       return numero + '@s.whatsapp.net'
+
     })
     .filter(Boolean)
 }
@@ -85,6 +91,7 @@ function limpiarJid(conn, jid) {
     return String(jid)
       .trim()
       .toLowerCase()
+
   }
 }
 
@@ -99,7 +106,11 @@ function obtenerNumero(conn, jid) {
 
   try {
 
-    let id = limpiarJid(conn, jid)
+    let id =
+      limpiarJid(
+        conn,
+        jid
+      )
 
     if (!id)
       return null
@@ -107,13 +118,15 @@ function obtenerNumero(conn, jid) {
     id = id.split('@')[0]
     id = id.split(':')[0]
 
-    const numero = id.replace(/\D/g, '')
+    const numero =
+      id.replace(/\D/g, '')
 
     return numero || null
 
   } catch {
 
     return null
+
   }
 }
 
@@ -121,9 +134,14 @@ function obtenerNumero(conn, jid) {
 // 🧠 OBTENER TODAS LAS IDENTIDADES
 // ============================================================
 
-async function obtenerIdentidades(conn, jid, chat) {
+async function obtenerIdentidades(
+  conn,
+  jid,
+  chat
+) {
 
-  const identidades = new Set()
+  const identidades =
+    new Set()
 
   if (!jid)
     return identidades
@@ -131,7 +149,10 @@ async function obtenerIdentidades(conn, jid, chat) {
   try {
 
     const original =
-      limpiarJid(conn, jid)
+      limpiarJid(
+        conn,
+        jid
+      )
 
     if (!original)
       return identidades
@@ -143,7 +164,10 @@ async function obtenerIdentidades(conn, jid, chat) {
     // ========================================================
 
     const numero =
-      obtenerNumero(conn, original)
+      obtenerNumero(
+        conn,
+        original
+      )
 
     if (numero) {
 
@@ -152,6 +176,7 @@ async function obtenerIdentidades(conn, jid, chat) {
       identidades.add(
         `${numero}@s.whatsapp.net`
       )
+
     }
 
     // ========================================================
@@ -166,18 +191,26 @@ async function obtenerIdentidades(conn, jid, chat) {
       try {
 
         const pn =
-          await conn.getPNForLID(original)
+          await conn.getPNForLID(
+            original
+          )
 
         if (pn) {
 
           const limpio =
-            limpiarJid(conn, pn)
+            limpiarJid(
+              conn,
+              pn
+            )
 
           if (limpio)
             identidades.add(limpio)
 
           const num =
-            obtenerNumero(conn, limpio)
+            obtenerNumero(
+              conn,
+              limpio
+            )
 
           if (num) {
 
@@ -186,10 +219,13 @@ async function obtenerIdentidades(conn, jid, chat) {
             identidades.add(
               `${num}@s.whatsapp.net`
             )
+
           }
+
         }
 
       } catch {}
+
     }
 
     // ========================================================
@@ -204,18 +240,25 @@ async function obtenerIdentidades(conn, jid, chat) {
       try {
 
         const lid =
-          await conn.getLIDForPN(original)
+          await conn.getLIDForPN(
+            original
+          )
 
         if (lid) {
 
           const limpio =
-            limpiarJid(conn, lid)
+            limpiarJid(
+              conn,
+              lid
+            )
 
           if (limpio)
             identidades.add(limpio)
+
         }
 
       } catch {}
+
     }
 
     // ========================================================
@@ -231,12 +274,17 @@ async function obtenerIdentidades(conn, jid, chat) {
       try {
 
         const metadata =
-          await conn.groupMetadata(chat)
+          await conn.groupMetadata(
+            chat
+          )
 
         const participantes =
           metadata?.participants || []
 
-        for (const participante of participantes) {
+        for (
+          const participante
+          of participantes
+        ) {
 
           const campos = [
             participante?.id,
@@ -247,45 +295,70 @@ async function obtenerIdentidades(conn, jid, chat) {
 
           let coincide = false
 
-          for (const campo of campos) {
+          for (
+            const campo
+            of campos
+          ) {
 
             const limpio =
-              limpiarJid(conn, campo)
+              limpiarJid(
+                conn,
+                campo
+              )
 
             if (!limpio)
               continue
 
-            if (limpio === original) {
+            if (
+              limpio === original
+            ) {
+
               coincide = true
               break
+
             }
 
             const numeroCampo =
-              obtenerNumero(conn, limpio)
+              obtenerNumero(
+                conn,
+                limpio
+              )
 
             if (
               numero &&
               numeroCampo &&
               numero === numeroCampo
             ) {
+
               coincide = true
               break
+
             }
+
           }
 
           if (!coincide)
             continue
 
-          for (const campo of campos) {
+          for (
+            const campo
+            of campos
+          ) {
 
             const limpio =
-              limpiarJid(conn, campo)
+              limpiarJid(
+                conn,
+                campo
+              )
 
             if (limpio)
               identidades.add(limpio)
 
             const num =
-              obtenerNumero(conn, limpio)
+              obtenerNumero(
+                conn,
+                limpio
+              )
 
             if (num) {
 
@@ -294,13 +367,17 @@ async function obtenerIdentidades(conn, jid, chat) {
               identidades.add(
                 `${num}@s.whatsapp.net`
               )
+
             }
+
           }
 
           break
+
         }
 
       } catch {}
+
     }
 
   } catch {}
@@ -336,10 +413,21 @@ async function esMismaPersona(
       chat
     )
 
-  for (const identidad of identidadesA) {
+  for (
+    const identidad
+    of identidadesA
+  ) {
 
-    if (identidadesB.has(identidad))
+    if (
+      identidadesB.has(
+        identidad
+      )
+    ) {
+
       return true
+
+    }
+
   }
 
   return false
@@ -360,7 +448,10 @@ async function buscarUsuarioId(
     return null
 
   const limpio =
-    limpiarJid(conn, jid)
+    limpiarJid(
+      conn,
+      jid
+    )
 
   // ==========================================================
   // COINCIDENCIA EXACTA
@@ -372,13 +463,17 @@ async function buscarUsuarioId(
   ) {
 
     return limpio
+
   }
 
   // ==========================================================
   // COINCIDENCIA POR IDENTIDAD
   // ==========================================================
 
-  for (const id of Object.keys(db)) {
+  for (
+    const id
+    of Object.keys(db)
+  ) {
 
     if (
       await esMismaPersona(
@@ -390,7 +485,9 @@ async function buscarUsuarioId(
     ) {
 
       return id
+
     }
+
   }
 
   return null
@@ -419,6 +516,7 @@ const crearUsuario = () => ({
   matrimonioFecha: null,
 
   amor: 0
+
 })
 
 // ============================================================
@@ -436,7 +534,10 @@ async function comprobarPareja(
   chat
 ) {
 
-  if (!senderId || !targetId)
+  if (
+    !senderId ||
+    !targetId
+  )
     return false
 
   const senderReal =
@@ -455,6 +556,10 @@ async function comprobarPareja(
       chat
     ) || targetId
 
+  // ==========================================================
+  // ❤️ PAREJA DEL REMITENTE
+  // ==========================================================
+
   if (senderUser?.pareja) {
 
     const parejaReal =
@@ -470,7 +575,9 @@ async function comprobarPareja(
       parejaReal === targetId ||
       parejaReal === target
     ) {
+
       return true
+
     }
 
     if (
@@ -481,7 +588,9 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
+
     }
 
     if (
@@ -492,9 +601,16 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
+
     }
+
   }
+
+  // ==========================================================
+  // ❤️ PAREJA DEL DESTINATARIO
+  // ==========================================================
 
   if (targetUser?.pareja) {
 
@@ -510,7 +626,9 @@ async function comprobarPareja(
       parejaReal === senderReal ||
       parejaReal === senderId
     ) {
+
       return true
+
     }
 
     if (
@@ -521,7 +639,9 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
+
     }
 
     if (
@@ -532,16 +652,28 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
+
     }
+
   }
 
-  for (const id of Object.keys(db)) {
+  // ==========================================================
+  // 🔎 BUSCAR RELACIÓN EN TODA LA DB
+  // ==========================================================
+
+  for (
+    const id
+    of Object.keys(db)
+  ) {
 
     const registro =
       db[id]
 
-    if (!registro?.pareja)
+    if (
+      !registro?.pareja
+    )
       continue
 
     const esSender =
@@ -570,7 +702,9 @@ async function comprobarPareja(
       parejaReal === targetId ||
       parejaReal === target
     ) {
+
       return true
+
     }
 
     if (
@@ -581,7 +715,9 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
+
     }
 
     if (
@@ -592,8 +728,11 @@ async function comprobarPareja(
         chat
       )
     ) {
+
       return true
+
     }
+
   }
 
   return false
@@ -646,6 +785,7 @@ let handler = async (
 
         db[id] =
           crearUsuario()
+
       }
 
       return db[id]
@@ -719,6 +859,7 @@ ${text}
         return conn.decodeJid(
           m.mentionedJid[0]
         )
+
       }
 
       if (
@@ -728,6 +869,7 @@ ${text}
         return conn.decodeJid(
           m.quoted.sender
         )
+
       }
 
       return null
@@ -761,6 +903,7 @@ ${text}
         return m.reply(
           '😹 No puedes proponerte a ti mismo.'
         )
+
       }
 
       const senderId =
@@ -785,7 +928,9 @@ ${text}
       const tu =
         getUser(targetId)
 
-      if (user.pareja) {
+      if (
+        user.pareja
+      ) {
 
         return conn.reply(
           m.chat,
@@ -806,9 +951,12 @@ No puedes proponer estando en relación.`
             ]
           }
         )
+
       }
 
-      if (tu.pareja) {
+      if (
+        tu.pareja
+      ) {
 
         return conn.reply(
           m.chat,
@@ -829,6 +977,7 @@ Respeta relaciones ajenas.`
             ]
           }
         )
+
       }
 
       tu.propuesta =
@@ -919,6 +1068,7 @@ juntos? 🥹❤️
         return m.reply(
           '❌ Uno de los dos ya tiene pareja.'
         )
+
       }
 
       // ======================================================
@@ -1134,7 +1284,7 @@ Nivel de amor: ❤️ ${user.amor}`
         user.relacionFecha
 
       // ======================================================
-      // 💍 AHORA SON 3 DÍAS
+      // 💍 3 DÍAS
       // ======================================================
 
       if (
@@ -1282,6 +1432,7 @@ con ${tag(user.pareja)}.
         return m.reply(
           '❌ Ya no son pareja.'
         )
+
       }
 
       user.matrimonioFecha =
@@ -1295,6 +1446,12 @@ con ${tag(user.pareja)}.
 
       proposerUser.propuestaMatrimonio =
         null
+
+      user.estado =
+        'casados'
+
+      proposerUser.estado =
+        'casados'
 
       saveDB(db)
 
@@ -1605,11 +1762,20 @@ Siguen siendo novios.`
       const user =
         getUser(senderId)
 
+      if (!user)
+        return m.reply(
+          '❌ No se pudo cargar tu perfil.'
+        )
+
+      // ======================================================
+      // 🎯 OBTENER DESTINATARIO
+      // ======================================================
+
       let target = null
 
       if (
         Array.isArray(m.mentionedJid) &&
-        m.mentionedJid.length
+        m.mentionedJid.length > 0
       ) {
 
         target =
@@ -1627,17 +1793,42 @@ Siguen siendo novios.`
             conn,
             m.quoted.sender
           )
+
       }
 
       if (!target) {
 
         return m.reply(
-          `💌 Usa el comando respondiendo a un mensaje o mencionando a alguien.
+          `💌 Debes mencionar o responder a alguien.
 
 Ejemplo:
 ${m.prefix || '.'}${command} @usuario`
         )
+
       }
+
+      // ======================================================
+      // 🚫 NO HACERLO SOBRE UNO MISMO
+      // ======================================================
+
+      if (
+        await esMismaPersona(
+          conn,
+          sender,
+          target,
+          m.chat
+        )
+      ) {
+
+        return m.reply(
+          '😹 No puedes hacer esa acción contigo mismo.'
+        )
+
+      }
+
+      // ======================================================
+      // 👤 BUSCAR DESTINATARIO
+      // ======================================================
 
       const targetId =
         await buscarUsuarioId(
@@ -1649,6 +1840,135 @@ ${m.prefix || '.'}${command} @usuario`
 
       const targetUser =
         getUser(targetId)
+
+      if (!targetUser)
+        return m.reply(
+          '❌ No se pudo cargar el perfil de esa persona.'
+        )
+
+      // ======================================================
+      // 🔎 OBTENER PAREJA REAL DEL DESTINATARIO
+      // ======================================================
+
+      let parejaDelTarget = null
+
+      if (
+        targetUser.pareja
+      ) {
+
+        parejaDelTarget =
+          await buscarUsuarioId(
+            conn,
+            db,
+            targetUser.pareja,
+            m.chat
+          ) || targetUser.pareja
+
+      }
+
+      // ======================================================
+      // 💔 SI EL DESTINATARIO TIENE PAREJA
+      // ======================================================
+
+      if (
+        parejaDelTarget
+      ) {
+
+        const esSuPareja =
+          await esMismaPersona(
+            conn,
+            parejaDelTarget,
+            senderId,
+            m.chat
+          )
+
+        if (!esSuPareja) {
+
+          return conn.reply(
+            m.chat,
+
+            box(
+              '💔 PERSONA OCUPADA',
+
+              `${tag(sender)} no puedes usar *.${command}* con ${tag(target)}.
+
+💑 ${tag(target)} ya tiene pareja: ${tag(parejaDelTarget)}.
+
+❤️ Respeta su relación.`
+            ),
+
+            m,
+
+            {
+              mentions: [
+                sender,
+                target,
+                parejaDelTarget
+              ]
+            }
+          )
+
+        }
+
+      }
+
+      // ======================================================
+      // 💔 SI QUIEN EJECUTA YA TIENE PAREJA
+      // ======================================================
+
+      if (
+        user.pareja
+      ) {
+
+        const parejaReal =
+          await buscarUsuarioId(
+            conn,
+            db,
+            user.pareja,
+            m.chat
+          ) || user.pareja
+
+        const esSuPareja =
+          await esMismaPersona(
+            conn,
+            parejaReal,
+            target,
+            m.chat
+          )
+
+        if (!esSuPareja) {
+
+          return conn.reply(
+            m.chat,
+
+            box(
+              '💔 YA TIENES PAREJA',
+
+              `${tag(sender)} ya tienes pareja: ${tag(parejaReal)}.
+
+🚫 No puedes usar *.${command}* con ${tag(target)}.
+
+❤️ Respeta tu relación.`
+            ),
+
+            m,
+
+            {
+              mentions: [
+                sender,
+                parejaReal,
+                target
+              ]
+            }
+          )
+
+        }
+
+      }
+
+      // ======================================================
+      // ❤️ COMPROBAR QUE REALMENTE SON PAREJA
+      // ======================================================
 
       const sonPareja =
         await comprobarPareja(
@@ -1670,7 +1990,10 @@ ${m.prefix || '.'}${command} @usuario`
           box(
             '💔 NO SON PAREJA',
 
-            `${tag(sender)} y ${tag(target)} todavía no son pareja.`
+            `${tag(sender)} y ${tag(target)}
+todavía no son pareja.
+
+💡 Primero deben usar *.pareja* y aceptar la propuesta.`
           ),
 
           m,
@@ -1682,10 +2005,18 @@ ${m.prefix || '.'}${command} @usuario`
             ]
           }
         )
+
       }
+
+      // ======================================================
+      // 💕 EJECUTAR ACCIÓN
+      // ======================================================
 
       const accion =
         acciones[command]
+
+      if (!accion)
+        return
 
       user.amor =
         Number(user.amor || 0) +
@@ -1695,23 +2026,35 @@ ${m.prefix || '.'}${command} @usuario`
         Number(targetUser.amor || 0) +
         accion.puntos
 
-      if (!user.pareja) {
-        user.pareja =
-          targetId
-      }
+      // ======================================================
+      // 🔗 ASEGURAR VÍNCULO MUTUO
+      // ======================================================
 
-      if (!targetUser.pareja) {
-        targetUser.pareja =
-          senderId
-      }
+      user.pareja =
+        targetId
+
+      targetUser.pareja =
+        senderId
 
       user.estado =
-        user.estado || 'novios'
+        user.estado === 'casados'
+          ? 'casados'
+          : 'novios'
 
       targetUser.estado =
-        targetUser.estado || 'novios'
+        targetUser.estado === 'casados'
+          ? 'casados'
+          : 'novios'
+
+      // ======================================================
+      // 💾 GUARDAR
+      // ======================================================
 
       saveDB(db)
+
+      // ======================================================
+      // 💬 RESPUESTA
+      // ======================================================
 
       return conn.reply(
         m.chat,
@@ -1721,9 +2064,9 @@ ${m.prefix || '.'}${command} @usuario`
 
           `${tag(sender)} ${accion.emoji} ${accion.texto} ${tag(target)}.
 
-Acción: ${command}
-Amor ganado: +${accion.puntos} ❤️
-Nuevo nivel de amor: ❤️ ${user.amor}`
+💖 Acción: *.${command}*
+❤️ Amor ganado: +${accion.puntos}
+💗 Nivel de amor: ${user.amor}`
         ),
 
         m,
@@ -1750,15 +2093,16 @@ Nuevo nivel de amor: ❤️ ${user.amor}`
       ) {
 
         const esOwner =
-          ownersJid.some(owner =>
-            obtenerNumero(
-              conn,
-              owner
-            ) ===
-            obtenerNumero(
-              conn,
-              sender
-            )
+          ownersJid.some(
+            owner =>
+              obtenerNumero(
+                conn,
+                owner
+              ) ===
+              obtenerNumero(
+                conn,
+                sender
+              )
           )
 
         if (!esOwner) {
@@ -1766,15 +2110,17 @@ Nuevo nivel de amor: ❤️ ${user.amor}`
           return m.reply(
             '❌ Solo el dueño.'
           )
+
         }
+
       }
 
       let texto = ''
-
       let mentions = []
 
       for (
-        const id of Object.keys(db)
+        const id
+        of Object.keys(db)
       ) {
 
         const user =
@@ -1818,13 +2164,16 @@ Nivel de amor: ❤️ ${user.amor}
             id,
             user.pareja
           )
+
         }
+
       }
 
       if (!texto) {
 
         texto =
           '😿 No hay parejas activas.'
+
       }
 
       return conn.reply(
@@ -1856,15 +2205,16 @@ Nivel de amor: ❤️ ${user.amor}
       ) {
 
         const esOwner =
-          ownersJid.some(owner =>
-            obtenerNumero(
-              conn,
-              owner
-            ) ===
-            obtenerNumero(
-              conn,
-              sender
-            )
+          ownersJid.some(
+            owner =>
+              obtenerNumero(
+                conn,
+                owner
+              ) ===
+              obtenerNumero(
+                conn,
+                sender
+              )
           )
 
         if (!esOwner) {
@@ -1872,15 +2222,19 @@ Nivel de amor: ❤️ ${user.amor}
           return m.reply(
             '❌ Solo el dueño.'
           )
+
         }
+
       }
 
       for (
-        const id of Object.keys(db)
+        const id
+        of Object.keys(db)
       ) {
 
         db[id] =
           crearUsuario()
+
       }
 
       saveDB(db)
@@ -1900,7 +2254,9 @@ Nivel de amor: ❤️ ${user.amor}
     return m.reply(
       '❌ Ocurrió un error en el sistema de parejas.'
     )
+
   }
+
 }
 
 // ============================================================

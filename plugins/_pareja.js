@@ -863,12 +863,23 @@ Respeta relaciones ajenas.`
         m.chat,
 
         box(
-          '💘 PROPUESTA DE AMOR',
+          '💌 UNA PROPUESTA ESPECIAL',
 
-          `${tag(sender)} quiere estar con ${tag(target)} ❤️
-Responde:
+          `💖 ${tag(sender)} tiene algo importante
+que decirle a ${tag(target)}...
+
+🌹 “Hay personas que llegan
+y hacen que todo se sienta
+un poquito más bonito.”
+
+💕 ${tag(sender)} quiere que
+${tag(target)} sea su pareja.
+
+¿Aceptas comenzar esta historia
+juntos? 🥹❤️
+
 ✨ *.aceptar*
-✨ *.rechazar*`
+❌ *.rechazar*`
         ),
 
         m,
@@ -964,11 +975,21 @@ Responde:
         m.chat,
 
         box(
-          '💞 NUEVA PAREJA',
+          '💞 UNA NUEVA HISTORIA',
 
-          `${tag(sender)} ❤️ ${tag(proposer)}
-Ahora son novios 💑
-Deben esperar 7 días para casarse.`
+          `🥹 ${tag(sender)} y ${tag(proposer)}
+
+💖 Han decidido comenzar
+una historia juntos.
+
+🌹 Desde hoy son oficialmente
+novios. 💑
+
+✨ Cuídense, quiéranse y
+disfruten cada momento.
+
+⏳ Podrán casarse después
+de 7 días. 💍`
         ),
 
         m,
@@ -1188,12 +1209,27 @@ Faltan ${faltan}.`
         m.chat,
 
         box(
-          '💒 PROPUESTA DE MATRIMONIO',
+          '💍 UNA PREGUNTA PARA SIEMPRE',
 
-          `${tag(sender)} 💍 ${tag(user.pareja)}
-Responde:
-✨ *.si*
-✨ *.no*`
+          `✨ ${tag(sender)} se arrodilla
+frente a ${tag(user.pareja)}...
+
+💐 Después de todo lo vivido,
+hay una pregunta que merece
+una respuesta especial:
+
+💖 “Quiero seguir compartiendo
+mis días contigo y convertir
+esta historia en algo para
+toda la vida.”
+
+💍 ${tag(sender)} quiere casarse
+con ${tag(user.pareja)}.
+
+¿Aceptas? 🥹💍
+
+💚 *.si*
+❤️ *.no*`
         ),
 
         m,
@@ -1282,10 +1318,19 @@ Responde:
         m.chat,
 
         box(
-          '💍 MATRIMONIO CONFIRMADO',
+          '💍💖 PARA SIEMPRE 💖💍',
 
-          `${tag(sender)} 💍 ${tag(proposer)}
-Ahora están oficialmente casados 💖`
+          `🥹 ${tag(sender)} y ${tag(proposer)}
+
+        💍 “SÍ” 💍
+
+❤️ Desde este momento quedan
+oficialmente casados.
+
+🌹 Que nunca les falten motivos
+para elegirse una y otra vez.
+
+💕 ¡FELICIDADES A LOS DOS! 💕`
         ),
 
         m,
@@ -1335,9 +1380,15 @@ Ahora están oficialmente casados 💖`
         m.chat,
 
         box(
-          '💔 MATRIMONIO RECHAZADO',
+          '💔 UNA DECISIÓN DIFÍCIL',
 
-          `${tag(sender)} ha rechazado casarse con ${tag(proposer)}.`
+          `💭 ${tag(sender)} ha decidido
+no aceptar la propuesta de
+matrimonio de ${tag(proposer)}.
+
+🌹 Quizás no era el momento...
+
+💔 La propuesta ha sido rechazada.`
         ),
 
         m,

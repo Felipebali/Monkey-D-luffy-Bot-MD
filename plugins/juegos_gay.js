@@ -84,7 +84,7 @@ let handler = async (m, { conn, command }) => {
 
     // 🧾 Mensaje final
     let msg = `
-🏳️‍🌈 *TEST GAY FELIXCAT 2.1* 🏳️‍🌈
+🏳️‍🌈 *TEST GAY WHATSAPP-BOT 2.1* 🏳️‍🌈
 
 👤 *Usuario:* @${simpleId}
 📊 *Nivel de gay:* ${porcentaje}%

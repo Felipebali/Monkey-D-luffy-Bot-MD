@@ -38,19 +38,19 @@ global.baileys = 'V 6.7.16'
 global.languaje = 'Español'
 global.vs = '2.2.0'
 global.nameqr = 'monkey-D-luffy-MD'
-global.namebot = 'Felix-Cat-Bot'
+global.namebot = 'WhatsApp-Bot'
 global.LuffySessions = 'LuffySessions'
 global.jadi = 'LuffyJadiBots' 
 global.LuffyJadibts = true
 
 //*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
 
-global.packname = 'Felix-Cat-Bot'
-global.botname = 'Felix-Cat-Bot'
+global.packname = 'WhatsApp-Bot'
+global.botname = 'WhatsApp-Bot'
 global.wm = '‧˚꒰🏴‍☠️꒱ ፝͜⁞ M͢ᴏɴᴋᴇʏ D L͢ᴜғғʏ-𝘉𝘰𝘵-𝑴𝑫✰⃔⃝'
 global.author = 'Made By ɴ͡ᴇ͜ɴᴇ❀᭄☂️' // Nombre del creador cambiado
 global.dev = '⌬ Modified by: ɴ͡ᴇ͜ɴᴇ❀᭄☂️ '
-global.textbot = 'Felix-Cat-Bot • 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗕𝘆 ɴ͡ᴇ͜ɴᴇ❀᭄☂️'
+global.textbot = 'WhatsApp-Bot • 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗕𝘆 ɴ͡ᴇ͜ɴᴇ❀᭄☂️'
 global.etiqueta = 'ˑ 𓈒 𐔌 ɴ͡ᴇ͜ɴᴇ❀᭄☂️ ͡꒱ ۫' // Etiqueta cambiada
 
 //*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*

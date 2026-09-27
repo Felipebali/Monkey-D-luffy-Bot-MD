@@ -1,5 +1,4 @@
-```js
-const botname = global.botname || 'WhatsApp-Bot'
+const botname = 'WhatsApp-Bot'
 const creador = 'Anónimo🐼'
 const versionBot = '11.0 ULTRA'
 
@@ -187,4 +186,3 @@ handler.tags = ['main']
 handler.command = ['menu', 'menú', 'help']
 
 export default handler
-```

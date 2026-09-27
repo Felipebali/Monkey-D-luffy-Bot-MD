@@ -7,9 +7,9 @@ let handler = async (m, { conn }) => {
     const gamesEnabled = chatSettings.games !== false
 
     let menuText = [
-      '╔═════════════════════╗',
-      '🎮  MINI-JUEGOS FELIXCAT 🐾',
-      '╚═════════════════════╝',
+      '╔════════════════════════╗',
+      '🎮  MINI-JUEGOS WHATSAPP-BOT🐾',
+      '╚════════════════════════╝',
       'Estado: ' + (gamesEnabled ? '🟢 Activados' : '🔴 Desactivados'),
       '────────────────────────────'
     ].join('\n')
@@ -67,7 +67,7 @@ let handler = async (m, { conn }) => {
       ].join('\n')
     }
 
-    menuText += '\n👑 *Powered by FelixCat 🐾*'
+    menuText += '\n👑 *Powered by WhatsApp-Bot 🐾*'
 
     await conn.sendMessage(
       m.chat,

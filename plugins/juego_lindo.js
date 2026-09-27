@@ -51,7 +51,7 @@ let handler = async (m, { conn, command }) => {
 
     // 🧾 Armar mensaje final
     let msg = `
-💞 *TEST DE BELLEZA FELIXCAT 2.1* 🐾
+💞 *TEST DE BELLEZA WHATSAPP-BOT 2.1* 🐾
 
 👤 *Usuario:* @${simpleId}
 📊 *Nivel de belleza:* ${porcentaje}%

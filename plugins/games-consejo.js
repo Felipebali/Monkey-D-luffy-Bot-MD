@@ -73,7 +73,7 @@ let handler = async (m, { conn }) => {
 
         // Mensaje minimalista y atractivo
         const mensaje = `
-✨ 🐾 *CONSEJO DEL DÍA - FELIXCAT* 🐾 ✨
+✨ 🐾 *CONSEJO DEL DÍA - WHATSAPP-BOT* 🐾 ✨
 
 💡 Consejo:
 > ${consejo}

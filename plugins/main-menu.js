@@ -1,5 +1,5 @@
 ```js
-const botname = global.botname || 'FelixCat-Bot'
+const botname = global.botname || 'WhatsApp-Bot'
 const creador = 'Anónimo🐼'
 const versionBot = '11.0 ULTRA'
 

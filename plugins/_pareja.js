@@ -646,8 +646,27 @@ Nivel de amor: ❤️ ${user.amor}`
       user.relacionFecha
 
 
+    // ============================================================
+    // 👑 OWNER
+    // LOS OWNERS PUEDEN CASARSE CUANDO QUIERAN
+    // ============================================================
+
+    const esOwner =
+      ownersJid.some(
+        owner => sameUser(
+          owner,
+          sender
+        )
+      )
+
+
+    // ============================================================
     // ⏳ ESPERAR 3 DÍAS
+    // SOLO PARA USUARIOS NORMALES
+    // ============================================================
+
     if (
+      !esOwner &&
       tiempoRelacion <
       TRES_DIAS
     ) {
@@ -1537,5 +1556,9 @@ handler.command = [
 
 ]
 
+
+// ============================================================
+// 📤 EXPORT
+// ============================================================
 
 export default handler

@@ -48,9 +48,7 @@ if (!fs.existsSync(hermanosFile)) {
 // ============================================================
 
 const loadJSON = file => {
-
   try {
-
     const data = fs.readFileSync(
       file,
       'utf8'
@@ -59,13 +57,11 @@ const loadJSON = file => {
     return JSON.parse(data || '{}')
 
   } catch {
-
     return {}
   }
 }
 
 const saveJSON = (file, data) => {
-
   fs.writeFileSync(
     file,
     JSON.stringify(data, null, 2)
@@ -752,7 +748,7 @@ let handler = async (
       return conn.reply(
         m.chat,
 
-`🏅 *INSIGNIA OTORGADA*
+        `🏅 *INSIGNIA OTORGADA*
 
 👤 Usuario: ${tag(target)}
 
@@ -848,7 +844,7 @@ let handler = async (
       return conn.reply(
         m.chat,
 
-`❌ *INSIGNIA QUITADA*
+        `❌ *INSIGNIA QUITADA*
 
 👤 Usuario: ${tag(target)}
 
@@ -918,7 +914,7 @@ let handler = async (
         return conn.reply(
           m.chat,
 
-`🏅 *INSIGNIAS DE ${tag(target)}*
+          `🏅 *INSIGNIAS DE ${tag(target)}*
 
 ${lista}`,
 
@@ -1038,7 +1034,7 @@ ${data.insignias.join(' ')}
         return conn.reply(
           m.chat,
 
-`🧹 *INSIGNIAS ELIMINADAS*
+          `🧹 *INSIGNIAS ELIMINADAS*
 
 Se borraron todas las insignias de ${tag(target)}.`,
 
@@ -1081,7 +1077,7 @@ Se borraron todas las insignias de ${tag(target)}.`,
 
       return m.reply(
 
-`🧹 *INSIGNIAS LIMPIADAS*
+        `🧹 *INSIGNIAS LIMPIADAS*
 
 🏅 Insignias eliminadas: ${eliminadas}
 
@@ -1125,10 +1121,45 @@ Se borraron todas las insignias de ${tag(target)}.`,
             conn
           )
 
-        estadoTexto =
-          parejaData.estado === 'casados'
-            ? '💍 Estado: Casado/a'
-            : '💑 Estado: De novio/a'
+        // ====================================================
+        // 💍 ESTADO DE LA RELACIÓN
+        // ====================================================
+
+        const estado =
+          String(
+            parejaData.estado || ''
+          )
+            .toLowerCase()
+            .trim()
+
+        if (
+          [
+            'casados',
+            'casado',
+            'casada',
+            'matrimonio'
+          ].includes(estado)
+        ) {
+
+          estadoTexto =
+            '💍 Estado: Casado/a'
+
+        } else if (
+          [
+            'divorciados',
+            'divorciado',
+            'divorciada'
+          ].includes(estado)
+        ) {
+
+          estadoTexto =
+            '💔 Estado: Divorciado/a'
+
+        } else {
+
+          estadoTexto =
+            '💑 Estado: De novio/a'
+        }
 
         parejaTexto =
           `❤️ Pareja: ${tag(parejaJid)}`

@@ -1278,7 +1278,7 @@ Se borraron todas las insignias de ${tag(target)}.`,
 
       const textoPerfil =
 
-`👤 *PERFIL FELIXCAT*
+`👤 *PERFIL DE USUARIO*
 
 ━━━━━━━━━━━━━━━━━━
 

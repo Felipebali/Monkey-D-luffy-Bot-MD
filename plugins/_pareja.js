@@ -15,6 +15,11 @@ const file = path.join(dir, 'parejas.json')
 if (!fs.existsSync(file))
   fs.writeFileSync(file, JSON.stringify({}, null, 2))
 
+
+// ============================================================
+// 💾 BASE DE DATOS
+// ============================================================
+
 const loadDB = () => {
   try {
     return JSON.parse(fs.readFileSync(file))
@@ -24,27 +29,48 @@ const loadDB = () => {
 }
 
 const saveDB = (data) => {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2))
+  fs.writeFileSync(
+    file,
+    JSON.stringify(data, null, 2)
+  )
 }
 
+
+// ============================================================
 // ⏳ 3 DÍAS PARA PODER CASARSE
+// ============================================================
+
 const TRES_DIAS = 3 * 24 * 60 * 60 * 1000
 
 
+// ============================================================
+// 👑 DUEÑOS
+// ============================================================
+
 function getOwnersJid() {
+
   return (global.owner || [])
     .map(v => {
+
       if (Array.isArray(v))
         v = v[0]
 
       if (typeof v !== 'string')
         return null
 
-      return v.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
+      return v.replace(
+        /[^0-9]/g,
+        ''
+      ) + '@s.whatsapp.net'
+
     })
     .filter(Boolean)
 }
 
+
+// ============================================================
+// 💕 HANDLER
+// ============================================================
 
 let handler = async (m, { conn, command }) => {
 
@@ -57,7 +83,10 @@ let handler = async (m, { conn, command }) => {
   const ownersJid = getOwnersJid()
 
 
-  // 👤 CREAR USUARIO
+  // ============================================================
+  // 👤 CREAR / OBTENER USUARIO
+  // ============================================================
+
   const getUser = (id) => {
 
     if (!db[id]) {
@@ -89,14 +118,28 @@ let handler = async (m, { conn, command }) => {
   }
 
 
+  // ============================================================
   // 🏷️ MENCIONAR
-  const tag = (id) => '@' + id.split('@')[0]
+  // ============================================================
+
+  const tag = (id) => {
+
+    if (!id)
+      return ''
+
+    return '@' + id.split('@')[0]
+  }
 
 
+  // ============================================================
   // ⏱️ FORMATO DE TIEMPO
+  // ============================================================
+
   const tiempo = (ms) => {
 
-    const dias = Math.floor(ms / 86400000)
+    const dias = Math.floor(
+      ms / 86400000
+    )
 
     const horas = Math.floor(
       (ms % 86400000) / 3600000
@@ -106,22 +149,120 @@ let handler = async (m, { conn, command }) => {
   }
 
 
-  // 📦 CAJA DE MENSAJE
-  const box = (title, text) => `╭━━━〔 ${title} 〕━━━⬣
+  // ============================================================
+  // 📦 CAJA
+  // ============================================================
+
+  const box = (title, text) => `
+╭━━━〔 ${title} 〕━━━⬣
 ${text}
 ╰━━━━━━━━━━━━━━━━⬣`
 
 
+  // ============================================================
   // 🎯 OBTENER OBJETIVO
+  // MENCIONANDO O RESPONDIENDO/CITANDO
+  // ============================================================
+
   const getTarget = () => {
 
+    // 👤 Mención
     if (m.mentionedJid?.length)
-      return conn.decodeJid(m.mentionedJid[0])
+      return conn.decodeJid(
+        m.mentionedJid[0]
+      )
 
+    // 💬 Respuesta / citado
     if (m.quoted?.sender)
-      return conn.decodeJid(m.quoted.sender)
+      return conn.decodeJid(
+        m.quoted.sender
+      )
 
     return null
+  }
+
+
+  // ============================================================
+  // 🔎 COMPARAR DOS JID
+  // ============================================================
+
+  const sameUser = (a, b) => {
+
+    if (!a || !b)
+      return false
+
+    a = conn.decodeJid(a)
+    b = conn.decodeJid(b)
+
+    // Comparación directa
+    if (a === b)
+      return true
+
+
+    // Limpiar identificador de dispositivo
+    const clean = jid => {
+
+      if (!jid)
+        return ''
+
+      return jid
+        .split(':')[0]
+        .toLowerCase()
+    }
+
+
+    const cleanA = clean(a)
+    const cleanB = clean(b)
+
+
+    if (cleanA === cleanB)
+      return true
+
+
+    // Comparar números
+    const numberA =
+      cleanA.replace(
+        /[^0-9]/g,
+        ''
+      )
+
+    const numberB =
+      cleanB.replace(
+        /[^0-9]/g,
+        ''
+      )
+
+
+    return Boolean(
+      numberA &&
+      numberB &&
+      numberA === numberB
+    )
+  }
+
+
+  // ============================================================
+  // 🔎 BUSCAR ID REAL EN parejas.json
+  // ============================================================
+
+  const findUserId = (jid) => {
+
+    if (!jid)
+      return null
+
+
+    if (db[jid])
+      return jid
+
+
+    for (const id of Object.keys(db)) {
+
+      if (sameUser(id, jid))
+        return id
+    }
+
+
+    return jid
   }
 
 
@@ -131,14 +272,18 @@ ${text}
 
   if (command === 'pareja') {
 
-    const target = getTarget()
+    const targetRaw = getTarget()
 
-    if (!target)
+    if (!targetRaw)
       return m.reply(
         '💌 Menciona o responde a la persona a la que quieres proponerle.'
       )
 
-    if (target === sender)
+
+    const target = findUserId(targetRaw)
+
+
+    if (sameUser(target, sender))
       return m.reply(
         '😹 No puedes proponerte a ti mismo.'
       )
@@ -153,6 +298,7 @@ ${text}
     if (user.pareja)
 
       return conn.reply(
+
         m.chat,
 
         box(
@@ -178,6 +324,7 @@ No puedes hacer una propuesta mientras estás en una relación.`
     if (tu.pareja)
 
       return conn.reply(
+
         m.chat,
 
         box(
@@ -255,6 +402,7 @@ de una hermosa historia.`
 
     const user = getUser(sender)
 
+
     if (!user.propuesta)
 
       return m.reply(
@@ -262,13 +410,18 @@ de una hermosa historia.`
       )
 
 
-    const proposer = user.propuesta
+    const proposer =
+      findUserId(user.propuesta)
 
-    const proposerUser = getUser(proposer)
+    const proposerUser =
+      getUser(proposer)
 
 
     // 🚫 COMPROBAR PAREJAS
-    if (user.pareja || proposerUser.pareja)
+    if (
+      user.pareja ||
+      proposerUser.pareja
+    )
 
       return m.reply(
         '❌ Uno de los dos ya tiene pareja.'
@@ -290,7 +443,12 @@ de una hermosa historia.`
 
     user.propuesta = null
 
+    user.propuestaFecha = null
+
     proposerUser.propuesta = null
+
+    proposerUser.propuestaFecha = null
+
 
     saveDB(db)
 
@@ -343,6 +501,7 @@ usen *.casarse*`
 
     const user = getUser(sender)
 
+
     if (!user.propuesta)
 
       return m.reply(
@@ -350,11 +509,14 @@ usen *.casarse*`
       )
 
 
-    const proposer = user.propuesta
+    const proposer =
+      user.propuesta
+
 
     user.propuesta = null
 
     user.propuestaFecha = null
+
 
     saveDB(db)
 
@@ -371,7 +533,6 @@ usen *.casarse*`
 la propuesta de ${tag(proposer)}.
 
 💔 Tal vez no era el momento.`
-
       ),
 
       m,
@@ -394,11 +555,16 @@ la propuesta de ${tag(proposer)}.
 
     const user = getUser(sender)
 
+
     if (!user.pareja)
 
       return m.reply(
         '💔 No tienes pareja actualmente.'
       )
+
+
+    const pareja =
+      findUserId(user.pareja)
 
 
     const estado =
@@ -409,7 +575,10 @@ la propuesta de ${tag(proposer)}.
 
     const tiempoJuntos =
       user.relacionFecha
-        ? tiempo(ahora - user.relacionFecha)
+        ? tiempo(
+            ahora -
+            user.relacionFecha
+          )
         : 'Desconocido'
 
 
@@ -421,14 +590,13 @@ la propuesta de ${tag(proposer)}.
 
         '💖 ESTADO DE RELACIÓN',
 
-        `${tag(sender)} ❤️ ${tag(user.pareja)}
+        `${tag(sender)} ❤️ ${tag(pareja)}
 
 Estado: ${estado}
 
 Tiempo juntos: ${tiempoJuntos}
 
 Nivel de amor: ❤️ ${user.amor}`
-
       ),
 
       m,
@@ -436,7 +604,7 @@ Nivel de amor: ❤️ ${user.amor}`
       {
         mentions: [
           sender,
-          user.pareja
+          pareja
         ]
       }
     )
@@ -466,15 +634,29 @@ Nivel de amor: ❤️ ${user.amor}`
       )
 
 
+    if (!user.relacionFecha)
+
+      return m.reply(
+        '❌ No se encontró la fecha de inicio de la relación.'
+      )
+
+
     const tiempoRelacion =
-      ahora - user.relacionFecha
+      ahora -
+      user.relacionFecha
 
 
     // ⏳ ESPERAR 3 DÍAS
-    if (tiempoRelacion < TRES_DIAS) {
+    if (
+      tiempoRelacion <
+      TRES_DIAS
+    ) {
 
       const faltan =
-        tiempo(TRES_DIAS - tiempoRelacion)
+        tiempo(
+          TRES_DIAS -
+          tiempoRelacion
+        )
 
 
       return conn.reply(
@@ -497,7 +679,6 @@ ${tiempo(tiempoRelacion)}
 ${faltan}
 
 ❤️ Sigan construyendo su historia.`
-
         ),
 
         m,
@@ -514,12 +695,15 @@ ${faltan}
 
     // 💍 CREAR PROPUESTA
     const pareja =
-      getUser(user.pareja)
+      getUser(
+        findUserId(
+          user.pareja
+        )
+      )
 
 
     pareja.propuestaMatrimonio =
       sender
-
 
     pareja.propuestaMatrimonioFecha =
       ahora
@@ -554,7 +738,6 @@ continúe para siempre? 💖
 
 ❤️ Hoy puede comenzar
 una nueva etapa de su historia.`
-
       ),
 
       m,
@@ -586,7 +769,9 @@ una nueva etapa de su historia.`
 
 
     const proposer =
-      user.propuestaMatrimonio
+      findUserId(
+        user.propuestaMatrimonio
+      )
 
 
     const proposerUser =
@@ -594,7 +779,12 @@ una nueva etapa de su historia.`
 
 
     // 🚫 YA NO SON PAREJA
-    if (user.pareja !== proposer)
+    if (
+      !sameUser(
+        user.pareja,
+        proposer
+      )
+    )
 
       return m.reply(
         '❌ Ya no son pareja.'
@@ -602,17 +792,28 @@ una nueva etapa de su historia.`
 
 
     // 💍 CASAMIENTO
-    user.matrimonioFecha = ahora
+    user.matrimonioFecha =
+      ahora
 
-    proposerUser.matrimonioFecha = ahora
+    proposerUser.matrimonioFecha =
+      ahora
 
     user.estado = 'casados'
 
     proposerUser.estado = 'casados'
 
-    user.propuestaMatrimonio = null
+    user.propuestaMatrimonio =
+      null
 
-    proposerUser.propuestaMatrimonio = null
+    user.propuestaMatrimonioFecha =
+      null
+
+    proposerUser.propuestaMatrimonio =
+      null
+
+    proposerUser.propuestaMatrimonioFecha =
+      null
+
 
     saveDB(db)
 
@@ -637,7 +838,6 @@ Que esta nueva etapa esté llena
 de buenos momentos, cariño y respeto. 💖
 
 🎉 ¡Felicidades! 🎉`
-
       ),
 
       m,
@@ -672,9 +872,12 @@ de buenos momentos, cariño y respeto. 💖
       user.propuestaMatrimonio
 
 
-    user.propuestaMatrimonio = null
+    user.propuestaMatrimonio =
+      null
 
-    user.propuestaMatrimonioFecha = null
+    user.propuestaMatrimonioFecha =
+      null
+
 
     saveDB(db)
 
@@ -691,7 +894,6 @@ de buenos momentos, cariño y respeto. 💖
 casarse con ${tag(proposer)}.
 
 💔 La relación continúa como noviazgo.`
-
       ),
 
       m,
@@ -730,7 +932,9 @@ casarse con ${tag(proposer)}.
 
 
     const exId =
-      user.pareja
+      findUserId(
+        user.pareja
+      )
 
 
     const pareja =
@@ -770,7 +974,6 @@ casarse con ${tag(proposer)}.
 La relación ha terminado.
 
 Ahora ambos están solteros. 💔`
-
       ),
 
       m,
@@ -802,12 +1005,18 @@ Ahora ambos están solteros. 💔`
 
 
     const pareja =
-      getUser(user.pareja)
+      getUser(
+        findUserId(
+          user.pareja
+        )
+      )
 
 
-    user.matrimonioFecha = null
+    user.matrimonioFecha =
+      null
 
-    pareja.matrimonioFecha = null
+    pareja.matrimonioFecha =
+      null
 
     user.estado = 'novios'
 
@@ -830,7 +1039,6 @@ Ahora ambos están solteros. 💔`
 El matrimonio ha terminado.
 
 💑 Siguen siendo novios.`
-
       ),
 
       m,
@@ -847,13 +1055,27 @@ El matrimonio ha terminado.
 
   // ============================================================
   // 💕 ACCIONES ROMÁNTICAS
+  //
+  // amor
+  // besar
+  // abrazar
+  // flores
+  // regalo
+  // cita
+  //
+  // TODAS FUNCIONAN POR:
+  // 👤 MENCIÓN
+  // 💬 RESPUESTA / CITA
   // ============================================================
 
   if (
     [
+      'amor',
       'besar',
       'abrazar',
-      'amor'
+      'flores',
+      'regalo',
+      'cita'
     ].includes(command)
   ) {
 
@@ -861,18 +1083,27 @@ El matrimonio ha terminado.
       getUser(sender)
 
 
-    const target =
+    const targetRaw =
       getTarget()
 
 
-    if (!target)
+    if (!targetRaw)
 
       return m.reply(
-        '💌 Menciona o responde a alguien.'
+        `💌 Menciona o responde a alguien para usar *.${command}*.`
       )
 
 
-    if (target === sender)
+    const target =
+      findUserId(targetRaw)
+
+
+    if (
+      sameUser(
+        target,
+        sender
+      )
+    )
 
       return m.reply(
         '😹 No puedes hacer esa acción contigo mismo.'
@@ -884,13 +1115,22 @@ El matrimonio ha terminado.
 
 
     // ========================================================
-    // 🚨 EL OBJETIVO YA TIENE PAREJA
+    // 🚨 TERCERO INTENTA INTERACTUAR CON PERSONA EN PAREJA
     // ========================================================
 
     if (
       targetUser.pareja &&
-      targetUser.pareja !== sender
+      !sameUser(
+        targetUser.pareja,
+        sender
+      )
     ) {
+
+      const parejaDelObjetivo =
+        findUserId(
+          targetUser.pareja
+        )
+
 
       return conn.reply(
 
@@ -900,23 +1140,31 @@ El matrimonio ha terminado.
 
           '🚨 PERSONA EN RELACIÓN',
 
-          `${tag(target)} está en pareja con
-${tag(targetUser.pareja)} ❤️
+          `${tag(sender)} intentó usar *.${command}*
+con ${tag(target)} 😾
 
-❌ No puedes usar *.${command}*
-con una persona que ya tiene pareja.
+❤️ ${tag(target)} está en pareja con
+${tag(parejaDelObjetivo)}.
 
-😾 Respeta relaciones ajenas.`
+💌 AVISO A LA PAREJA
 
+${tag(sender)} intentó interactuar
+románticamente con ${tag(target)}.
+
+❌ La acción fue bloqueada.
+
+⚠️ ${tag(parejaDelObjetivo)}, tu pareja recibió
+un intento de interacción romántica
+por parte de ${tag(sender)}.`
         ),
 
         m,
 
         {
           mentions: [
+            sender,
             target,
-            targetUser.pareja,
-            sender
+            parejaDelObjetivo
           ]
         }
       )
@@ -925,12 +1173,24 @@ con una persona que ya tiene pareja.
 
     // ========================================================
     // 🚨 INFIDELIDAD
+    //
+    // Si quien ejecuta tiene pareja y quiere
+    // interactuar con otra persona.
     // ========================================================
 
     if (
       user.pareja &&
-      user.pareja !== target
+      !sameUser(
+        user.pareja,
+        target
+      )
     ) {
+
+      const parejaDelSender =
+        findUserId(
+          user.pareja
+        )
+
 
       return conn.reply(
 
@@ -940,15 +1200,22 @@ con una persona que ya tiene pareja.
 
           '🚨 INFIDELIDAD DETECTADA',
 
-          `${tag(sender)} intentó
-*.${command}* a ${tag(target)} 😾
+          `${tag(sender)} intentó usar *.${command}*
+con ${tag(target)} 😾
 
-Pero estás en pareja con
-${tag(user.pareja)} ❤️
+❤️ Su pareja es
+${tag(parejaDelSender)}.
 
-❌ No puedes utilizar acciones románticas
-con otra persona mientras tengas pareja.`
+💌 AVISO DE INFIDELIDAD
 
+${tag(sender)} intentó interactuar
+románticamente con otra persona.
+
+❌ La acción fue bloqueada.
+
+⚠️ ${tag(parejaDelSender)}, tu pareja
+intentó usar *.${command}* con
+${tag(target)}.`
         ),
 
         m,
@@ -957,7 +1224,7 @@ con otra persona mientras tengas pareja.`
           mentions: [
             sender,
             target,
-            user.pareja
+            parejaDelSender
           ]
         }
       )
@@ -970,7 +1237,10 @@ con otra persona mientras tengas pareja.`
 
     if (
       !user.pareja ||
-      user.pareja !== target
+      !sameUser(
+        user.pareja,
+        target
+      )
     ) {
 
       return m.reply(
@@ -979,24 +1249,51 @@ con otra persona mientras tengas pareja.`
 
 Para usar *.${command}*
 primero deben estar en una relación. ❤️`
-
       )
     }
 
 
     // ========================================================
-    // ❤️ SUMAR AMOR
+    // ❤️ PUNTOS DE AMOR
     // ========================================================
 
-    let suma =
+    let suma = 0
 
-      command === 'besar'
-        ? 5
 
-        : command === 'abrazar'
-          ? 3
+    if (command === 'amor')
+      suma = 10
 
-          : 10
+
+    if (command === 'besar')
+      suma = 5
+
+
+    if (command === 'abrazar')
+      suma = 3
+
+
+    if (command === 'flores')
+      suma = 15
+
+
+    if (command === 'regalo')
+      suma = 20
+
+
+    if (command === 'cita')
+      suma = 25
+
+
+    user.amor =
+      Number(
+        user.amor || 0
+      )
+
+
+    targetUser.amor =
+      Number(
+        targetUser.amor || 0
+      )
 
 
     user.amor += suma
@@ -1023,7 +1320,6 @@ Acción: ${command}
 
 Nuevo nivel de amor:
 ❤️ ${user.amor}`
-
       ),
 
       m,
@@ -1044,7 +1340,14 @@ Nuevo nivel de amor:
 
   if (command === 'listapareja') {
 
-    if (!ownersJid.includes(sender))
+    if (
+      !ownersJid.some(
+        owner => sameUser(
+          owner,
+          sender
+        )
+      )
+    )
 
       return m.reply(
         '❌ Solo el dueño puede utilizar este comando.'
@@ -1056,9 +1359,12 @@ Nuevo nivel de amor:
     let mentions = []
 
 
-    for (let id in db) {
+    for (
+      let id in db
+    ) {
 
-      const user = db[id]
+      const user =
+        db[id]
 
 
       if (
@@ -1087,7 +1393,8 @@ Nuevo nivel de amor:
             : 'Desconocido'
 
 
-        texto += `╭─────────────⬣
+        texto +=
+`╭─────────────⬣
 💖 ${tag(id)} ❤️ ${tag(user.pareja)}
 Estado: ${estado}
 Tiempo juntos: ${tiempoJuntos}
@@ -1135,14 +1442,23 @@ Nivel de amor: ❤️ ${user.amor}
 
   if (command === 'clearship') {
 
-    if (!ownersJid.includes(sender))
+    if (
+      !ownersJid.some(
+        owner => sameUser(
+          owner,
+          sender
+        )
+      )
+    )
 
       return m.reply(
         '❌ Solo el dueño puede utilizar este comando.'
       )
 
 
-    for (let id in db) {
+    for (
+      let id in db
+    ) {
 
       db[id] = {
 
@@ -1179,6 +1495,10 @@ Nivel de amor: ❤️ ${user.amor}
 }
 
 
+// ============================================================
+// 📋 LOS 17 COMANDOS
+// ============================================================
+
 handler.command = [
 
   'pareja',
@@ -1204,6 +1524,12 @@ handler.command = [
   'besar',
 
   'abrazar',
+
+  'flores',
+
+  'regalo',
+
+  'cita',
 
   'listapareja',
 

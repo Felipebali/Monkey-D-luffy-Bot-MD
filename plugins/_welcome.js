@@ -1,175 +1,410 @@
 // 📂 plugins/welcome.js
+// 🎉 Sistema de bienvenida y despedida
+// FelixCat_Bot 🐈
 
 let handler = async (m, { conn, text, command, isAdmin }) => {
-    if (!m.isGroup)
-        return conn.sendMessage(m.chat, { text: "❌ Solo funciona en grupos." });
 
-    if (!isAdmin)
-        return conn.sendMessage(m.chat, {
-            text: "⚠️ Solo los administradores pueden usar este comando."
-        });
+    // ============================================================
+    // 👥 SOLO GRUPOS
+    // ============================================================
+
+    if (!m.isGroup) {
+        return conn.sendMessage(
+            m.chat,
+            {
+                text: "❌ Solo funciona en grupos."
+            }
+        )
+    }
+
+    // ============================================================
+    // 🔐 SOLO ADMIN
+    // ============================================================
+
+    if (!isAdmin) {
+        return conn.sendMessage(
+            m.chat,
+            {
+                text:
+                    "⚠️ Solo los administradores pueden usar este comando."
+            }
+        )
+    }
+
+    // ============================================================
+    // 💾 CREAR CONFIGURACIÓN
+    // ============================================================
 
     if (!global.db.data.chats[m.chat])
-        global.db.data.chats[m.chat] = {};
+        global.db.data.chats[m.chat] = {}
 
-    let chat = global.db.data.chats[m.chat];
+    let chat = global.db.data.chats[m.chat]
 
-    // 🔧 Valores por defecto
-    const defaultWelcome = "🎉 ¡Bienvenido/a!";
-    const defaultLeave = "👋 Se fue del grupo.";
+    // ============================================================
+    // 🔧 VALORES POR DEFECTO
+    // ============================================================
 
-    // 🔴 DESACTIVADO POR DEFECTO
+    const defaultWelcome =
+        "🎉 ¡Bienvenido/a!"
+
+    const defaultLeave =
+        "👋 Se fue del grupo."
+
     if (typeof chat.welcome === "undefined")
-        chat.welcome = false;
+        chat.welcome = false
 
     if (!chat.welcomeMsg)
-        chat.welcomeMsg = defaultWelcome;
+        chat.welcomeMsg = defaultWelcome
 
     if (!chat.leaveMsg)
-        chat.leaveMsg = defaultLeave;
+        chat.leaveMsg = defaultLeave
 
+    // ============================================================
     // 🔘 ACTIVAR / DESACTIVAR
-    if (command === "welcome") {
-        chat.welcome = !chat.welcome;
+    // ============================================================
 
-        return conn.sendMessage(m.chat, {
-            text: `✨ *Welcome ${chat.welcome ? "ACTIVADO" : "DESACTIVADO"}*\n\nLos mensajes están ${chat.welcome ? "habilitados" : "deshabilitados"}.`
-        });
+    if (
+        command === "welcome" ||
+        command === "welc" ||
+        command === "wl"
+    ) {
+
+        chat.welcome = !chat.welcome
+
+        return conn.sendMessage(
+            m.chat,
+            {
+                text:
+                    `✨ *WELCOME ${chat.welcome ? "ACTIVADO" : "DESACTIVADO"}*\n\n` +
+                    `📢 Los mensajes de entrada y salida están ` +
+                    `${chat.welcome ? "*habilitados*" : "*deshabilitados*"}.`
+            }
+        )
     }
 
+    // ============================================================
     // ✏️ EDITAR BIENVENIDA
+    // ============================================================
+
     if (command === "set1") {
-        if (!text)
-            return m.reply("✏️ Usa:\n.set1 texto");
 
-        chat.welcomeMsg = text;
+        if (!text) {
+            return m.reply(
+                `✏️ *CONFIGURAR BIENVENIDA*\n\n` +
+                `Usa:\n` +
+                `*.set1 texto*`
+            )
+        }
 
-        return m.reply("✅ Bienvenida actualizada.");
+        chat.welcomeMsg = text
+
+        return m.reply(
+            `✅ *Bienvenida actualizada correctamente.*\n\n` +
+            `📝 ${text}`
+        )
     }
 
+    // ============================================================
     // ✏️ EDITAR DESPEDIDA
+    // ============================================================
+
     if (command === "set2") {
-        if (!text)
-            return m.reply("✏️ Usa:\n.set2 texto");
 
-        chat.leaveMsg = text;
+        if (!text) {
+            return m.reply(
+                `✏️ *CONFIGURAR DESPEDIDA*\n\n` +
+                `Usa:\n` +
+                `*.set2 texto*`
+            )
+        }
 
-        return m.reply("✅ Despedida actualizada.");
+        chat.leaveMsg = text
+
+        return m.reply(
+            `✅ *Despedida actualizada correctamente.*\n\n` +
+            `📝 ${text}`
+        )
     }
 
+    // ============================================================
     // 🧹 RESET TOTAL
+    // ============================================================
+
     if (command === "clearwel") {
-        chat.welcome = false;
-        chat.welcomeMsg = defaultWelcome;
-        chat.leaveMsg = defaultLeave;
 
-        return conn.sendMessage(m.chat, {
-            text: `🧹 *Mensajes reiniciados*\n\n✅ Welcome quedó DESACTIVADO.\n🔄 Se restauraron los mensajes por defecto.`
-        });
+        chat.welcome = false
+        chat.welcomeMsg = defaultWelcome
+        chat.leaveMsg = defaultLeave
+
+        return conn.sendMessage(
+            m.chat,
+            {
+                text:
+                    `🧹 *MENSAJES REINICIADOS*\n\n` +
+                    `🔴 Welcome quedó *DESACTIVADO*.\n` +
+                    `🔄 Se restauraron los mensajes por defecto.`
+            }
+        )
     }
-};
+}
 
-// ============================================================
+// ================================================================
 // 🔥 DETECTOR DE ENTRADAS Y SALIDAS
-// ============================================================
+// ================================================================
 
 handler.before = async function (m, { conn }) {
-    if (!m.isGroup) return;
+
+    if (!m.isGroup)
+        return
+
+    // ============================================================
+    // 💾 CREAR CONFIGURACIÓN
+    // ============================================================
 
     if (!global.db.data.chats[m.chat])
-        global.db.data.chats[m.chat] = {};
+        global.db.data.chats[m.chat] = {}
 
-    let chat = global.db.data.chats[m.chat];
+    let chat = global.db.data.chats[m.chat]
 
-    // 🔧 Valores por defecto
-    const defaultWelcome = "🎉 ¡Bienvenido/a!";
-    const defaultLeave = "👋 Se fue del grupo.";
+    // ============================================================
+    // 🔧 VALORES POR DEFECTO
+    // ============================================================
 
-    // 🔴 SI NO EXISTE LA CONFIGURACIÓN, QUEDA DESACTIVADO
+    const defaultWelcome =
+        "🎉 ¡Bienvenido/a!"
+
+    const defaultLeave =
+        "👋 Se fue del grupo."
+
     if (typeof chat.welcome === "undefined")
-        chat.welcome = false;
+        chat.welcome = false
 
     if (!chat.welcomeMsg)
-        chat.welcomeMsg = defaultWelcome;
+        chat.welcomeMsg = defaultWelcome
 
     if (!chat.leaveMsg)
-        chat.leaveMsg = defaultLeave;
-
-    // 🚫 NO HACER NADA SI ESTÁ DESACTIVADO
-    if (!chat.welcome) return;
-
-    const meta = await conn.groupMetadata(m.chat);
-
-    const current = meta.participants.map(p => p.id);
-
-    if (!chat.participants) {
-        chat.participants = current;
-        return;
-    }
-
-    const old = chat.participants;
-
-    const added = current.filter(x => !old.includes(x));
-    const removed = old.filter(x => !current.includes(x));
-
-    const groupName = meta.subject;
+        chat.leaveMsg = defaultLeave
 
     // ============================================================
-    // 🎉 BIENVENIDA
+    // 🚫 SI ESTÁ DESACTIVADO
     // ============================================================
 
-    for (let user of added) {
-        let username = `@${user.split("@")[0]}`;
+    if (!chat.welcome)
+        return
 
-        let text = (chat.welcomeMsg || defaultWelcome)
-            .replace(/@user/g, username)
-            .replace(/@group/g, groupName);
+    try {
 
-        let finalText = `
+        // ========================================================
+        // 👥 PARTICIPANTES ACTUALES
+        // ========================================================
+
+        const meta =
+            await conn.groupMetadata(m.chat)
+
+        const current =
+            meta.participants
+                .map(p => p.id)
+                .filter(Boolean)
+
+        // ========================================================
+        // 🆕 PRIMERA CARGA
+        // ========================================================
+
+        if (!Array.isArray(chat.participants)) {
+            chat.participants = current
+            return
+        }
+
+        const old = chat.participants
+
+        // ========================================================
+        // 🎉 NUEVOS
+        // ========================================================
+
+        const added =
+            current.filter(
+                user => !old.includes(user)
+            )
+
+        // ========================================================
+        // 👋 SALIERON
+        // ========================================================
+
+        const removed =
+            old.filter(
+                user => !current.includes(user)
+            )
+
+        const groupName =
+            meta.subject || "este grupo"
+
+        // ========================================================
+        // 🎉 BIENVENIDA — UNO
+        // ========================================================
+
+        if (added.length === 1) {
+
+            const user = added[0]
+
+            const username =
+                `@${user.split("@")[0]}`
+
+            let texto =
+                chat.welcomeMsg ||
+                defaultWelcome
+
+            texto = texto
+                .replace(/@user/g, username)
+                .replace(/@group/g, groupName)
+
+            const finalText = `
 ╭━━━〔 🎉 BIENVENIDO 〕━━━⬣
 ┃ 👤 Usuario: ${username}
 ┃ 🏷️ Grupo: *${groupName}*
-┃━━━━━━━━━━━━━━
-┃ ${text}
-╰━━━━━━━━━━━━━━⬣
-`.trim();
+┃━━━━━━━━━━━━━━━━━━━━
+┃ ${texto}
+╰━━━━━━━━━━━━━━━━━━━━⬣
+`.trim()
 
-        await conn.sendMessage(m.chat, {
-            text: finalText,
-            mentions: [user]
-        });
-    }
+            await conn.sendMessage(
+                m.chat,
+                {
+                    text: finalText,
+                    mentions: [user]
+                }
+            )
+        }
 
-    // ============================================================
-    // 👋 DESPEDIDA
-    // ============================================================
+        // ========================================================
+        // 🎉 BIENVENIDA — VARIOS
+        // ========================================================
 
-    for (let user of removed) {
-        let username = `@${user.split("@")[0]}`;
+        else if (added.length > 1) {
 
-        let text = (chat.leaveMsg || defaultLeave)
-            .replace(/@user/g, username)
-            .replace(/@group/g, groupName);
+            let texto =
+                chat.welcomeMsg ||
+                defaultWelcome
 
-        let finalText = `
+            texto = texto
+                .replace(
+                    /@user/g,
+                    "los nuevos integrantes"
+                )
+                .replace(
+                    /@group/g,
+                    groupName
+                )
+
+            const finalText = `
+╭━━━〔 🎉 BIENVENIDOS 〕━━━⬣
+┃ 🏷️ Grupo: *${groupName}*
+┃ 👥 Nuevos integrantes: *${added.length}*
+┃━━━━━━━━━━━━━━━━━━━━
+┃ ${texto}
+╰━━━━━━━━━━━━━━━━━━━━⬣
+`.trim()
+
+            await conn.sendMessage(
+                m.chat,
+                {
+                    text: finalText
+                }
+            )
+        }
+
+        // ========================================================
+        // 👋 DESPEDIDA — UNO
+        // ========================================================
+
+        if (removed.length === 1) {
+
+            const user = removed[0]
+
+            const username =
+                `@${user.split("@")[0]}`
+
+            let texto =
+                chat.leaveMsg ||
+                defaultLeave
+
+            texto = texto
+                .replace(/@user/g, username)
+                .replace(/@group/g, groupName)
+
+            const finalText = `
 ╭━━━〔 👋 DESPEDIDA 〕━━━⬣
 ┃ 👤 Usuario: ${username}
 ┃ 🏷️ Grupo: *${groupName}*
-┃━━━━━━━━━━━━━━
-┃ ${text}
-╰━━━━━━━━━━━━━━⬣
-`.trim();
+┃━━━━━━━━━━━━━━━━━━━━
+┃ ${texto}
+╰━━━━━━━━━━━━━━━━━━━━⬣
+`.trim()
 
-        await conn.sendMessage(m.chat, {
-            text: finalText,
-            mentions: [user]
-        });
+            await conn.sendMessage(
+                m.chat,
+                {
+                    text: finalText,
+                    mentions: [user]
+                }
+            )
+        }
+
+        // ========================================================
+        // 👋 DESPEDIDA — VARIOS
+        // ========================================================
+
+        else if (removed.length > 1) {
+
+            let texto =
+                chat.leaveMsg ||
+                defaultLeave
+
+            texto = texto
+                .replace(
+                    /@user/g,
+                    "los integrantes que salieron"
+                )
+                .replace(
+                    /@group/g,
+                    groupName
+                )
+
+            const finalText = `
+╭━━━〔 👋 DESPEDIDA 〕━━━⬣
+┃ 🏷️ Grupo: *${groupName}*
+┃ 👥 Integrantes que salieron: *${removed.length}*
+┃━━━━━━━━━━━━━━━━━━━━
+┃ ${texto}
+╰━━━━━━━━━━━━━━━━━━━━⬣
+`.trim()
+
+            await conn.sendMessage(
+                m.chat,
+                {
+                    text: finalText
+                }
+            )
+        }
+
+        // ========================================================
+        // 💾 ACTUALIZAR LISTA
+        // ========================================================
+
+        chat.participants = current
+
+    } catch (error) {
+
+        console.error(
+            "❌ Error en sistema de bienvenida:",
+            error
+        )
     }
+}
 
-    chat.participants = current;
-};
-
+// ================================================================
 // 📌 COMANDOS
+// ================================================================
+
 handler.command = [
     "welcome",
     "welc",
@@ -177,9 +412,9 @@ handler.command = [
     "set1",
     "set2",
     "clearwel"
-];
+]
 
-handler.group = true;
-handler.admin = true;
+handler.group = true
+handler.admin = true
 
-export default handler;
+export default handler

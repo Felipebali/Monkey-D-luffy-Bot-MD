@@ -1,121 +1,150 @@
-// 📂 plugins/imagen.js — FelixCat-Bot 🐾
-// 🖼️ Busca y envía una imagen
+// 📂 plugins/imagen.js
+// 🖼️ Búsqueda de imágenes sin API KEY
+// FelixCat_Bot 🐈
 
-import axios from 'axios'
+import axios from "axios"
 
-const handler = async (m, { conn, text }) => {
-
-  // ============================================================
-  // 🔎 VALIDAR BÚSQUEDA
-  // ============================================================
-
-  if (!text?.trim()) {
-    return conn.reply(
-      m.chat,
-      '❌ Escribí qué imagen querés buscar.\n\nEjemplo:\n*.imagen gato*',
-      m
-    )
-  }
-
-  await m.react('📷')
-
+let handler = async (m, { conn, text }) => {
   try {
+    const query = text?.trim()
 
-    const query =
-      encodeURIComponent(
-        text.trim()
-      )
-
-    // ==========================================================
-    // 🌐 BUSCAR IMAGEN
-    // ==========================================================
-
-    const url =
-      `https://source.unsplash.com/900x700/?${query}`
-
-    const response =
-      await axios.get(
-        url,
-        {
-          responseType: 'arraybuffer',
-          maxRedirects: 5,
-          timeout: 15000,
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0'
-          }
-        }
-      )
-
-    // ==========================================================
-    // 📦 COMPROBAR RESPUESTA
-    // ==========================================================
-
-    if (
-      !response.data ||
-      !response.data.length
-    ) {
-      throw new Error(
-        'La búsqueda no devolvió ninguna imagen.'
+    if (!query) {
+      return conn.reply(
+        m.chat,
+        `🖼️ *BÚSQUEDA DE IMÁGENES*\n\n` +
+        `📌 Uso:\n` +
+        `*.imagen <texto>*\n\n` +
+        `💡 Ejemplo:\n` +
+        `*.imagen gato*`,
+        m
       )
     }
 
-    const buffer =
-      Buffer.from(response.data)
+    await m.react("🔎")
 
-    // ==========================================================
+    // ============================================================
+    // 🔎 BUSCAR EN OPENVERSE
+    // ============================================================
+
+    const response = await axios.get(
+      "https://api.openverse.org/v1/images/",
+      {
+        params: {
+          q: query,
+          page_size: 20
+        },
+        timeout: 15000
+      }
+    )
+
+    const resultados = response.data?.results || []
+
+    if (!resultados.length) {
+      await m.react("❌")
+
+      return conn.reply(
+        m.chat,
+        `❌ No encontré imágenes para:\n\n*${query}*`,
+        m
+      )
+    }
+
+    // ============================================================
+    // 🖼️ BUSCAR UNA IMAGEN VÁLIDA
+    // ============================================================
+
+    let imagen = null
+
+    for (const resultado of resultados) {
+      const url =
+        resultado?.url ||
+        resultado?.thumbnail ||
+        resultado?.image
+
+      if (!url) continue
+
+      try {
+        const img = await axios.get(url, {
+          responseType: "arraybuffer",
+          timeout: 10000,
+          maxContentLength: 15 * 1024 * 1024
+        })
+
+        const contentType =
+          img.headers?.["content-type"] || ""
+
+        if (
+          contentType.startsWith("image/") &&
+          img.data?.length
+        ) {
+          imagen = {
+            buffer: Buffer.from(img.data),
+            url,
+            titulo: resultado?.title || query,
+            autor: resultado?.creator || "Desconocido"
+          }
+
+          break
+        }
+      } catch {
+        // Probar la siguiente imagen
+      }
+    }
+
+    if (!imagen) {
+      await m.react("❌")
+
+      return conn.reply(
+        m.chat,
+        `❌ Encontré resultados, pero no pude descargar ninguna imagen.\n\n` +
+        `🔎 Búsqueda: *${query}*`,
+        m
+      )
+    }
+
+    // ============================================================
     // 📤 ENVIAR IMAGEN
-    // ==========================================================
+    // ============================================================
 
     await conn.sendMessage(
       m.chat,
       {
-        image: buffer,
-        mimetype: 'image/jpeg',
-        fileName: 'imagen.jpg',
+        image: imagen.buffer,
         caption:
-          `🖼️ *Resultado de:* ${text.trim()}`
+          `🖼️ *RESULTADO DE IMAGEN*\n\n` +
+          `🔎 *Búsqueda:* ${query}\n` +
+          `👤 *Autor:* ${imagen.autor}`
       },
-      {
-        quoted: m
-      }
+      { quoted: m }
     )
 
-    await m.react('✅')
+    await m.react("✅")
 
-  } catch (e) {
+  } catch (error) {
+    console.error("❌ Error en imagen:", error)
 
-    console.error(
-      '❌ Error buscando imagen:',
-      e
-    )
-
-    await m.react('❌')
+    await m.react("❌")
 
     return conn.reply(
       m.chat,
-      `❌ No pude obtener una imagen de *${text.trim()}*.\n\n⚠️ El servicio de búsqueda puede estar temporalmente no disponible.`,
+      `❌ *No pude buscar la imagen.*\n\n` +
+      `🔎 Búsqueda: *${text || "Sin texto"}*\n\n` +
+      `⚠️ Puede que el servicio de imágenes esté temporalmente caído.`,
       m
     )
   }
 }
 
-// ============================================================
-// 📋 CONFIGURACIÓN
-// ============================================================
-
 handler.help = [
-  'imagen <texto>',
-  'foto <texto>'
+  "imagen <texto>",
+  "foto <texto>"
 ]
 
-handler.tags = [
-  'tools'
-]
+handler.tags = ["tools"]
 
 handler.command = [
-  'imagen',
-  'foto'
+  "imagen",
+  "foto"
 ]
 
 handler.group = true

@@ -64,8 +64,8 @@ function getConnectionStatus(state) {
     return states[state] || '❓ Desconocido'
 }
 
-handler.help = ['ping', 'info']
+handler.help = ['info']
 handler.tags = ['main', 'info']
-handler.command = ['ping', 'speed', 'info'] // <- .p eliminado
+handler.command = ['speed', 'info'] // <- .p eliminado
 
 export default handler

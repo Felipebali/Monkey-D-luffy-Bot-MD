@@ -24,7 +24,6 @@ let handler = async (m, { conn }) => {
         '',
         '🎲 *Juegos Disponibles:*',
         '',
-        '🧠 *.math* → Operaciones matemáticas',
         '✊✋✌️ *.ppt <@user>* → Piedra, papel o tijera',
         '💃🕺 *.dance <@user>* → Bailar con amigo',
         '🌍 *.bandera* → Adivina la bandera',

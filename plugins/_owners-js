@@ -1,126 +1,119 @@
 // 📂 plugins/owner.js — FelixCat-Bot 🐾
 // 👑 adowner / rowner
 //
-// .adowner → responder/citar a un usuario
-// .rowner  → responder/citar a un usuario
+// USO:
+// Responder/citar un mensaje:
+//
+// .adowner
+// .rowner
 //
 // Guarda:
+//
 // ['NUMERO', 'Nombre', true]
 // ['LID', 'NombreLID', true]
 
+import { jidDecode } from '@whiskeysockets/baileys'
+
+// ============================================================
+// 👑 OBTENER OWNERS
+// ============================================================
+
 function getOwners() {
-  return (global.owner || [])
-    .map(o => Array.isArray(o) ? o : [o])
-    .filter(o => o[0])
+
+  if (!Array.isArray(global.owner))
+    global.owner = []
+
+  return global.owner
 }
 
 // ============================================================
-// 📱 OBTENER NÚMERO
+// 🔢 LIMPIAR ID
 // ============================================================
 
-function getNumber(jid) {
-  if (!jid) return null
+function cleanId(id) {
 
-  const value = String(jid)
+  if (!id) return null
+
+  return String(id)
     .split('@')[0]
     .split(':')[0]
-    .replace(/[^0-9]/g, '')
-
-  return value || null
+    .replace(/[^0-9]/g, '') || null
 }
 
 // ============================================================
-// 🆔 OBTENER LID
-// ============================================================
-
-function getLid(jid) {
-  if (!jid) return null
-
-  const value = String(jid)
-    .split('@')[0]
-    .split(':')[0]
-    .replace(/[^0-9]/g, '')
-
-  return value || null
-}
-
-// ============================================================
-// 👑 VERIFICAR OWNER
+// 👑 COMPROBAR SI ES OWNER
 // ============================================================
 
 function isOwner(m) {
 
-  const senderJid = String(m.sender || '')
+  const sender = String(m.sender || '')
 
-  const senderNumber =
-    senderJid.includes('@s.whatsapp.net')
-      ? getNumber(senderJid)
-      : null
+  const senderId = cleanId(sender)
 
-  const senderLid =
-    senderJid.includes('@lid')
-      ? getLid(senderJid)
-      : null
+  if (!senderId)
+    return false
 
   return getOwners().some(owner => {
 
-    const id = String(owner[0])
-      .replace(/[^0-9]/g, '')
+    if (!Array.isArray(owner))
+      return false
 
-    return (
-      (senderNumber && id === senderNumber) ||
-      (senderLid && id === senderLid)
-    )
+    const ownerId =
+      cleanId(owner[0])
+
+    return ownerId === senderId
   })
 }
 
 // ============================================================
-// 🎯 OBTENER DATOS DEL USUARIO CITADO
+// 🎯 OBTENER USUARIO CITADO
 // ============================================================
 
 async function getQuotedUser(m, conn) {
 
-  if (!m.quoted) return null
+  if (!m.quoted)
+    return null
 
   let number = null
   let lid = null
-  let name = 'Owner'
 
-  // ----------------------------------------------------------
-  // 👤 DATOS DEL MENSAJE CITADO
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 👤 ID DEL MENSAJE CITADO
+  // ==========================================================
 
   const quotedSender =
     m.quoted.sender ||
     m.quoted.participant ||
+    m.quoted.key?.participant ||
     null
+
+  // ==========================================================
+  // 📱 SI YA TENEMOS JID NORMAL
+  // ==========================================================
 
   if (quotedSender) {
 
-    const jid =
+    const senderString =
       String(quotedSender)
 
-    if (jid.includes('@s.whatsapp.net')) {
-      number = getNumber(jid)
+    if (
+      senderString.includes('@s.whatsapp.net')
+    ) {
+      number =
+        cleanId(senderString)
     }
 
-    if (jid.includes('@lid')) {
-      lid = getLid(jid)
+    if (
+      senderString.includes('@lid')
+    ) {
+      lid =
+        cleanId(senderString)
     }
   }
 
-  // ----------------------------------------------------------
-  // 🏷️ NOMBRE
-  // ----------------------------------------------------------
-
-  name =
-    m.quoted.pushName ||
-    m.quoted.name ||
-    name
-
-  // ----------------------------------------------------------
-  // 👥 SI ES GRUPO, BUSCAR PARTICIPANTE
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 👥 BUSCAR EN PARTICIPANTES DEL GRUPO
+  // ==========================================================
 
   if (m.isGroup) {
 
@@ -135,68 +128,87 @@ async function getQuotedUser(m, conn) {
       const participant =
         participants.find(p => {
 
-          const id = String(p.id || '')
+          const ids = [
+            p.id,
+            p.jid,
+            p.lid
+          ]
 
-          return (
-            id === quotedSender ||
-            p.jid === quotedSender ||
-            p.lid === quotedSender
-          )
+          return ids.some(id => {
+
+            if (!id || !quotedSender)
+              return false
+
+            return String(id) ===
+              String(quotedSender)
+          })
         })
 
       if (participant) {
 
-        // -------------------------------
+        // ====================================================
         // 📱 NÚMERO
-        // -------------------------------
+        // ====================================================
 
-        if (!number) {
-
-          const possibleNumber =
-            participant.jid ||
-            participant.id
-
-          if (
-            possibleNumber &&
-            String(possibleNumber)
+        const possibleJid =
+          participant.jid ||
+          (
+            String(participant.id || '')
               .includes('@s.whatsapp.net')
-          ) {
-            number =
-              getNumber(possibleNumber)
-          }
+              ? participant.id
+              : null
+          )
+
+        if (possibleJid) {
+
+          number =
+            cleanId(possibleJid)
         }
 
-        // -------------------------------
+        // ====================================================
         // 🆔 LID
-        // -------------------------------
+        // ====================================================
 
-        if (!lid) {
+        const possibleLid =
+          participant.lid ||
+          (
+            String(participant.id || '')
+              .includes('@lid')
+              ? participant.id
+              : null
+          )
 
-          const possibleLid =
-            participant.lid
+        if (possibleLid) {
 
-          if (possibleLid) {
-            lid =
-              getLid(possibleLid)
-          }
+          lid =
+            cleanId(possibleLid)
         }
       }
 
     } catch (e) {
+
       console.log(
-        '⚠️ No se pudo obtener metadata:',
+        '⚠️ Error obteniendo participante:',
         e
       )
     }
   }
 
-  // ----------------------------------------------------------
-  // ⚠️ SI NO SE ENCONTRÓ NADA
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 🏷️ NOMBRE
+  // ==========================================================
 
-  if (!number && !lid) {
+  const name =
+    m.quoted.pushName ||
+    m.quoted.name ||
+    'Owner'
+
+  // ==========================================================
+  // ❌ NO SE ENCONTRÓ NADA
+  // ==========================================================
+
+  if (!number && !lid)
     return null
-  }
 
   return {
     number,
@@ -206,28 +218,61 @@ async function getQuotedUser(m, conn) {
 }
 
 // ============================================================
+// 🔍 COMPROBAR SI UN ID YA EXISTE
+// ============================================================
+
+function ownerExists(id) {
+
+  if (!id)
+    return false
+
+  const clean =
+    cleanId(id)
+
+  return getOwners().some(owner => {
+
+    if (!Array.isArray(owner))
+      return false
+
+    return cleanId(owner[0]) === clean
+  })
+}
+
+// ============================================================
 // 👑 ADOWNER
 // ============================================================
 
 async function addOwner(m, { conn }) {
 
+  // ==========================================================
+  // 🔐 SOLO OWNER
+  // ==========================================================
+
   if (!isOwner(m)) {
 
     return conn.reply(
       m.chat,
-      '❌ Solo los owners pueden agregar nuevos owners.',
+      '❌ Solo los owners pueden usar este comando.',
       m
     )
   }
+
+  // ==========================================================
+  // 💬 OBLIGATORIO CITAR
+  // ==========================================================
 
   if (!m.quoted) {
 
     return conn.reply(
       m.chat,
-      '⚠️ Tenés que responder al mensaje del usuario que querés agregar.',
+      '⚠️ Respondé/citá el mensaje del usuario que querés agregar.',
       m
     )
   }
+
+  // ==========================================================
+  // 🎯 OBTENER DATOS
+  // ==========================================================
 
   const user =
     await getQuotedUser(m, conn)
@@ -242,36 +287,31 @@ async function addOwner(m, { conn }) {
   }
 
   // ==========================================================
-  // 🔍 COMPROBAR SI YA EXISTE
+  // 🔍 COMPROBAR
   // ==========================================================
 
-  const owners =
-    getOwners()
+  const numberExists =
+    user.number &&
+    ownerExists(user.number)
 
-  const alreadyExists =
-    owners.some(owner => {
+  const lidExists =
+    user.lid &&
+    ownerExists(user.lid)
 
-      const id =
-        String(owner[0])
-          .replace(/[^0-9]/g, '')
-
-      return (
-        (user.number && id === user.number) ||
-        (user.lid && id === user.lid)
-      )
-    })
-
-  if (alreadyExists) {
+  if (numberExists || lidExists) {
 
     return conn.reply(
       m.chat,
-      `⚠️ *${user.name}* ya es owner.`,
+`⚠️ *${user.name}* ya figura como owner.
+
+📱 Número: ${user.number || 'No encontrado'}
+🆔 LID: ${user.lid || 'No encontrado'}`,
       m
     )
   }
 
   // ==========================================================
-  // ➕ AGREGAR NÚMERO
+  // 📱 AGREGAR NÚMERO
   // ==========================================================
 
   if (user.number) {
@@ -284,7 +324,7 @@ async function addOwner(m, { conn }) {
   }
 
   // ==========================================================
-  // ➕ AGREGAR LID
+  // 🆔 AGREGAR LID
   // ==========================================================
 
   if (user.lid) {
@@ -297,12 +337,8 @@ async function addOwner(m, { conn }) {
   }
 
   // ==========================================================
-  // 💾 GUARDAR
+  // 💾 MOSTRAR RESULTADO
   // ==========================================================
-
-  if (global.db?.write) {
-    await global.db.write()
-  }
 
   await m.react('👑')
 
@@ -313,12 +349,12 @@ async function addOwner(m, { conn }) {
 👤 *Nombre:* ${user.name}
 
 📱 *Número:*
-${user.number ? `\`${user.number}\`` : 'No encontrado'}
+${user.number ? `\`${user.number}\`` : '❌ No encontrado'}
 
 🆔 *LID:*
-${user.lid ? `\`${user.lid}\`` : 'No encontrado'}
+${user.lid ? `\`${user.lid}\`` : '❌ No encontrado'}
 
-✅ Agregado a *global.owner*`,
+✅ *Agregado correctamente a global.owner*`,
     m
   )
 }
@@ -329,23 +365,35 @@ ${user.lid ? `\`${user.lid}\`` : 'No encontrado'}
 
 async function removeOwner(m, { conn }) {
 
+  // ==========================================================
+  // 🔐 SOLO OWNER
+  // ==========================================================
+
   if (!isOwner(m)) {
 
     return conn.reply(
       m.chat,
-      '❌ Solo los owners pueden quitar owners.',
+      '❌ Solo los owners pueden usar este comando.',
       m
     )
   }
+
+  // ==========================================================
+  // 💬 OBLIGATORIO CITAR
+  // ==========================================================
 
   if (!m.quoted) {
 
     return conn.reply(
       m.chat,
-      '⚠️ Tenés que responder al mensaje del owner que querés quitar.',
+      '⚠️ Respondé/citá el mensaje del owner que querés eliminar.',
       m
     )
   }
+
+  // ==========================================================
+  // 🎯 OBTENER DATOS
+  // ==========================================================
 
   const user =
     await getQuotedUser(m, conn)
@@ -360,49 +408,66 @@ async function removeOwner(m, { conn }) {
   }
 
   // ==========================================================
-  // 🔍 BUSCAR Y ELIMINAR
+  // 🛡️ NO ELIMINAR AL ÚLTIMO OWNER
   // ==========================================================
 
-  const before =
-    global.owner.length
+  const currentOwners =
+    getOwners()
 
-  global.owner =
-    getOwners().filter(owner => {
+  const remaining =
+    currentOwners.filter(owner => {
+
+      if (!Array.isArray(owner))
+        return true
 
       const id =
-        String(owner[0])
-          .replace(/[^0-9]/g, '')
+        cleanId(owner[0])
 
-      const removeNumber =
+      if (
         user.number &&
         id === user.number
+      )
+        return false
 
-      const removeLid =
+      if (
         user.lid &&
         id === user.lid
+      )
+        return false
 
-      return !removeNumber && !removeLid
+      return true
     })
 
-  const removed =
-    before !== global.owner.length
-
-  if (!removed) {
+  if (
+    remaining.length === currentOwners.length
+  ) {
 
     return conn.reply(
       m.chat,
-      `⚠️ *${user.name}* no se encuentra en global.owner.`,
+      `⚠️ *${user.name}* no figura como owner.`,
+      m
+    )
+  }
+
+  if (remaining.length === 0) {
+
+    return conn.reply(
+      m.chat,
+      '🛡️ No podés eliminar al último owner.',
       m
     )
   }
 
   // ==========================================================
-  // 💾 GUARDAR
+  // 🗑️ ACTUALIZAR GLOBAL.OWNER
   // ==========================================================
 
-  if (global.db?.write) {
-    await global.db.write()
-  }
+  global.owner =
+    remaining
+
+  // ==========================================================
+  // ✅ RESULTADO
+  // ==========================================================
 
   await m.react('🗑️')
 
@@ -413,12 +478,12 @@ async function removeOwner(m, { conn }) {
 👤 *Nombre:* ${user.name}
 
 📱 *Número:*
-${user.number ? `\`${user.number}\`` : 'No encontrado'}
+${user.number ? `\`${user.number}\`` : '❌ No encontrado'}
 
 🆔 *LID:*
-${user.lid ? `\`${user.lid}\`` : 'No encontrado'}
+${user.lid ? `\`${user.lid}\`` : '❌ No encontrado'}
 
-❌ Eliminado de *global.owner*`,
+✅ *Eliminado de global.owner*`,
     m
   )
 }
@@ -431,12 +496,24 @@ let handler = async (m, { conn, command }) => {
 
   try {
 
+    command =
+      String(command || '')
+        .toLowerCase()
+
     if (command === 'adowner') {
-      return await addOwner(m, { conn })
+
+      return await addOwner(
+        m,
+        { conn }
+      )
     }
 
     if (command === 'rowner') {
-      return await removeOwner(m, { conn })
+
+      return await removeOwner(
+        m,
+        { conn }
+      )
     }
 
   } catch (e) {
@@ -455,7 +532,7 @@ let handler = async (m, { conn, command }) => {
 }
 
 // ============================================================
-// 📋 COMANDOS
+// 📋 CONFIGURACIÓN
 // ============================================================
 
 handler.help = [

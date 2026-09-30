@@ -20,7 +20,8 @@ let handler = async (m, { conn, text }) => {
       return await conn.sendMessage(
         m.chat,
         {
-          text: "❌ Escribí un texto o citá un mensaje para crear el sticker."
+          text:
+            "❌ Escribí un texto o citá un mensaje para crear el sticker."
         },
         {
           quoted: m
@@ -36,7 +37,8 @@ let handler = async (m, { conn, text }) => {
       return await conn.sendMessage(
         m.chat,
         {
-          text: "❌ El texto no puede superar los 50 caracteres."
+          text:
+            "❌ El texto no puede superar los 50 caracteres."
         },
         {
           quoted: m
@@ -90,7 +92,7 @@ let handler = async (m, { conn, text }) => {
         }
       }
 
-    } catch (e) {
+    } catch {
 
       console.log(
         "[QC] Foto de perfil no disponible. Usando imagen predeterminada."
@@ -162,13 +164,11 @@ let handler = async (m, { conn, text }) => {
     // ============================================================
     // 🌐 GENERAR IMAGEN
     // ============================================================
-    // Usamos el endpoint PNG directo.
-    // La API devuelve la imagen como binario.
 
     const response =
       await axios.post(
 
-        "https://quote.yuri.ly/quote/generate.png",
+        "https://quote.yuri.ly/quote/generate",
 
         payload,
 
@@ -180,15 +180,12 @@ let handler = async (m, { conn, text }) => {
               "application/json",
 
             "Accept":
-              "image/png",
+              "application/json",
 
             "User-Agent":
               "FelixCat-Bot"
 
           },
-
-          responseType:
-            "arraybuffer",
 
           timeout:
             30000,
@@ -197,17 +194,17 @@ let handler = async (m, { conn, text }) => {
             20 * 1024 * 1024,
 
           maxBodyLength:
-            20 * 1024 * 1024,
-
-          validateStatus:
-            () => true
+            20 * 1024 * 1024
 
         }
 
       )
 
+    const data =
+      response?.data
+
     // ============================================================
-    // 🔍 COMPROBAR RESPUESTA
+    // 🔍 RESPUESTA API
     // ============================================================
 
     console.log(
@@ -220,85 +217,178 @@ let handler = async (m, { conn, text }) => {
       response.headers?.["content-type"]
     )
 
+    console.log(
+      "[QC] Respuesta API:",
+      {
+        ok: data?.ok,
+        code: data?.code,
+        message: data?.message,
+        type: data?.type,
+        ext: data?.ext,
+        width: data?.width,
+        height: data?.height,
+        tieneImagen:
+          !!data?.image,
+        tieneResult:
+          !!data?.result,
+        tieneResultImage:
+          !!data?.result?.image
+      }
+    )
+
+    // ============================================================
+    // ❌ ERROR DE LA API
+    // ============================================================
+
     if (
-      response.status < 200 ||
-      response.status >= 300
+      data?.error ||
+      (
+        data?.code &&
+        Number(data.code) >= 400
+      )
     ) {
 
-      let errorText = ""
-
-      try {
-
-        const raw =
-          Buffer.from(
-            response.data
-          ).toString("utf8")
-
-        try {
-
-          const json =
-            JSON.parse(raw)
-
-          errorText =
-            json?.error ||
-            json?.message ||
-            raw
-
-        } catch {
-
-          errorText =
-            raw
-
-        }
-
-      } catch {
-
-        errorText =
-          "Respuesta inválida de la API."
-
-      }
-
-      console.error(
-        "[QC] Error API:",
-        errorText
-      )
+      const apiError =
+        typeof data === "object"
+          ? (
+              data?.message ||
+              data?.error ||
+              JSON.stringify(data)
+            )
+          : String(data)
 
       throw new Error(
-        `API respondió ${response.status}: ${errorText}`
+        `API: ${apiError}`
       )
     }
 
     // ============================================================
-    // 🖼️ OBTENER BUFFER
+    // 🖼️ BUSCAR IMAGEN
+    // ============================================================
+
+    let image =
+      data?.image ||
+      data?.result?.image ||
+      data?.data?.image
+
+    // ============================================================
+    // 📦 SI LA API DEVUELVE RESULT DIRECTO
+    // ============================================================
+
+    if (
+      !image &&
+      typeof data?.result === "string"
+    ) {
+
+      image =
+        data.result
+
+    }
+
+    // ============================================================
+    // ❌ SIN IMAGEN
+    // ============================================================
+
+    if (!image) {
+
+      console.error(
+        "[QC] Respuesta completa de la API:"
+      )
+
+      console.error(
+        JSON.stringify(
+          data,
+          null,
+          2
+        )
+      )
+
+      throw new Error(
+        "La API no devolvió ninguna imagen."
+      )
+    }
+
+    // ============================================================
+    // 🔄 CONVERTIR IMAGEN A BUFFER
     // ============================================================
 
     let buffer
 
+    // ------------------------------------------------------------
+    // BUFFER
+    // ------------------------------------------------------------
+
     if (
-      Buffer.isBuffer(
-        response.data
+      Buffer.isBuffer(image)
+    ) {
+
+      buffer =
+        image
+
+    }
+
+    // ------------------------------------------------------------
+    // BASE64
+    // ------------------------------------------------------------
+
+    else if (
+      typeof image === "string"
+    ) {
+
+      let base64 =
+        image.trim()
+
+      // data:image/png;base64,...
+      if (
+        base64.includes(",")
+      ) {
+
+        base64 =
+          base64
+            .split(",")
+            .pop()
+
+      }
+
+      // Quitar posibles espacios
+      base64 =
+        base64.replace(
+          /\s/g,
+          ""
+        )
+
+      buffer =
+        Buffer.from(
+          base64,
+          "base64"
+        )
+
+    }
+
+    // ------------------------------------------------------------
+    // ARRAYBUFFER
+    // ------------------------------------------------------------
+
+    else if (
+      image instanceof ArrayBuffer
+    ) {
+
+      buffer =
+        Buffer.from(
+          image
+        )
+
+    }
+
+    // ------------------------------------------------------------
+    // UNKNOWN
+    // ------------------------------------------------------------
+
+    else {
+
+      throw new Error(
+        "La API devolvió un formato de imagen desconocido."
       )
-    ) {
-
-      buffer =
-        response.data
-
-    } else if (
-      response.data instanceof ArrayBuffer
-    ) {
-
-      buffer =
-        Buffer.from(
-          response.data
-        )
-
-    } else {
-
-      buffer =
-        Buffer.from(
-          response.data
-        )
-
     }
 
     // ============================================================
@@ -311,7 +401,7 @@ let handler = async (m, { conn, text }) => {
     ) {
 
       throw new Error(
-        "La API devolvió una imagen vacía."
+        "La imagen recibida está vacía."
       )
     }
 
@@ -320,7 +410,7 @@ let handler = async (m, { conn, text }) => {
     )
 
     // ============================================================
-    // 🔎 COMPROBAR FIRMA PNG
+    // 🔎 COMPROBAR PNG
     // ============================================================
 
     const esPNG =
@@ -333,44 +423,8 @@ let handler = async (m, { conn, text }) => {
     if (!esPNG) {
 
       console.log(
-        "[QC] La respuesta no parece PNG."
+        "[QC] La respuesta no parece PNG. Se intentará convertir igualmente."
       )
-
-      // Intentar detectar si la API devolvió JSON
-      try {
-
-        const raw =
-          buffer.toString("utf8")
-
-        const json =
-          JSON.parse(raw)
-
-        console.error(
-          "[QC] Respuesta JSON inesperada:",
-          json
-        )
-
-        throw new Error(
-          json?.error ||
-          json?.message ||
-          "La API no devolvió una imagen PNG."
-        )
-
-      } catch (jsonError) {
-
-        if (
-          jsonError?.message &&
-          !jsonError.message.includes(
-            "Unexpected token"
-          )
-        ) {
-          throw jsonError
-        }
-
-        throw new Error(
-          "La API no devolvió una imagen PNG válida."
-        )
-      }
     }
 
     // ============================================================
@@ -422,14 +476,34 @@ let handler = async (m, { conn, text }) => {
       "❌ QC ERROR:"
     )
 
-    console.error(
-      e?.response?.data ||
-      e?.message ||
-      e
-    )
+    // ============================================================
+    // 🔍 MOSTRAR ERROR REAL
+    // ============================================================
+
+    if (
+      e?.response?.data
+    ) {
+
+      console.error(
+        "[QC] Respuesta del servidor:",
+        JSON.stringify(
+          e.response.data,
+          null,
+          2
+        )
+      )
+
+    } else {
+
+      console.error(
+        e?.message ||
+        e
+      )
+
+    }
 
     // ============================================================
-    // 📋 MENSAJE DE ERROR
+    // 📋 TEXTO DEL ERROR
     // ============================================================
 
     let detalle =
@@ -439,12 +513,17 @@ let handler = async (m, { conn, text }) => {
     if (
       detalle.length > 300
     ) {
+
       detalle =
         detalle.substring(
           0,
           300
         ) + "..."
     }
+
+    // ============================================================
+    // 📤 ENVIAR ERROR
+    // ============================================================
 
     return await conn.sendMessage(
 
@@ -455,7 +534,7 @@ let handler = async (m, { conn, text }) => {
         text:
           "⚠️ *No se pudo generar el sticker.*\n\n" +
 
-          "🔧 La API de citas respondió con un error.\n" +
+          "🔧 Ocurrió un error al generar la cita.\n\n" +
 
           `📋 ${detalle}`
 

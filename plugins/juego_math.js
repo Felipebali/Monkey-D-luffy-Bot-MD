@@ -1,6 +1,6 @@
 // 📂 plugins/math.js
 // 🧮 Juego de matemáticas — FelixCat_Bot 🐈
-// Generador + sistema de respuestas en un solo plugin
+// Generador + respuestas en un solo plugin
 
 global.math = global.math || {}
 
@@ -42,12 +42,7 @@ const modes = {
 // ➕ OPERADORES
 // ============================================================
 
-const operators = [
-    "+",
-    "-",
-    "*",
-    "/"
-]
+const operators = ["+", "-", "*", "/"]
 
 // ============================================================
 // 🔢 COMPROBAR NÚMERO
@@ -58,7 +53,7 @@ function isNumber(x) {
 }
 
 // ============================================================
-// 🧮 GENERADOR DE OPERACIÓN
+// 🧮 GENERAR OPERACIÓN
 // ============================================================
 
 function genMath(mode) {
@@ -72,21 +67,18 @@ function genMath(mode) {
 
     const a =
         Math.floor(
-            Math.random() *
-            (max - min + 1)
+            Math.random() * (max - min + 1)
         ) + min
 
     const b =
         Math.floor(
-            Math.random() *
-            (max - min + 1)
+            Math.random() * (max - min + 1)
         ) + min
 
     const op =
         operators[
             Math.floor(
-                Math.random() *
-                operators.length
+                Math.random() * operators.length
             )
         ]
 
@@ -107,12 +99,9 @@ function genMath(mode) {
             break
 
         case "/":
-            result =
-                b === 0
-                    ? a
-                    : parseFloat(
-                        (a / b).toFixed(2)
-                    )
+            result = parseFloat(
+                (a / b).toFixed(2)
+            )
             break
     }
 
@@ -125,7 +114,7 @@ function genMath(mode) {
 }
 
 // ============================================================
-// 🎮 HANDLER PRINCIPAL
+// 🎮 JUEGO PRINCIPAL
 // ============================================================
 
 let handler = async (
@@ -150,7 +139,7 @@ let handler = async (
         return conn.reply(
             m.chat,
             `⚠️ *Los juegos están desactivados en este chat.*\n\n` +
-            `Usa *.juegos* para activarlos.`,
+            `Usa *${usedPrefix}juegos* para activarlos.`,
             m
         )
     }
@@ -162,29 +151,39 @@ let handler = async (
     const textoAyuda = `
 🧮 *JUEGO DE MATEMÁTICAS*
 
-🌵 Ingresa la dificultad con la que deseas jugar.
+🌵 Elige una dificultad:
 
 🚩 *Dificultades disponibles:*
+
 • noob
 • easy
 • medium
 • hard
 
-📝 *Ejemplo:*
-${usedPrefix + command} noob
+━━━━━━━━━━━━━━━━━━━━
 
-💰 *Premios:*
-• Noob: 50 monedas
-• Easy: 100 monedas
-• Medium: 200 monedas
-• Hard: 500 monedas
+📝 *Ejemplos:*
+
+${usedPrefix}math noob
+${usedPrefix}math easy
+${usedPrefix}math medium
+${usedPrefix}math hard
+
+━━━━━━━━━━━━━━━━━━━━
+
+💰 *PREMIOS*
+
+🟢 Noob → 50 monedas
+🔵 Easy → 100 monedas
+🟠 Medium → 200 monedas
+🔴 Hard → 500 monedas
 `.trim()
 
     // ========================================================
     // ❓ SIN DIFICULTAD
     // ========================================================
 
-    if (!args[0]) {
+    if (!args || !args[0]) {
 
         return conn.reply(
             m.chat,
@@ -194,46 +193,46 @@ ${usedPrefix + command} noob
     }
 
     // ========================================================
-    // 🎯 DIFICULTAD
+    // 🎯 OBTENER DIFICULTAD
     // ========================================================
 
     const mode =
-        args[0].toLowerCase()
+        String(args[0]).toLowerCase().trim()
 
-    if (!(mode in modes)) {
+    if (!modes[mode]) {
 
         return conn.reply(
             m.chat,
-            textoAyuda,
+            `❌ *Dificultad no válida.*\n\n${textoAyuda}`,
             m
         )
     }
 
     // ========================================================
-    // 🚫 YA HAY UN JUEGO ACTIVO
+    // 🚫 YA EXISTE UNA PARTIDA
     // ========================================================
 
     const id = m.chat
 
-    if (id in global.math) {
+    if (global.math[id]) {
 
         return conn.reply(
             m.chat,
-            `🌵 *Todavía hay una pregunta activa en este chat.*\n\n` +
-            `🧮 Responde la pregunta actual antes de iniciar otra.`,
+            `🌵 *Ya hay una pregunta activa en este chat.*\n\n` +
+            `💡 Responde la pregunta actual antes de iniciar otra.`,
             global.math[id][0]
         )
     }
 
     // ========================================================
-    // 🧮 GENERAR OPERACIÓN
+    // 🧮 GENERAR MATEMÁTICA
     // ========================================================
 
     const math =
         genMath(mode)
 
     // ========================================================
-    // 💰 CREAR USUARIO
+    // 👤 CREAR USUARIO
     // ========================================================
 
     if (!global.db.data.users[m.sender]) {
@@ -257,16 +256,11 @@ ${usedPrefix + command} noob
         await conn.reply(
             m.chat,
 
-            `🧮 *¿Cuánto es el resultado de:* ${math.str} *?*\n\n` +
-
+            `🧮 *¿Cuánto es el resultado de:*\n\n` +
+            `➤ *${math.str}* ❓\n\n` +
             `🎯 Dificultad: *${mode.toUpperCase()}*\n` +
-
-            `⏱️ Tiempo: *${(
-                math.time / 1000
-            ).toFixed(2)} segundos*\n` +
-
+            `⏱️ Tiempo: *${math.time / 1000} segundos*\n` +
             `🔁 Intentos: *4*\n` +
-
             `💰 Premio: *${math.bonus.toLocaleString()} monedas*`,
 
             m
@@ -301,33 +295,27 @@ ${usedPrefix + command} noob
                 } catch (error) {
 
                     console.error(
-                        "❌ Error enviando tiempo agotado:",
+                        "❌ Error enviando resultado:",
                         error
                     )
                 }
 
                 delete global.math[id]
-            },
 
+            },
             math.time
         )
     ]
 }
 
 // ============================================================
-// 🧷 SISTEMA DE RESPUESTAS
-// ============================================================
-// SOLO acepta respuestas citando el mensaje del juego.
+// 🧷 RESPUESTAS DEL JUEGO
 // ============================================================
 
 handler.before = async function (
     m,
     { conn }
 ) {
-
-    // ========================================================
-    // ⚙️ COMPROBAR JUEGOS
-    // ========================================================
 
     const chatSettings =
         global.db.data.chats[m.chat] || {}
@@ -337,11 +325,7 @@ handler.before = async function (
 
     const id = m.chat
 
-    // ========================================================
-    // ❌ NO HAY PARTIDA
-    // ========================================================
-
-    if (!(id in global.math))
+    if (!global.math[id])
         return
 
     const [
@@ -350,7 +334,7 @@ handler.before = async function (
     ] = global.math[id]
 
     // ========================================================
-    // 🧷 OBTENER ID DEL MENSAJE CITADO
+    // 🔒 SOLO RESPONDER CITANDO EL JUEGO
     // ========================================================
 
     const quotedId =
@@ -360,10 +344,6 @@ handler.before = async function (
             ?.stanzaId ||
         m.quoted?.id
 
-    // ========================================================
-    // 🔒 SOLO REPLY AL JUEGO
-    // ========================================================
-
     if (
         !quotedId ||
         quotedId !== gameMsg.key.id
@@ -372,24 +352,25 @@ handler.before = async function (
     }
 
     // ========================================================
-    // 🔢 CONVERTIR RESPUESTA
+    // 🔢 OBTENER RESPUESTA
     // ========================================================
 
-    const respuestaUsuario =
-        parseFloat(
-            String(m.text || "")
-                .replace(",", ".")
-                .trim()
-        )
+    let texto =
+        String(m.text || "")
+            .trim()
+            .replace(",", ".")
 
-    if (isNaN(respuestaUsuario))
+    if (!/^-?\d+(\.\d+)?$/.test(texto))
         return
 
+    const respuestaUsuario =
+        Number(texto)
+
     const respuestaCorrecta =
-        parseFloat(math.result)
+        Number(math.result)
 
     // ========================================================
-    // 💰 ASEGURAR USUARIO
+    // 👤 USUARIO
     // ========================================================
 
     if (!global.db.data.users[m.sender]) {
@@ -406,7 +387,7 @@ handler.before = async function (
         user.monedas = 0
 
     // ========================================================
-    // 🎯 COMPROBAR RESPUESTA
+    // 🎉 RESPUESTA CORRECTA
     // ========================================================
 
     if (
@@ -414,7 +395,6 @@ handler.before = async function (
         respuestaCorrecta
     ) {
 
-        // 💰 PREMIO
         user.monedas += math.bonus
 
         await conn.reply(
@@ -422,13 +402,12 @@ handler.before = async function (
 
             `🎉 *¡RESPUESTA CORRECTA!*\n\n` +
             `🧮 Resultado: *${math.result}*\n` +
-            `💰 Ganaste: *${math.bonus.toLocaleString()} monedas*\n` +
-            `💳 Tus monedas: *${user.monedas.toLocaleString()}*`,
+            `💰 Premio: *+${math.bonus.toLocaleString()} monedas*\n` +
+            `💳 Saldo: *${user.monedas.toLocaleString()} monedas*`,
 
             m
         )
 
-        // 🧹 TERMINAR PARTIDA
         clearTimeout(
             global.math[id][3]
         )
@@ -456,9 +435,9 @@ handler.before = async function (
         await conn.reply(
             m.chat,
 
-            `❌ *RESPUESTA INCORRECTA*\n\n` +
-            `⏳ Se acabaron tus oportunidades.\n` +
-            `✔️ La respuesta correcta era: *${math.result}*`,
+            `❌ *SIN INTENTOS*\n\n` +
+            `✔️ La respuesta correcta era:\n` +
+            `*${math.result}*`,
 
             m
         )
@@ -473,7 +452,7 @@ handler.before = async function (
     }
 
     // ========================================================
-    // 🔁 TODAVÍA TIENE INTENTOS
+    // 🔁 TODAVÍA QUEDAN INTENTOS
     // ========================================================
 
     await conn.reply(
@@ -487,25 +466,32 @@ handler.before = async function (
 }
 
 // ============================================================
-// 🔢 RESPUESTAS NUMÉRICAS
+// 🔢 DETECTOR DE RESPUESTAS NUMÉRICAS
 // ============================================================
 
-// Acepta:
+// Permite:
 // 5
 // -5
 // 5.5
-// -5.5
 // 5,5
+// -5,5
 
 handler.customPrefix =
-    /^-?[0-9]+([.,][0-9]+)?$/
+    /^-?\d+([.,]\d+)?$/
+
+// ============================================================
+// 📌 COMANDOS
+// ============================================================
+
+// IMPORTANTE:
+// Se usa RegExp para que reconozca:
+// .math
+// .mates
+// .matematicas
+// .matemáticas
 
 handler.command =
-    new RegExp
-
-// ============================================================
-// 📌 CONFIGURACIÓN
-// ============================================================
+    /^(math|mates|matematicas|matemáticas)$/i
 
 handler.help = [
     "math",
@@ -517,12 +503,6 @@ handler.help = [
 
 handler.tags = [
     "game"
-]
-
-handler.command = [
-    "math",
-    "mates",
-    "matemáticas"
 ]
 
 export default handler

@@ -1,48 +1,150 @@
+// 📂 plugins/avisar.js — FelixCat-Bot 🐾
+// 🚨 avisar / reportar → avisa a todos los administradores
 
 const handler = async (m, { conn, participants }) => {
-  if (!m.isGroup) return m.reply('❗ Este comando solo funciona en grupos.');
 
-  // Obtener administradores del grupo
-  const admins = participants?.filter(p => p.admin) || [];
-  if (!admins.length) return m.reply('⚠️ No hay administradores en este grupo.');
+  // ============================================================
+  // 👥 SOLO GRUPOS
+  // ============================================================
 
-  const senderTag = `@${m.sender.split('@')[0]}`;
+  if (!m.isGroup) {
+    return m.reply(
+      '❗ Este comando solo funciona en grupos.'
+    )
+  }
 
-  // Frases aleatorias estilo militar
-  const frases = [
-    '🪖 *Atención, oficiales:* hay un nuevo incidente en curso.',
-    '⚡ *Alerta táctica:* intervención administrativa solicitada.',
-    '🚨 *Comando de control:* se requiere revisión inmediata.',
-    '🔥 *Reporte prioritario:* revisar situación en el frente.',
-    '🎯 *Aviso de campo:* supervisión requerida.'
-  ];
-  const frase = frases[Math.floor(Math.random() * frases.length)];
+  // ============================================================
+  // 👮 OBTENER ADMINISTRADORES
+  // ============================================================
 
-  // Texto del aviso
-  const aviso = `⚠️ *ALERTA EN EL GRUPO* ⚠️\n\n${frase}\n\n📣 *Solicitado por:* ${senderTag}\n\n👮 *Administradores:* ${admins.map(a => '@' + a.id.split('@')[0]).join(', ')}`;
+  const admins = (participants || [])
+    .filter(p => p?.admin)
+    .filter(p => p?.id)
 
-  // Menciones: usuario + admins
-  const mentions = [m.sender, ...admins.map(a => a.id)];
+  if (!admins.length) {
+    return m.reply(
+      '⚠️ No hay administradores disponibles en este grupo.'
+    )
+  }
+
+  // ============================================================
+  // 👤 USUARIO QUE REALIZA EL AVISO
+  // ============================================================
+
+  const sender =
+    String(m.sender || '')
+
+  const senderNumber =
+    sender
+      .split('@')[0]
+      .split(':')[0]
+
+  const senderTag =
+    `@${senderNumber}`
+
+  // ============================================================
+  // 👮 PREPARAR ADMINISTRADORES
+  // ============================================================
+
+  const adminJids = admins
+    .map(admin => admin.id)
+    .filter(Boolean)
+
+  if (!adminJids.length) {
+    return m.reply(
+      '⚠️ No se pudieron identificar los administradores del grupo.'
+    )
+  }
+
+  const adminTags = adminJids
+    .map(jid => {
+
+      const number =
+        String(jid)
+          .split('@')[0]
+          .split(':')[0]
+
+      return `@${number}`
+    })
+    .join(', ')
+
+  // ============================================================
+  // 📢 MENSAJE DEL AVISO
+  // ============================================================
+
+  const aviso =
+`⚠️ *AVISO A LOS ADMINISTRADORES*
+
+📣 *Solicitado por:* ${senderTag}
+
+👮 *Administradores:*
+${adminTags}
+
+━━━━━━━━━━━━━━━━━━━━
+📌 *Se solicita la intervención de un administrador.*`
+
+  // ============================================================
+  // 📌 MENCIONES
+  // ============================================================
+
+  const mentions = [
+    sender,
+    ...adminJids
+  ]
+
+  // ============================================================
+  // 📤 ENVIAR AVISO
+  // ============================================================
 
   try {
-    // Cita siempre el mensaje donde se usó el comando
+
     await conn.sendMessage(
       m.chat,
       {
         text: aviso,
         mentions
       },
-      { quoted: m }
-    );
+      {
+        quoted: m
+      }
+    )
+
   } catch (err) {
-    console.error('Error al enviar aviso:', err);
-    m.reply('❌ Ocurrió un error al intentar avisar a los administradores.');
+
+    console.error(
+      '❌ Error al enviar aviso:',
+      err
+    )
+
+    try {
+
+      await m.reply(
+        '❌ Ocurrió un error al avisar a los administradores.'
+      )
+
+    } catch {}
+
   }
-};
+}
 
-handler.command = ['avisar', 'reportar'];
-handler.help = ['avisar', 'reportar'];
-handler.tags = ['group'];
-handler.group = true;
+// ============================================================
+// 📋 CONFIGURACIÓN
+// ============================================================
 
-export default handler;
+handler.command = [
+  'avisar',
+  'reportar'
+]
+
+handler.help = [
+  'avisar',
+  'reportar'
+]
+
+handler.tags = [
+  'group'
+]
+
+handler.group = true
+
+export default handler

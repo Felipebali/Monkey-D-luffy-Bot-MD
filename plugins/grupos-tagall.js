@@ -15,7 +15,9 @@ let handler = async function (m, { conn, groupMetadata, args, isAdmin, isOwner, 
   // 🔥 Toggle .antitagall — SOLO ADMIN / OWNER
   if (command === 'antitagall') {
     if (!(isAdmin || isOwner)) {
-      return conn.sendMessage(chatId, { text: '❌ Solo un administrador puede usar este comando.' })
+      return conn.sendMessage(chatId, {
+        text: '❌ Solo un administrador puede usar este comando.'
+      })
     }
 
     chatData.tagallEnabled = !chatData.tagallEnabled
@@ -42,30 +44,74 @@ let handler = async function (m, { conn, groupMetadata, args, isAdmin, isOwner, 
     })
   }
 
-  const participantes = groupMetadata?.participants || []
-  const mencionados = participantes.map(p => p.id).filter(Boolean)
+  // ===========================
+  // 👥 OBTENER PARTICIPANTES
+  // ===========================
 
-  const mensajeOpcional = args.length ? args.join(' ') : ''
+  const participantes = groupMetadata?.participants || []
+
+  const mencionados = participantes
+    .map(p => p.id)
+    .filter(Boolean)
+
+  // ===========================
+  // 💬 MENSAJE OPCIONAL
+  // ===========================
+
+  const mensajeOpcional = args.length
+    ? args.join(' ')
+    : ''
+
+  // ===========================
+  // 🔥 CREAR MENSAJE
+  // ===========================
+
+  const listaUsuarios = mencionados
+    .map(jid => `- @${jid.split('@')[0]}`)
+    .join('\n')
 
   const mensaje = [
-    `🔥 Se activó el tag de todos! 🔥`,
-    `⚡ Usuarios invocados:`,
-    mencionados.map(jid => `- @${jid.split('@')[0]}`).join('\n'),
-    '💥 Que comience la acción!',
-    'https://miunicolink.local/tagall-FelixCat',
+    `🔥 *SE ACTIVÓ EL TAG DE TODOS* 🔥`,
+    ``,
+    `⚡ *Usuarios invocados:*`,
+    listaUsuarios,
+    ``,
+    `💥 *¡Que comience la acción!*`,
     mensajeOpcional
-  ].filter(Boolean).join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  // ===========================
+  // 📢 MENCIONAR A TODOS
+  // ===========================
 
   await conn.sendMessage(chatId, {
     text: mensaje,
-    mentions: mencionados.concat(sender)
+    mentions: mencionados
   })
 }
 
-// Comandos
-handler.command = ['invocar', 'todos', 'tagall', 'antitagall']
-handler.help = ['tagall', 'antitagall']
-handler.tags = ['grupos']
+// ===========================
+// 📌 COMANDOS
+// ===========================
+
+handler.command = [
+  'invocar',
+  'todos',
+  'tagall',
+  'antitagall'
+]
+
+handler.help = [
+  'tagall',
+  'antitagall'
+]
+
+handler.tags = [
+  'grupos'
+]
+
 handler.group = true
 handler.admin = true
 

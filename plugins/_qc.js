@@ -48,7 +48,9 @@ let handler = async (m, { conn, text }) => {
     // 👤 USUARIO
     // ============================================================
 
-    const userJid = m.quoted?.sender || m.sender
+    const userJid =
+      m.quoted?.sender ||
+      m.sender
 
     let nombre =
       m.quoted?.name ||
@@ -56,21 +58,29 @@ let handler = async (m, { conn, text }) => {
       m.name ||
       "Usuario"
 
-    nombre = String(nombre).substring(0, 50)
+    nombre =
+      String(nombre)
+        .substring(0, 50)
 
     // ============================================================
     // 🖼️ FOTO DE PERFIL
     // ============================================================
 
-    let pp = "https://i.ibb.co/dyk5QdQ/1212121212121212.png"
+    let pp =
+      "https://i.ibb.co/dyk5QdQ/1212121212121212.png"
 
     try {
-      if (typeof conn.profilePictureUrl === "function") {
 
-        const url = await conn.profilePictureUrl(
-          userJid,
-          "image"
-        )
+      if (
+        typeof conn.profilePictureUrl ===
+        "function"
+      ) {
+
+        const url =
+          await conn.profilePictureUrl(
+            userJid,
+            "image"
+          )
 
         if (
           typeof url === "string" &&
@@ -79,7 +89,9 @@ let handler = async (m, { conn, text }) => {
           pp = url
         }
       }
+
     } catch (e) {
+
       console.log(
         "[QC] Foto de perfil no disponible. Usando imagen predeterminada."
       )
@@ -90,133 +102,216 @@ let handler = async (m, { conn, text }) => {
     // ============================================================
 
     const payload = {
+
       type: "quote",
+
       format: "png",
+
       backgroundColor: "#000000",
+
       width: 512,
+
       height: 768,
+
       scale: 2,
 
       messages: [
+
         {
+
           entities: [],
+
           avatar: true,
 
           from: {
+
             id: 1,
+
             name: nombre,
 
             photo: {
               url: pp
             }
+
           },
 
           text: frase,
 
           replyMessage: {}
+
         }
+
       ]
+
     }
 
-    console.log("[QC] Generando cita...")
-    console.log("[QC] Usuario:", nombre)
-    console.log("[QC] Texto:", frase)
+    console.log(
+      "[QC] Generando cita..."
+    )
+
+    console.log(
+      "[QC] Usuario:",
+      nombre
+    )
+
+    console.log(
+      "[QC] Texto:",
+      frase
+    )
 
     // ============================================================
     // 🌐 GENERAR IMAGEN
     // ============================================================
+    // Usamos el endpoint PNG directo.
+    // La API devuelve la imagen como binario.
 
-    const response = await axios.post(
-      "https://quote.yuri.ly/quote/generate",
-      payload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "FelixCat-Bot"
-        },
+    const response =
+      await axios.post(
 
-        timeout: 30000,
+        "https://quote.yuri.ly/quote/generate.png",
 
-        maxContentLength: 15 * 1024 * 1024,
+        payload,
 
-        maxBodyLength: 15 * 1024 * 1024
-      }
+        {
+
+          headers: {
+
+            "Content-Type":
+              "application/json",
+
+            "Accept":
+              "image/png",
+
+            "User-Agent":
+              "FelixCat-Bot"
+
+          },
+
+          responseType:
+            "arraybuffer",
+
+          timeout:
+            30000,
+
+          maxContentLength:
+            20 * 1024 * 1024,
+
+          maxBodyLength:
+            20 * 1024 * 1024,
+
+          validateStatus:
+            () => true
+
+        }
+
+      )
+
+    // ============================================================
+    // 🔍 COMPROBAR RESPUESTA
+    // ============================================================
+
+    console.log(
+      "[QC] Status API:",
+      response.status
     )
 
-    const data = response?.data
+    console.log(
+      "[QC] Content-Type:",
+      response.headers?.["content-type"]
+    )
 
-    // ============================================================
-    // 🔍 MOSTRAR RESPUESTA DE LA API
-    // ============================================================
+    if (
+      response.status < 200 ||
+      response.status >= 300
+    ) {
 
-    console.log("[QC] Respuesta API:", {
-      ok: data?.ok,
-      type: data?.type,
-      ext: data?.ext,
-      width: data?.width,
-      height: data?.height,
-      tieneImagen: !!data?.image,
-      tieneResult: !!data?.result?.image
-    })
+      let errorText = ""
 
-    // ============================================================
-    // 🖼️ OBTENER IMAGEN
-    // ============================================================
+      try {
 
-    const image =
-      data?.image ||
-      data?.result?.image
+        const raw =
+          Buffer.from(
+            response.data
+          ).toString("utf8")
 
-    if (!image) {
+        try {
+
+          const json =
+            JSON.parse(raw)
+
+          errorText =
+            json?.error ||
+            json?.message ||
+            raw
+
+        } catch {
+
+          errorText =
+            raw
+
+        }
+
+      } catch {
+
+        errorText =
+          "Respuesta inválida de la API."
+
+      }
 
       console.error(
-        "[QC] Respuesta completa:",
-        data
+        "[QC] Error API:",
+        errorText
       )
 
       throw new Error(
-        "La API no devolvió ninguna imagen."
+        `API respondió ${response.status}: ${errorText}`
       )
     }
 
     // ============================================================
-    // 🔄 CONVERTIR BASE64 A BUFFER
+    // 🖼️ OBTENER BUFFER
     // ============================================================
 
     let buffer
 
-    if (Buffer.isBuffer(image)) {
-
-      buffer = image
-
-    } else if (typeof image === "string") {
-
-      let base64 = image
-
-      if (base64.includes(",")) {
-        base64 = base64.split(",").pop()
-      }
-
-      buffer = Buffer.from(
-        base64,
-        "base64"
+    if (
+      Buffer.isBuffer(
+        response.data
       )
+    ) {
+
+      buffer =
+        response.data
+
+    } else if (
+      response.data instanceof ArrayBuffer
+    ) {
+
+      buffer =
+        Buffer.from(
+          response.data
+        )
 
     } else {
 
-      throw new Error(
-        "La API devolvió un formato de imagen desconocido."
-      )
+      buffer =
+        Buffer.from(
+          response.data
+        )
+
     }
 
     // ============================================================
     // ✅ COMPROBAR IMAGEN
     // ============================================================
 
-    if (!buffer || !buffer.length) {
+    if (
+      !buffer ||
+      !buffer.length
+    ) {
 
       throw new Error(
-        "La imagen recibida está vacía."
+        "La API devolvió una imagen vacía."
       )
     }
 
@@ -225,13 +320,72 @@ let handler = async (m, { conn, text }) => {
     )
 
     // ============================================================
+    // 🔎 COMPROBAR FIRMA PNG
+    // ============================================================
+
+    const esPNG =
+      buffer.length >= 8 &&
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4E &&
+      buffer[3] === 0x47
+
+    if (!esPNG) {
+
+      console.log(
+        "[QC] La respuesta no parece PNG."
+      )
+
+      // Intentar detectar si la API devolvió JSON
+      try {
+
+        const raw =
+          buffer.toString("utf8")
+
+        const json =
+          JSON.parse(raw)
+
+        console.error(
+          "[QC] Respuesta JSON inesperada:",
+          json
+        )
+
+        throw new Error(
+          json?.error ||
+          json?.message ||
+          "La API no devolvió una imagen PNG."
+        )
+
+      } catch (jsonError) {
+
+        if (
+          jsonError?.message &&
+          !jsonError.message.includes(
+            "Unexpected token"
+          )
+        ) {
+          throw jsonError
+        }
+
+        throw new Error(
+          "La API no devolvió una imagen PNG válida."
+        )
+      }
+    }
+
+    // ============================================================
     // 🏷️ CONVERTIR A STICKER
     // ============================================================
 
-    const stiker = await sticker(
-      buffer,
-      false
+    console.log(
+      "[QC] Convirtiendo imagen a sticker..."
     )
+
+    const stiker =
+      await sticker(
+        buffer,
+        false
+      )
 
     if (!stiker) {
 
@@ -249,33 +403,70 @@ let handler = async (m, { conn, text }) => {
     // ============================================================
 
     return await conn.sendMessage(
+
       m.chat,
+
       {
         sticker: stiker
       },
+
       {
         quoted: m
       }
+
     )
 
   } catch (e) {
 
     console.error(
-      "❌ QC ERROR:",
-      e?.response?.data || e
+      "❌ QC ERROR:"
     )
 
+    console.error(
+      e?.response?.data ||
+      e?.message ||
+      e
+    )
+
+    // ============================================================
+    // 📋 MENSAJE DE ERROR
+    // ============================================================
+
+    let detalle =
+      e?.message ||
+      "Error desconocido."
+
+    if (
+      detalle.length > 300
+    ) {
+      detalle =
+        detalle.substring(
+          0,
+          300
+        ) + "..."
+    }
+
     return await conn.sendMessage(
+
       m.chat,
+
       {
+
         text:
           "⚠️ *No se pudo generar el sticker.*\n\n" +
+
           "🔧 La API de citas respondió con un error.\n" +
-          "📋 Revisá la consola para ver el código exacto."
+
+          `📋 ${detalle}`
+
       },
+
       {
+
         quoted: m
+
       }
+
     )
   }
 }
@@ -284,7 +475,9 @@ let handler = async (m, { conn, text }) => {
 // ⚙️ CONFIGURACIÓN DEL PLUGIN
 // ============================================================
 
-handler.command = ["qc"]
+handler.command = [
+  "qc"
+]
 
 handler.help = [
   "qc <texto>"

@@ -100,7 +100,7 @@ let handler = async (m, { conn, text }) => {
     }
 
     // ============================================================
-    // 📦 DATOS PARA LA API
+    // 📦 PAYLOAD
     // ============================================================
 
     const payload = {
@@ -147,6 +147,10 @@ let handler = async (m, { conn, text }) => {
 
     }
 
+    // ============================================================
+    // 🌐 GENERAR CITA
+    // ============================================================
+
     console.log(
       "[QC] Generando cita..."
     )
@@ -161,14 +165,10 @@ let handler = async (m, { conn, text }) => {
       frase
     )
 
-    // ============================================================
-    // 🌐 GENERAR IMAGEN
-    // ============================================================
-
     const response =
       await axios.post(
 
-        "https://quote.yuri.ly/quote/generate",
+        "https://bot.lyo.su/quote/generate",
 
         payload,
 
@@ -177,9 +177,6 @@ let handler = async (m, { conn, text }) => {
           headers: {
 
             "Content-Type":
-              "application/json",
-
-            "Accept":
               "application/json",
 
             "User-Agent":
@@ -204,7 +201,7 @@ let handler = async (m, { conn, text }) => {
       response?.data
 
     // ============================================================
-    // 🔍 RESPUESTA API
+    // 🔍 MOSTRAR RESPUESTA
     // ============================================================
 
     console.log(
@@ -213,86 +210,49 @@ let handler = async (m, { conn, text }) => {
     )
 
     console.log(
-      "[QC] Content-Type:",
-      response.headers?.["content-type"]
-    )
-
-    console.log(
       "[QC] Respuesta API:",
       {
         ok: data?.ok,
-        code: data?.code,
-        message: data?.message,
-        type: data?.type,
-        ext: data?.ext,
-        width: data?.width,
-        height: data?.height,
+        type: data?.result?.type,
+        width: data?.result?.width,
+        height: data?.result?.height,
         tieneImagen:
-          !!data?.image,
-        tieneResult:
-          !!data?.result,
-        tieneResultImage:
           !!data?.result?.image
       }
     )
 
     // ============================================================
-    // ❌ ERROR DE LA API
+    // ❌ ERROR API
     // ============================================================
 
     if (
-      data?.error ||
-      (
-        data?.code &&
-        Number(data.code) >= 400
-      )
+      data?.ok === false
     ) {
 
-      const apiError =
-        typeof data === "object"
-          ? (
-              data?.message ||
-              data?.error ||
-              JSON.stringify(data)
-            )
-          : String(data)
+      const error =
+        data?.error ||
+        data?.message ||
+        "La API rechazó la solicitud."
 
       throw new Error(
-        `API: ${apiError}`
+        typeof error === "object"
+          ? JSON.stringify(error)
+          : String(error)
       )
     }
 
     // ============================================================
-    // 🖼️ BUSCAR IMAGEN
+    // 🖼️ OBTENER IMAGEN
     // ============================================================
 
-    let image =
-      data?.image ||
+    const image =
       data?.result?.image ||
-      data?.data?.image
-
-    // ============================================================
-    // 📦 SI LA API DEVUELVE RESULT DIRECTO
-    // ============================================================
-
-    if (
-      !image &&
-      typeof data?.result === "string"
-    ) {
-
-      image =
-        data.result
-
-    }
-
-    // ============================================================
-    // ❌ SIN IMAGEN
-    // ============================================================
+      data?.image
 
     if (!image) {
 
       console.error(
-        "[QC] Respuesta completa de la API:"
+        "[QC] Respuesta completa:"
       )
 
       console.error(
@@ -309,90 +269,40 @@ let handler = async (m, { conn, text }) => {
     }
 
     // ============================================================
-    // 🔄 CONVERTIR IMAGEN A BUFFER
+    // 🔄 BASE64 → BUFFER
     // ============================================================
 
-    let buffer
+    let base64 =
+      String(image)
 
-    // ------------------------------------------------------------
-    // BUFFER
-    // ------------------------------------------------------------
+    // Por si devuelve:
+    // data:image/png;base64,...
 
     if (
-      Buffer.isBuffer(image)
+      base64.includes(",")
     ) {
 
-      buffer =
-        image
-
-    }
-
-    // ------------------------------------------------------------
-    // BASE64
-    // ------------------------------------------------------------
-
-    else if (
-      typeof image === "string"
-    ) {
-
-      let base64 =
-        image.trim()
-
-      // data:image/png;base64,...
-      if (
-        base64.includes(",")
-      ) {
-
-        base64 =
-          base64
-            .split(",")
-            .pop()
-
-      }
-
-      // Quitar posibles espacios
       base64 =
-        base64.replace(
-          /\s/g,
-          ""
-        )
-
-      buffer =
-        Buffer.from(
-          base64,
-          "base64"
-        )
+        base64
+          .split(",")
+          .pop()
 
     }
 
-    // ------------------------------------------------------------
-    // ARRAYBUFFER
-    // ------------------------------------------------------------
-
-    else if (
-      image instanceof ArrayBuffer
-    ) {
-
-      buffer =
-        Buffer.from(
-          image
-        )
-
-    }
-
-    // ------------------------------------------------------------
-    // UNKNOWN
-    // ------------------------------------------------------------
-
-    else {
-
-      throw new Error(
-        "La API devolvió un formato de imagen desconocido."
+    base64 =
+      base64.replace(
+        /\s/g,
+        ""
       )
-    }
+
+    const buffer =
+      Buffer.from(
+        base64,
+        "base64"
+      )
 
     // ============================================================
-    // ✅ COMPROBAR IMAGEN
+    // ✅ COMPROBAR BUFFER
     // ============================================================
 
     if (
@@ -408,24 +318,6 @@ let handler = async (m, { conn, text }) => {
     console.log(
       `[QC] Imagen recibida: ${buffer.length} bytes`
     )
-
-    // ============================================================
-    // 🔎 COMPROBAR PNG
-    // ============================================================
-
-    const esPNG =
-      buffer.length >= 8 &&
-      buffer[0] === 0x89 &&
-      buffer[1] === 0x50 &&
-      buffer[2] === 0x4E &&
-      buffer[3] === 0x47
-
-    if (!esPNG) {
-
-      console.log(
-        "[QC] La respuesta no parece PNG. Se intentará convertir igualmente."
-      )
-    }
 
     // ============================================================
     // 🏷️ CONVERTIR A STICKER
@@ -453,7 +345,7 @@ let handler = async (m, { conn, text }) => {
     )
 
     // ============================================================
-    // 📤 ENVIAR STICKER
+    // 📤 ENVIAR
     // ============================================================
 
     return await conn.sendMessage(
@@ -472,20 +364,19 @@ let handler = async (m, { conn, text }) => {
 
   } catch (e) {
 
+    // ============================================================
+    // ❌ ERROR
+    // ============================================================
+
     console.error(
       "❌ QC ERROR:"
     )
-
-    // ============================================================
-    // 🔍 MOSTRAR ERROR REAL
-    // ============================================================
 
     if (
       e?.response?.data
     ) {
 
       console.error(
-        "[QC] Respuesta del servidor:",
         JSON.stringify(
           e.response.data,
           null,
@@ -499,11 +390,10 @@ let handler = async (m, { conn, text }) => {
         e?.message ||
         e
       )
-
     }
 
     // ============================================================
-    // 📋 TEXTO DEL ERROR
+    // 📋 MENSAJE
     // ============================================================
 
     let detalle =
@@ -521,10 +411,6 @@ let handler = async (m, { conn, text }) => {
         ) + "..."
     }
 
-    // ============================================================
-    // 📤 ENVIAR ERROR
-    // ============================================================
-
     return await conn.sendMessage(
 
       m.chat,
@@ -533,17 +419,13 @@ let handler = async (m, { conn, text }) => {
 
         text:
           "⚠️ *No se pudo generar el sticker.*\n\n" +
-
-          "🔧 Ocurrió un error al generar la cita.\n\n" +
-
+          "🔧 La API de citas respondió con un error.\n" +
           `📋 ${detalle}`
 
       },
 
       {
-
         quoted: m
-
       }
 
     )
@@ -551,7 +433,7 @@ let handler = async (m, { conn, text }) => {
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN DEL PLUGIN
+// ⚙️ CONFIGURACIÓN
 // ============================================================
 
 handler.command = [

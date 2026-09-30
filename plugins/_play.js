@@ -1,5 +1,6 @@
-// 📂 plugins/play.js
-// 🎵 FelixCat_Bot — YouTube Audio
+// 📂 plugins/play.js — FelixCat-Bot 🐾
+// 🎵 YouTube → Audio
+// Comandos: .play / .playaudio / .audio
 
 import yts from 'yt-search'
 import axios from 'axios'
@@ -14,10 +15,9 @@ const MAX_DURATION_SECONDS = 7 * 60
 // 🧹 LIMPIAR TEXTO
 // ============================================================
 
-const cleanText = text => {
+const cleanText = (text) => {
 
-  if (!text)
-    return ''
+  if (!text) return ''
 
   if (typeof text === 'string')
     return text.trim()
@@ -32,56 +32,27 @@ const cleanText = text => {
 // 👁️ FORMATEAR VISTAS
 // ============================================================
 
-const formatViews = v => {
+const formatViews = (v) => {
 
-  if (!v)
-    return '0'
+  v = Number(v) || 0
 
-  return v >= 1e9
-    ? (v / 1e9).toFixed(1) + 'B'
-    : v >= 1e6
-      ? (v / 1e6).toFixed(1) + 'M'
-      : v >= 1e3
-        ? (v / 1e3).toFixed(1) + 'K'
-        : String(v)
-}
+  if (v >= 1e9)
+    return (v / 1e9).toFixed(1) + 'B'
 
-// ============================================================
-// 📡 PROGRESO
-// ============================================================
+  if (v >= 1e6)
+    return (v / 1e6).toFixed(1) + 'M'
 
-const emitProgress = (
-  msgId,
-  step,
-  extraData = {}
-) => {
+  if (v >= 1e3)
+    return (v / 1e3).toFixed(1) + 'K'
 
-  try {
-
-    queueMicrotask(() => {
-
-      try {
-
-        global.broadcast?.(
-          'cmd_progress',
-          {
-            id: msgId,
-            step,
-            ...extraData
-          }
-        )
-
-      } catch {}
-    })
-
-  } catch {}
+  return String(v)
 }
 
 // ============================================================
 // 🔎 EXTRAER URL DE DESCARGA
 // ============================================================
 
-const extractDownloadUrl = data => {
+const extractDownloadUrl = (data) => {
 
   const candidate =
     data?.data?.download ||
@@ -99,10 +70,8 @@ const extractDownloadUrl = data => {
     data?.data?.link ||
     (
       typeof data?.download === 'object'
-        ? (
-            data?.download?.url ||
-            data?.download?.link
-          )
+        ? data?.download?.url ||
+          data?.download?.link
         : null
     ) ||
     data?.url ||
@@ -120,37 +89,33 @@ const extractDownloadUrl = data => {
 // 🌐 CONSULTAR API
 // ============================================================
 
-const fetchApiUrl = async apiUrl => {
+const fetchApiUrl = async (apiUrl) => {
 
-  const res =
-    await axios.get(
-      apiUrl,
-      {
-        timeout: 15000,
-
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-        }
+  const res = await axios.get(
+    apiUrl,
+    {
+      timeout: 10000,
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
       }
-    )
+    }
+  )
 
   const dlUrl =
     extractDownloadUrl(res.data)
 
   if (!dlUrl)
-    throw new Error(
-      'La API no devolvió una URL de descarga.'
-    )
+    throw new Error('Sin URL de descarga')
 
   return dlUrl
 }
 
 // ============================================================
-// 🔄 OBTENER AUDIO CON VARIAS APIs
+// 🔄 OBTENER AUDIO CON FALLBACK
 // ============================================================
 
-const getAudioUrlWithRetry = async videoUrl => {
+const getAudioUrlWithRetry = async (videoUrl) => {
 
   const encoded =
     encodeURIComponent(videoUrl)
@@ -165,8 +130,6 @@ const getAudioUrlWithRetry = async videoUrl => {
 
   ]
 
-  let lastError = null
-
   for (const api of apis) {
 
     try {
@@ -177,85 +140,65 @@ const getAudioUrlWithRetry = async videoUrl => {
       if (url)
         return url
 
-    } catch (error) {
+    } catch (e) {
 
-      lastError = error
+      console.log(
+        '⚠️ API de audio falló:',
+        api
+      )
     }
   }
 
-  throw (
-    lastError ||
-    new Error(
-      'No se pudo obtener el audio.'
-    )
+  throw new Error(
+    'Todas las APIs de descarga fallaron.'
   )
 }
 
 // ============================================================
-// 🤖 HANDLER
+// 🎵 HANDLER
 // ============================================================
 
-const handler = async (
-  m,
-  {
-    conn,
-    text,
-    command
+let handler = async (m, { conn, text }) => {
+
+  const query =
+    String(text || '').trim()
+
+  // ==========================================================
+  // ❌ SIN BÚSQUEDA
+  // ==========================================================
+
+  if (!query) {
+
+    return conn.sendMessage(
+      m.chat,
+      {
+        text:
+          'ꕤ *Ingresá el título o enlace de YouTube que querés buscar.*'
+      },
+      {
+        quoted: m
+      }
+    )
   }
-) => {
 
   try {
 
     // ========================================================
-    // 📝 CONSULTA
+    // 🔎 BUSCAR VIDEO
     // ========================================================
 
-    const query =
-      cleanText(text)
-
-    if (!query) {
-
-      return conn.reply(
-        m.chat,
-        'ꕤ *Ingresa el título o enlace de YouTube que quieres buscar.* ✰',
-        m
-      )
-    }
-
-    // ========================================================
-    // 📡 ID DEL MENSAJE
-    // ========================================================
-
-    const msgId =
-      m.key?.id ||
-      m.id ||
-      `${Date.now()}`
-
-    emitProgress(
-      msgId,
-      'search_started',
-      {
-        query
-      }
-    )
-
-    // ========================================================
-    // 🔗 DETECTAR URL DE YOUTUBE
-    // ========================================================
+    let searchQuery =
+      query
 
     const urlMatch =
       query.match(
         /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/|v\/))([a-zA-Z0-9_-]{11})/
       )
 
-    const searchQuery =
-      urlMatch
-        ? `https://youtu.be/${urlMatch[1]}`
-        : query
-
-    // ========================================================
-    // 🔎 BUSCAR EN YOUTUBE
-    // ========================================================
+    if (urlMatch) {
+      searchQuery =
+        `https://youtu.be/${urlMatch[1]}`
+    }
 
     const searchResult =
       await yts(searchQuery)
@@ -264,23 +207,20 @@ const handler = async (
       !searchResult?.videos?.length
     ) {
 
-      emitProgress(
-        msgId,
-        'no_results',
-        {
-          query
-        }
-      )
-
-      return conn.reply(
+      return conn.sendMessage(
         m.chat,
-        `✿ No se encontraron resultados para *${query}*.`,
-        m
+        {
+          text:
+            `✿ No se encontraron resultados para *${query}*.`
+        },
+        {
+          quoted: m
+        }
       )
     }
 
     // ========================================================
-    // 🎵 PRIMER RESULTADO
+    // 🎬 PRIMER RESULTADO
     // ========================================================
 
     const video =
@@ -296,24 +236,23 @@ const handler = async (
 
     if (!videoId) {
 
-      return conn.reply(
+      return conn.sendMessage(
         m.chat,
-        '❌ No pude obtener el ID del video.',
-        m
+        {
+          text:
+            '❌ No pude obtener el ID del video.'
+        },
+        {
+          quoted: m
+        }
       )
     }
 
     const videoUrl =
       `https://youtu.be/${videoId}`
 
-    // ========================================================
-    // 📋 INFORMACIÓN
-    // ========================================================
-
     const title =
-      cleanText(
-        video.title
-      ) ||
+      cleanText(video.title) ||
       'Sin título'
 
     const channel =
@@ -332,25 +271,27 @@ const handler = async (
       cleanText(
         video.timestamp ||
         video.duration
-      ) ||
-      ''
+      ) || ''
 
     // ========================================================
-    // ⏱️ COMPROBAR DURACIÓN
+    // ⏱️ LÍMITE DE DURACIÓN
     // ========================================================
 
     if (
       video.seconds &&
       video.seconds >
-      MAX_DURATION_SECONDS
+        MAX_DURATION_SECONDS
     ) {
 
-      return conn.reply(
+      return conn.sendMessage(
         m.chat,
-
-        `✿ El audio dura *${duration}*, superando el límite permitido de *7 minutos*.`,
-        
-        m
+        {
+          text:
+            `✿ El audio dura *${duration}*, superando el límite permitido de *7 minutos*.`
+        },
+        {
+          quoted: m
+        }
       )
     }
 
@@ -360,10 +301,6 @@ const handler = async (
 
     const thumbnail =
       `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
-
-    // ========================================================
-    // 💬 INFORMACIÓN DEL VIDEO
-    // ========================================================
 
     const caption =
 `﹒𝜗ৎ ࣪ *${title}*
@@ -394,25 +331,16 @@ const handler = async (
         }
       )
 
-    } catch (error) {
+    } catch (e) {
 
-      console.error(
-        '⚠️ Error enviando miniatura:',
-        error
+      console.log(
+        '⚠️ No se pudo enviar la miniatura:',
+        e
       )
     }
 
     // ========================================================
-    // 📡 BUSCANDO AUDIO
-    // ========================================================
-
-    emitProgress(
-      msgId,
-      'fetching_audio_stream'
-    )
-
-    // ========================================================
-    // 🎵 OBTENER URL DEL AUDIO
+    // 🎵 OBTENER AUDIO
     // ========================================================
 
     const downloadUrl =
@@ -423,27 +351,12 @@ const handler = async (
     if (!downloadUrl) {
 
       throw new Error(
-        'No se obtuvo la URL del audio.'
+        'No se obtuvo URL de audio.'
       )
     }
 
     // ========================================================
-    // 📤 ENVIANDO AUDIO
-    // ========================================================
-
-    emitProgress(
-      msgId,
-      'sending_audio_to_whatsapp'
-    )
-
-    const safeFileName =
-      title
-        .replace(/[\\/:*?"<>|]/g, '')
-        .substring(0, 100) ||
-      'audio'
-
-    // ========================================================
-    // 🎧 ENVIAR AUDIO
+    // 📤 ENVIAR AUDIO
     // ========================================================
 
     await conn.sendMessage(
@@ -452,42 +365,39 @@ const handler = async (
         audio: {
           url: downloadUrl
         },
-
         mimetype:
           'audio/mpeg',
-
         fileName:
-          `${safeFileName}.mp3`,
-
-        ptt:
-          false
+          `${title}.mp3`,
+        ptt: false
       },
       {
         quoted: m
       }
     )
 
-  } catch (error) {
+  } catch (e) {
 
     console.error(
-      '❌ Error en play.js:',
-      error
+      '❌ Error en play:',
+      e
     )
 
-    return conn.reply(
+    return conn.sendMessage(
       m.chat,
-
-      `❌ No pude descargar el audio.
-
-Posible causa: el servicio de descarga está temporalmente caído o no pudo procesar el video.`,
-
-      m
+      {
+        text:
+          '❌ No pude descargar el audio. Intentá nuevamente en unos segundos.'
+      },
+      {
+        quoted: m
+      }
     )
   }
 }
 
 // ============================================================
-// 📌 CONFIGURACIÓN DEL PLUGIN
+// 📋 CONFIGURACIÓN
 // ============================================================
 
 handler.help = [

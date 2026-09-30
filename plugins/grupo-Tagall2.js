@@ -3,6 +3,7 @@
 // 🔐 SOLO ROOT OWNERS reales pueden activarlo
 // 👤 Mención visible a un usuario al azar
 // 🫥 Mención oculta al resto
+// 🚫 NO responde/cita el mensaje original
 
 function getRootOwners() {
   return (global.owner || [])
@@ -93,20 +94,14 @@ let handler = async (m, { conn, groupMetadata }) => {
     const mensaje =
       frases[Math.floor(Math.random() * frases.length)]
 
-    // 📢 ENVIAR
-    await conn.sendMessage(
-      m.chat,
-      {
-        text: mensaje,
-        mentions: [
-          usuarioAzar,
-          ...mencionesOcultas
-        ]
-      },
-      {
-        quoted: m
-      }
-    )
+    // 📢 ENVIAR SIN CITAR EL MENSAJE ORIGINAL
+    await conn.sendMessage(m.chat, {
+      text: mensaje,
+      mentions: [
+        usuarioAzar,
+        ...mencionesOcultas
+      ]
+    })
 
   } catch (error) {
     console.error('[tagallT] Error:', error)

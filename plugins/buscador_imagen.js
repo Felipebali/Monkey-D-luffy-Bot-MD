@@ -26,7 +26,7 @@ const handler = async (m, { conn, text }) => {
 
 handler.help = ["imagen <texto>"];
 handler.tags = ["tools"];
-handler.command = ["imagen", "foto", "img"];
+handler.command = ["imagen", "foto"];
 
 handler.group = true;
 handler.botAdmin = false;

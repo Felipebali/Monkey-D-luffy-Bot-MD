@@ -31,7 +31,7 @@ let handler = async (m, { conn, text }) => {
       {
         params: {
           q: query,
-          page_size: 20
+          page_size: 50
         },
         timeout: 15000
       }
@@ -50,54 +50,65 @@ let handler = async (m, { conn, text }) => {
     }
 
     // ============================================================
-    // 🖼️ BUSCAR UNA IMAGEN VÁLIDA
+    // 🖼️ PROBAR TODAS LAS IMÁGENES DISPONIBLES
     // ============================================================
 
     let imagen = null
 
     for (const resultado of resultados) {
-      const url =
-        resultado?.url ||
-        resultado?.thumbnail ||
-        resultado?.image
 
-      if (!url) continue
+      const urls = [
+        resultado?.url,
+        resultado?.image,
+        resultado?.thumbnail
+      ].filter(Boolean)
 
-      try {
-        const img = await axios.get(url, {
-          responseType: "arraybuffer",
-          timeout: 10000,
-          maxContentLength: 15 * 1024 * 1024
-        })
+      for (const url of urls) {
+        try {
 
-        const contentType =
-          img.headers?.["content-type"] || ""
+          const img = await axios.get(url, {
+            responseType: "arraybuffer",
+            timeout: 12000,
+            maxContentLength: 30 * 1024 * 1024,
+            maxBodyLength: 30 * 1024 * 1024,
+            validateStatus: status =>
+              status >= 200 && status < 400
+          })
 
-        if (
-          contentType.startsWith("image/") &&
-          img.data?.length
-        ) {
-          imagen = {
-            buffer: Buffer.from(img.data),
-            url,
-            titulo: resultado?.title || query,
-            autor: resultado?.creator || "Desconocido"
+          if (img.data && img.data.length > 0) {
+
+            imagen = {
+              buffer: Buffer.from(img.data),
+              url: url,
+              titulo: resultado?.title || query,
+              autor: resultado?.creator || "Desconocido"
+            }
+
+            break
           }
 
-          break
+        } catch (error) {
+          // Probar la siguiente URL
+          continue
         }
-      } catch {
-        // Probar la siguiente imagen
       }
+
+      if (imagen) break
     }
+
+    // ============================================================
+    // ❌ NINGUNA IMAGEN PUDO DESCARGARSE
+    // ============================================================
 
     if (!imagen) {
       await m.react("❌")
 
       return conn.reply(
         m.chat,
-        `❌ Encontré resultados, pero no pude descargar ninguna imagen.\n\n` +
-        `🔎 Búsqueda: *${query}*`,
+        `❌ *No pude descargar ninguna imagen.*\n\n` +
+        `🔎 Búsqueda: *${query}*\n\n` +
+        `⚠️ El buscador encontró resultados, pero las imágenes ` +
+        `no pudieron ser descargadas.`,
         m
       )
     }
@@ -115,12 +126,15 @@ let handler = async (m, { conn, text }) => {
           `🔎 *Búsqueda:* ${query}\n` +
           `👤 *Autor:* ${imagen.autor}`
       },
-      { quoted: m }
+      {
+        quoted: m
+      }
     )
 
     await m.react("✅")
 
   } catch (error) {
+
     console.error("❌ Error en imagen:", error)
 
     await m.react("❌")
@@ -128,8 +142,8 @@ let handler = async (m, { conn, text }) => {
     return conn.reply(
       m.chat,
       `❌ *No pude buscar la imagen.*\n\n` +
-      `🔎 Búsqueda: *${text || "Sin texto"}*\n\n` +
-      `⚠️ Puede que el servicio de imágenes esté temporalmente caído.`,
+      `🔎 *Búsqueda:* ${text || "Sin texto"}\n\n` +
+      `⚠️ El servicio de imágenes puede estar temporalmente caído.`,
       m
     )
   }

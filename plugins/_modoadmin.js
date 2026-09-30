@@ -1,41 +1,230 @@
 // 📂 plugins/_modoadmin-filter.js
+// 🛡️ FELIXCAT BOT — MODO ADMINISTRADOR
+// 🔒 Bloquea comandos para usuarios que no sean Admin/Owner
 
-let handler = async (m, { conn, isAdmin, isOwner }) => {
+// ============================================================
+// 👑 OBTENER OWNERS
+// ============================================================
+
+function getOwners() {
+
+  return (global.owner || [])
+    .map(owner =>
+      Array.isArray(owner)
+        ? owner[0]
+        : owner
+    )
+    .filter(Boolean)
+    .map(owner =>
+      String(owner)
+        .replace(/\D/g, '')
+    )
+    .filter(Boolean)
+}
+
+// ============================================================
+// 🔐 NORMALIZAR JID
+// ============================================================
+
+function normalizeJid(jid) {
+
+  if (!jid) return ''
+
+  return String(jid)
+    .replace(/:\d+@/, '@')
+    .trim()
+}
+
+// ============================================================
+// 👑 COMPROBAR OWNER
+// ============================================================
+
+function isGlobalOwner(jid) {
+
+  const number =
+    normalizeJid(jid)
+      .replace(/\D/g, '')
+
+  return getOwners()
+    .includes(number)
+}
+
+// ============================================================
+// 🚀 HANDLER
+// ============================================================
+
+let handler = async (
+  m,
+  {
+    conn,
+    isAdmin,
+    isOwner
+  }
+) => {
+
   try {
+
+    // ========================================================
+    // 👥 SOLO GRUPOS
+    // ========================================================
+
     if (!m.isGroup) return
 
-    const chat = global.db?.data?.chats?.[m.chat]
-    if (!chat || !chat.modoadmin) return
+    // ========================================================
+    // 📂 DATOS DEL GRUPO
+    // ========================================================
+
+    const chat =
+      global.db?.data?.chats?.[m.chat]
+
+    if (!chat) return
+
+    // ========================================================
+    // 🔘 MODO ADMIN DESACTIVADO
+    // ========================================================
+
+    if (!chat.modoadmin) return
+
+    // ========================================================
+    // 📝 OBTENER TEXTO
+    // ========================================================
 
     if (!m.text) return
-    const body = m.text.trim()
+
+    const body =
+      String(m.text).trim()
+
+    if (!body) return
+
+    // ========================================================
+    // 🔎 SOLO COMANDOS
+    // ========================================================
 
     if (!body.startsWith('.')) return
 
-    const command = body.slice(1).split(' ')[0].toLowerCase()
+    // ========================================================
+    // 🧹 LIMPIAR COMANDO
+    // ========================================================
 
-    // ✅ Comandos permitidos aunque esté activo
-    const permitidos = ['modoadmin', 'menu', 'bot']
+    const command =
+      body
+        .slice(1)
+        .trim()
+        .split(/\s+/)[0]
+        .toLowerCase()
 
-    if (permitidos.includes(command)) return
+    if (!command) return
 
-    // ⛔ Si no es admin ni owner → BLOQUEO REAL
-    if (!(isAdmin || isOwner)) {
-      await conn.reply(
-        m.chat,
-        `🚫 *MODO ADMIN ACTIVADO*\n\nSolo los administradores pueden usar comandos.\n\n⛔ Bloqueado: *.${command}*`,
-        m
-      )
+    // ========================================================
+    // 📋 COMANDOS PERMITIDOS
+    // ========================================================
+    //
+    // Estos funcionan aunque Modo Admin esté activo.
+    //
+    // Se pueden agregar comandos desde:
+    //
+    // chat.modoadminAllow = ['menu', 'bot']
+    //
+    // ========================================================
 
-      return true // 🔥 ESTE return es el bloqueo real
+    const permitidosBase = [
+      'modoadmin',
+      'menu',
+      'bot'
+    ]
+
+    const permitidosExtra =
+      Array.isArray(chat.modoadminAllow)
+        ? chat.modoadminAllow
+            .map(x =>
+              String(x)
+                .toLowerCase()
+                .trim()
+            )
+            .filter(Boolean)
+        : []
+
+    const permitidos = [
+      ...new Set([
+        ...permitidosBase,
+        ...permitidosExtra
+      ])
+    ]
+
+    // ========================================================
+    // ✅ COMANDO PERMITIDO
+    // ========================================================
+
+    if (
+      permitidos.includes(command)
+    ) {
+      return
     }
 
+    // ========================================================
+    // 👑 OWNER → ACCESO TOTAL
+    // ========================================================
+
+    const globalOwner =
+      isGlobalOwner(m.sender)
+
+    if (
+      isOwner ||
+      globalOwner
+    ) {
+      return
+    }
+
+    // ========================================================
+    // 🛡️ ADMIN → ACCESO TOTAL
+    // ========================================================
+
+    if (isAdmin) {
+      return
+    }
+
+    // ========================================================
+    // 🚫 USUARIO NORMAL → BLOQUEAR
+    // ========================================================
+
+    await conn.reply(
+      m.chat,
+`🚫 *MODO ADMIN ACTIVADO*
+
+━━━━━━━━━━━━━━━━━━
+
+👑 Solo los administradores pueden utilizar comandos.
+
+⛔ *Comando bloqueado:*
+*.${command}*
+
+━━━━━━━━━━━━━━━━━━
+
+💡 Si necesitás utilizar un comando, pedile a un administrador que desactive el modo admin.`,
+      m
+    )
+
+    // ========================================================
+    // 🔥 BLOQUEO REAL
+    // ========================================================
+
+    return true
+
   } catch (e) {
-    console.error('Error en _modoadmin-filter:', e)
+
+    console.error(
+      '❌ Error en _modoadmin-filter:',
+      e
+    )
+
+    return
   }
 }
 
-// ✅ ESTO ES LO QUE TU LOADER SÍ SOPORTA
+// ============================================================
+// ⚙️ LOADER
+// ============================================================
+
 handler.all = true
 
 export default handler

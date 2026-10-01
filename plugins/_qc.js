@@ -4,8 +4,11 @@
 import { sticker } from "../lib/sticker.js"
 import axios from "axios"
 
+const API_URL = "https://bot.lyo.su/quote/generate"
+
 let handler = async (m, { conn, text }) => {
   try {
+
     // ============================================================
     // 📝 OBTENER TEXTO
     // ============================================================
@@ -16,35 +19,62 @@ let handler = async (m, { conn, text }) => {
 
     if (m.quoted?.text) {
       quoteText = m.quoted.text.trim()
-      quoteSender = m.quoted.sender
-      quoteName = m.quoted.pushName || m.quoted.name || quoteSender.split("@")[0]
+      quoteSender = conn.decodeJid(m.quoted.sender)
+      quoteName =
+        m.quoted.pushName ||
+        m.quoted.name ||
+        quoteSender.split("@")[0]
+
     } else if (text?.trim()) {
       quoteText = text.trim()
-      quoteSender = m.sender
-      quoteName = m.pushName || m.name || quoteSender.split("@")[0]
+      quoteSender = conn.decodeJid(m.sender)
+      quoteName =
+        m.pushName ||
+        m.name ||
+        quoteSender.split("@")[0]
+
     } else {
+
       return conn.sendMessage(
         m.chat,
         {
-          text: "❌ Debes escribir un texto o responder a un mensaje.\n\n💡 Ejemplo:\n.qc Hola mundo"
+          text:
+`╭━━━〔 💬 *STICKER QC* 〕━━━╮
+┃
+┃ ❌ *Falta el texto.*
+┃
+┃ 📌 Escribe:
+┃ • .qc <texto>
+┃
+┃ 📌 O responde a un mensaje:
+┃ • .qc
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
         },
         { quoted: m }
       )
     }
 
     // ============================================================
-    // 📏 LÍMITE DE TEXTO
+    // 📏 LÍMITE
     // ============================================================
 
     if (quoteText.length > 310) {
+
       return conn.sendMessage(
         m.chat,
         {
-          text: "❌ El texto es demasiado largo.\n\n📏 Máximo permitido: *310 caracteres*."
+          text:
+`⚠️ *Texto demasiado largo.*
+
+📏 Máximo permitido: *310 caracteres*
+📝 Tu texto: *${quoteText.length} caracteres*`
         },
         { quoted: m }
       )
     }
+
+    await m.react("💬")
 
     // ============================================================
     // 🖼️ FOTO DE PERFIL
@@ -57,20 +87,23 @@ let handler = async (m, { conn, text }) => {
       )
 
     // ============================================================
-    // 🎨 CONFIGURACIÓN DEL QUOTE
+    // 🎨 DATOS PARA LA API
     // ============================================================
 
-    const obj = {
+    const data = {
       type: "quote",
       format: "png",
       backgroundColor: "#000000",
       width: 512,
       height: 768,
       scale: 2,
+
       messages: [
         {
           entities: [],
+
           avatar: true,
+
           from: {
             id: 1,
             name: quoteName,
@@ -78,48 +111,173 @@ let handler = async (m, { conn, text }) => {
               url: pp
             }
           },
+
           text: quoteText,
+
           replyMessage: {}
         }
       ]
     }
 
     // ============================================================
-    // 🚀 GENERAR IMAGEN
+    // 🚀 GENERAR QUOTE
     // ============================================================
 
-    const response = await axios.post(
-      "https://bot.lyo.su/quote/generate",
-      obj,
-      {
-        headers: {
-          "Content-Type": "application/json"
-        },
-        timeout: 30000
-      }
-    )
+    let response
 
-    if (!response.data?.result?.image) {
-      throw new Error("La API no devolvió ninguna imagen.")
+    try {
+
+      response = await axios.post(
+        API_URL,
+        data,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "User-Agent": "FelixCat-Bot/1.0"
+          },
+
+          timeout: 30000,
+
+          validateStatus: () => true
+        }
+      )
+
+    } catch (error) {
+
+      console.error(
+        "❌ Error conectando con API QC:",
+        error.message
+      )
+
+      await m.react("⚠️")
+
+      return conn.sendMessage(
+        m.chat,
+        {
+          text:
+`⚠️ *No se pudo conectar con el generador QC.*
+
+🌐 La API no respondió correctamente.
+
+🔄 Intenta nuevamente en unos segundos.`
+        },
+        { quoted: m }
+      )
     }
 
     // ============================================================
-    // 🧩 CONVERTIR A STICKER
+    // 🚨 ERROR 502 / 5XX
+    // ============================================================
+
+    if (response.status >= 500) {
+
+      console.error(
+        `❌ API QC respondió HTTP ${response.status}`
+      )
+
+      await m.react("⚠️")
+
+      return conn.sendMessage(
+        m.chat,
+        {
+          text:
+`⚠️ *El generador de stickers está temporalmente fuera de servicio.*
+
+🌐 Servidor: *bot.lyo.su*
+📡 Estado: *HTTP ${response.status}*
+
+🔄 Espera unos segundos y vuelve a intentarlo.`
+        },
+        { quoted: m }
+      )
+    }
+
+    // ============================================================
+    // ❌ OTROS ERRORES
+    // ============================================================
+
+    if (response.status !== 200) {
+
+      console.error(
+        "❌ Respuesta inesperada:",
+        response.status,
+        response.data
+      )
+
+      await m.react("⚠️")
+
+      return conn.sendMessage(
+        m.chat,
+        {
+          text:
+`❌ *No se pudo generar el sticker.*
+
+📡 Código HTTP: *${response.status}*`
+        },
+        { quoted: m }
+      )
+    }
+
+    // ============================================================
+    // 🧩 COMPROBAR RESPUESTA
+    // ============================================================
+
+    const imageBase64 =
+      response.data?.result?.image
+
+    if (!imageBase64) {
+
+      console.error(
+        "❌ La API no devolvió la imagen:",
+        response.data
+      )
+
+      await m.react("⚠️")
+
+      return conn.sendMessage(
+        m.chat,
+        {
+          text:
+`❌ *La API respondió, pero no devolvió la imagen.*
+
+🔄 Intenta nuevamente.`
+        },
+        { quoted: m }
+      )
+    }
+
+    // ============================================================
+    // 🖼️ BASE64 → BUFFER
     // ============================================================
 
     const buffer = Buffer.from(
-      response.data.result.image,
+      imageBase64,
       "base64"
     )
 
-    const stiker = await sticker(buffer, false)
-
-    if (!stiker) {
-      throw new Error("No se pudo convertir la imagen a sticker.")
+    if (!buffer.length) {
+      throw new Error(
+        "La imagen recibida está vacía."
+      )
     }
 
     // ============================================================
-    // 📤 ENVIAR STICKER
+    // 🎨 CONVERTIR A STICKER
+    // ============================================================
+
+    const stiker = await sticker(
+      buffer,
+      false
+    )
+
+    if (!stiker) {
+      throw new Error(
+        "No se pudo convertir la imagen en sticker."
+      )
+    }
+
+    // ============================================================
+    // 📤 ENVIAR
     // ============================================================
 
     await conn.sendMessage(
@@ -127,20 +285,35 @@ let handler = async (m, { conn, text }) => {
       {
         sticker: stiker
       },
-      { quoted: m }
+      {
+        quoted: m
+      }
     )
 
+    await m.react("✅")
+
   } catch (error) {
-    console.error("❌ Error en .qc:", error)
+
+    console.error(
+      "❌ Error en .qc:",
+      error
+    )
+
+    try {
+      await m.react("❌")
+    } catch {}
 
     await conn.sendMessage(
       m.chat,
       {
         text:
-          "❌ *No se pudo generar el sticker.*\n\n" +
-          "🔄 Intenta nuevamente en unos segundos."
+`❌ *Ocurrió un error generando el sticker QC.*
+
+🔄 Intenta nuevamente más tarde.`
       },
-      { quoted: m }
+      {
+        quoted: m
+      }
     )
   }
 }
@@ -151,7 +324,7 @@ let handler = async (m, { conn, text }) => {
 
 handler.help = [
   "qc <texto>",
-  "qc respondiendo un mensaje"
+  "qc respondiendo mensaje"
 ]
 
 handler.tags = [
@@ -161,5 +334,7 @@ handler.tags = [
 handler.command = [
   "qc"
 ]
+
+handler.limit = false
 
 export default handler

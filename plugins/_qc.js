@@ -1,9 +1,8 @@
-// 📂 plugins/qc.js
+// 📂 plugins/_qc.js
 // 💬 Generador de stickers de citas
 
 import { sticker } from "../lib/sticker.js"
 import axios from "axios"
-import { getUser } from "../database-functions.js"
 
 let handler = async (m, { conn, text }) => {
   try {
@@ -12,46 +11,68 @@ let handler = async (m, { conn, text }) => {
     // 📝 OBTENER TEXTO
     // ============================================================
 
-    let quoteText
-    let quoteSender
-    let quoteName
+    let quoteText = ""
+    let quoteSender = ""
+    let quoteName = ""
 
+    // Si responde a un mensaje
     if (m.quoted?.text) {
-      quoteText = m.quoted.text.trim()
-      quoteSender = m.quoted.sender
 
-      const quotedUser = getUser(quoteSender)
+      quoteText = m.quoted.text.trim()
+      quoteSender = conn.decodeJid(m.quoted.sender)
+
       quoteName =
-        quotedUser?.pushName ||
-        quoteSender?.split("@")[0] ||
+        m.quoted.pushName ||
+        m.pushName ||
+        quoteSender.split("@")[0] ||
         "Usuario"
 
-    } else if (text) {
+    }
+
+    // Si escribe directamente
+    else if (text?.trim()) {
+
       quoteText = text.trim()
-      quoteSender = m.sender
+      quoteSender = conn.decodeJid(m.sender)
+
       quoteName =
         m.pushName ||
-        m.name ||
-        m.sender?.split("@")[0] ||
+        quoteSender.split("@")[0] ||
         "Usuario"
 
-    } else {
+    }
+
+    // Sin texto
+    else {
+
       return m.reply(
-        "❌ Debes escribir un texto o responder a un mensaje.\n\n" +
-        "📌 *Ejemplo:*\n" +
-        ".qc Hola mundo"
+`╭━━━〔 💬 *QUOTE STICKER* 〕━━━╮
+┃
+┃ ❌ *Falta el texto.*
+┃
+┃ 📝 Escribe:
+┃ .qc Hola mundo
+┃
+┃ 💬 O responde a un mensaje
+┃ con *.qc*
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
       )
     }
 
     // ============================================================
-    // 📏 LÍMITE DE TEXTO
+    // 📏 LÍMITE
     // ============================================================
 
     if (quoteText.length > 310) {
+
       return m.reply(
-        "❌ El texto es demasiado largo.\n\n" +
-        "📏 Máximo permitido: *310 caracteres*."
+`⚠️ *Texto demasiado largo*
+
+📏 Máximo permitido: *310 caracteres*
+📝 Caracteres actuales: *${quoteText.length}*`
       )
+
     }
 
     // ============================================================
@@ -65,38 +86,59 @@ let handler = async (m, { conn, text }) => {
       )
 
     // ============================================================
-    // 🎨 CONFIGURACIÓN DEL QUOTE
+    // 🎨 DATOS PARA LA API
     // ============================================================
 
     const obj = {
+
       type: "quote",
+
       format: "png",
+
       backgroundColor: "#000000",
+
       width: 512,
+
       height: 768,
+
       scale: 2,
 
       messages: [
+
         {
           entities: [],
 
           avatar: true,
 
           from: {
+
             id: 1,
+
             name: quoteName,
 
             photo: {
               url: pp
             }
+
           },
 
           text: quoteText,
 
           replyMessage: {}
+
         }
+
       ]
+
     }
+
+    // ============================================================
+    // ⏳ REACCIÓN
+    // ============================================================
+
+    try {
+      await m.react("📝")
+    } catch {}
 
     // ============================================================
     // 🌐 GENERAR IMAGEN
@@ -109,16 +151,25 @@ let handler = async (m, { conn, text }) => {
         headers: {
           "Content-Type": "application/json"
         },
+
         timeout: 30000
       }
     )
 
-    if (!response?.data?.result?.image) {
-      throw new Error("La API no devolvió ninguna imagen.")
+    // ============================================================
+    // 🔎 COMPROBAR RESPUESTA
+    // ============================================================
+
+    if (
+      !response?.data?.result?.image
+    ) {
+      throw new Error(
+        "La API no devolvió la imagen."
+      )
     }
 
     // ============================================================
-    // 🖼️ CONVERTIR BASE64 → BUFFER
+    // 🖼️ BASE64 → BUFFER
     // ============================================================
 
     const buffer = Buffer.from(
@@ -130,10 +181,15 @@ let handler = async (m, { conn, text }) => {
     // 🎟️ CONVERTIR A STICKER
     // ============================================================
 
-    const stiker = await sticker(buffer, false)
+    const stiker = await sticker(
+      buffer,
+      false
+    )
 
     if (!stiker) {
-      throw new Error("No se pudo convertir la imagen en sticker.")
+      throw new Error(
+        "No se pudo convertir la imagen a sticker."
+      )
     }
 
     // ============================================================
@@ -150,13 +206,35 @@ let handler = async (m, { conn, text }) => {
       }
     )
 
-  } catch (e) {
+    // ============================================================
+    // ✅ REACCIÓN FINAL
+    // ============================================================
 
-    console.error("❌ Error en QC:", e)
+    try {
+      await m.react("✅")
+    } catch {}
+
+  } catch (error) {
+
+    console.error(
+      "❌ Error en plugin QC:",
+      error
+    )
+
+    try {
+      await m.react("❌")
+    } catch {}
 
     return m.reply(
-      "❌ *No se pudo generar el sticker.*\n\n" +
-      "🔄 Intenta nuevamente en unos segundos."
+`╭━━━〔 ❌ *ERROR QC* 〕━━━╮
+┃
+┃ No se pudo generar
+┃ el sticker.
+┃
+┃ 🔄 Intenta nuevamente
+┃ en unos segundos.
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
     )
   }
 }
@@ -167,7 +245,7 @@ let handler = async (m, { conn, text }) => {
 
 handler.help = [
   "qc <texto>",
-  "qc respondiendo un mensaje"
+  "qc"
 ]
 
 handler.tags = [

@@ -153,7 +153,7 @@ ${lista.split('\n').map(line => `┃ ${line}`).join('\n')}
 ╰━━━━━━━━━━━━━━━━━━╯
 
 🎲 *Ranking generado al azar*
-🐾 *FelixCat-Bot*
+🐾 *Whatsapp-Bot*
 `.trim()
 
     // ============================================================

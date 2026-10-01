@@ -1,5 +1,5 @@
 // 📂 plugins/_qc.js
-// 💬 Generador de stickers de citas
+// 💬 Generador de stickers de citas — FelixCat Bot
 
 import { sticker } from "../lib/sticker.js"
 import axios from "axios"
@@ -15,48 +15,42 @@ let handler = async (m, { conn, text }) => {
     let quoteSender = ""
     let quoteName = ""
 
-    // Si responde a un mensaje
     if (m.quoted?.text) {
-
       quoteText = m.quoted.text.trim()
-      quoteSender = conn.decodeJid(m.quoted.sender)
+      quoteSender = m.quoted.sender
 
       quoteName =
         m.quoted.pushName ||
-        m.pushName ||
-        quoteSender.split("@")[0] ||
-        "Usuario"
+        m.quoted.name ||
+        `@${quoteSender.split("@")[0]}`
 
-    }
-
-    // Si escribe directamente
-    else if (text?.trim()) {
-
+    } else if (text?.trim()) {
       quoteText = text.trim()
-      quoteSender = conn.decodeJid(m.sender)
+      quoteSender = m.sender
 
       quoteName =
         m.pushName ||
-        quoteSender.split("@")[0] ||
-        "Usuario"
-
+        `@${m.sender.split("@")[0]}`
     }
 
-    // Sin texto
-    else {
+    // ============================================================
+    // ❌ SIN TEXTO
+    // ============================================================
 
-      return m.reply(
-`╭━━━〔 💬 *QUOTE STICKER* 〕━━━╮
-┃
-┃ ❌ *Falta el texto.*
-┃
-┃ 📝 Escribe:
-┃ .qc Hola mundo
-┃
-┃ 💬 O responde a un mensaje
-┃ con *.qc*
-┃
-╰━━━━━━━━━━━━━━━━━━━━╯`
+    if (!quoteText) {
+      return conn.sendMessage(
+        m.chat,
+        {
+          text:
+`💬 *STICKER DE CITA*
+
+📝 Escribí un texto o respondé a un mensaje.
+
+📌 *Ejemplos:*
+• .qc Hola mundo
+• Respondé un mensaje con *.qc*`
+        },
+        { quoted: m }
       )
     }
 
@@ -65,80 +59,63 @@ let handler = async (m, { conn, text }) => {
     // ============================================================
 
     if (quoteText.length > 310) {
+      return conn.sendMessage(
+        m.chat,
+        {
+          text:
+`⚠️ *Texto demasiado largo.*
 
-      return m.reply(
-`⚠️ *Texto demasiado largo*
-
-📏 Máximo permitido: *310 caracteres*
-📝 Caracteres actuales: *${quoteText.length}*`
+📏 Máximo permitido: *310 caracteres.*
+📝 Tu texto tiene: *${quoteText.length} caracteres.*`
+        },
+        { quoted: m }
       )
-
     }
 
     // ============================================================
     // 🖼️ FOTO DE PERFIL
     // ============================================================
 
+    const defaultPP =
+      "https://i.ibb.co/dyk5QdQ/1212121212121212.png"
+
     const pp = await conn
       .profilePictureUrl(quoteSender, "image")
-      .catch(() =>
-        "https://i.ibb.co/dyk5QdQ/1212121212121212.png"
-      )
+      .catch(() => defaultPP)
 
     // ============================================================
-    // 🎨 DATOS PARA LA API
+    // 🎨 CONFIGURACIÓN DE LA CITA
     // ============================================================
 
     const obj = {
-
       type: "quote",
-
       format: "png",
-
       backgroundColor: "#000000",
-
       width: 512,
-
       height: 768,
-
       scale: 2,
 
       messages: [
-
         {
           entities: [],
 
           avatar: true,
 
           from: {
-
             id: 1,
-
             name: quoteName,
 
             photo: {
               url: pp
             }
-
           },
 
           text: quoteText,
 
           replyMessage: {}
-
         }
-
       ]
-
     }
-
-    // ============================================================
-    // ⏳ REACCIÓN
-    // ============================================================
-
-    try {
-      await m.react("📝")
-    } catch {}
 
     // ============================================================
     // 🌐 GENERAR IMAGEN
@@ -151,25 +128,20 @@ let handler = async (m, { conn, text }) => {
         headers: {
           "Content-Type": "application/json"
         },
-
         timeout: 30000
       }
     )
 
-    // ============================================================
-    // 🔎 COMPROBAR RESPUESTA
-    // ============================================================
-
     if (
-      !response?.data?.result?.image
+      !response.data ||
+      !response.data.result ||
+      !response.data.result.image
     ) {
-      throw new Error(
-        "La API no devolvió la imagen."
-      )
+      throw new Error("La API no devolvió la imagen.")
     }
 
     // ============================================================
-    // 🖼️ BASE64 → BUFFER
+    // 🖼️ CONVERTIR BASE64
     // ============================================================
 
     const buffer = Buffer.from(
@@ -178,18 +150,16 @@ let handler = async (m, { conn, text }) => {
     )
 
     // ============================================================
-    // 🎟️ CONVERTIR A STICKER
+    // 🎟️ CREAR STICKER
     // ============================================================
 
-    const stiker = await sticker(
+    const stickerBuffer = await sticker(
       buffer,
       false
     )
 
-    if (!stiker) {
-      throw new Error(
-        "No se pudo convertir la imagen a sticker."
-      )
+    if (!stickerBuffer) {
+      throw new Error("No se pudo generar el sticker.")
     }
 
     // ============================================================
@@ -199,20 +169,10 @@ let handler = async (m, { conn, text }) => {
     await conn.sendMessage(
       m.chat,
       {
-        sticker: stiker
+        sticker: stickerBuffer
       },
-      {
-        quoted: m
-      }
+      { quoted: m }
     )
-
-    // ============================================================
-    // ✅ REACCIÓN FINAL
-    // ============================================================
-
-    try {
-      await m.react("✅")
-    } catch {}
 
   } catch (error) {
 
@@ -221,20 +181,17 @@ let handler = async (m, { conn, text }) => {
       error
     )
 
-    try {
-      await m.react("❌")
-    } catch {}
+    return conn.sendMessage(
+      m.chat,
+      {
+        text:
+`❌ *No se pudo generar el sticker.*
 
-    return m.reply(
-`╭━━━〔 ❌ *ERROR QC* 〕━━━╮
-┃
-┃ No se pudo generar
-┃ el sticker.
-┃
-┃ 🔄 Intenta nuevamente
-┃ en unos segundos.
-┃
-╰━━━━━━━━━━━━━━━━━━━━╯`
+🔧 Puede que el servicio de generación esté temporalmente caído.
+
+💡 Intentá nuevamente en unos segundos.`
+      },
+      { quoted: m }
     )
   }
 }
@@ -245,7 +202,7 @@ let handler = async (m, { conn, text }) => {
 
 handler.help = [
   "qc <texto>",
-  "qc"
+  "qc respondiendo un mensaje"
 ]
 
 handler.tags = [
@@ -256,6 +213,6 @@ handler.command = [
   "qc"
 ]
 
-handler.group = false
+handler.limit = false
 
 export default handler

@@ -1,4 +1,4 @@
-// 📂 plugins/traducir.js
+// 📂 plugins/_traductor.js
 // 🌐 Traductor Universal — FelixCat-Bot
 
 import fetch from 'node-fetch'
@@ -19,24 +19,11 @@ const idiomas = {
   ko: 'Coreano 🇰🇷',
   zh: 'Chino 🇨🇳',
   ar: 'Árabe 🇸🇦',
-  pl: 'Polaco 🇵🇱',
-  nl: 'Neerlandés 🇳🇱',
-  tr: 'Turco 🇹🇷',
-  uk: 'Ucraniano 🇺🇦',
-  hi: 'Hindi 🇮🇳',
-  sv: 'Sueco 🇸🇪',
-  no: 'Noruego 🇳🇴',
-  da: 'Danés 🇩🇰',
-  fi: 'Finés 🇫🇮',
-  cs: 'Checo 🇨🇿',
-  el: 'Griego 🇬🇷',
-  he: 'Hebreo 🇮🇱',
-  id: 'Indonesio 🇮🇩',
-  vi: 'Vietnamita 🇻🇳'
+  pl: 'Polaco 🇵🇱'
 }
 
 // ============================================================
-// 🧹 LIMPIAR TEXTO
+// 🧹 NORMALIZAR TEXTO
 // ============================================================
 
 function limpiarTexto(texto) {
@@ -46,154 +33,125 @@ function limpiarTexto(texto) {
 }
 
 // ============================================================
-// 📖 MENÚ DE AYUDA
-// ============================================================
-
-function menuIdiomas(usedPrefix, command) {
-  return `
-╭━━━〔 🌐 *TRADUCTOR* 〕━━━╮
-┃
-┃ 🔤 Traduce textos a
-┃ diferentes idiomas.
-┃
-┣━━━━━━━━━━━━━━━━━━
-┃ 📌 *USO*
-┃
-┃ ${usedPrefix + command} <idioma> <texto>
-┃
-┃ 💬 También puedes responder
-┃ un mensaje con:
-┃ ${usedPrefix + command} <idioma>
-┃
-┣━━━━━━━━━━━━━━━━━━
-┃ 📘 *EJEMPLOS*
-┃
-┃ • ${usedPrefix + command} en Hola
-┃ • ${usedPrefix + command} pt Buenos días
-┃ • ${usedPrefix + command} ja Hola amigo
-┃
-┣━━━━━━━━━━━━━━━━━━
-┃ 🌍 *IDIOMAS*
-┃
-${Object.entries(idiomas)
-  .map(([codigo, nombre]) => `┃ • *${codigo}* → ${nombre}`)
-  .join('\n')}
-┃
-╰━━━━━━━━━━━━━━━━━━╯
-`.trim()
-}
-
-// ============================================================
 // 🌐 HANDLER
 // ============================================================
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
-
-  // Reacción inicial
   try {
-    await conn.sendMessage(m.chat, {
-      react: {
-        text: '🌐',
-        key: m.key
-      }
-    })
-  } catch {}
 
-  // ============================================================
-  // 💬 TEXTO CITADO
-  // ============================================================
+    // 🌐 Reacción inicial
+    try {
+      await conn.sendMessage(m.chat, {
+        react: {
+          text: '🌐',
+          key: m.key
+        }
+      })
+    } catch {}
 
-  const citado = limpiarTexto(
-    m.quoted?.text ||
-    m.quoted?.caption ||
-    ''
-  )
+    // ========================================================
+    // 📌 TEXTO CITADO
+    // ========================================================
 
-  const entrada = limpiarTexto(text)
+    const citado = m.quoted?.text
+      ? limpiarTexto(m.quoted.text)
+      : ''
 
-  // ============================================================
-  // ❓ SIN TEXTO
-  // ============================================================
+    // ========================================================
+    // 📖 AYUDA
+    // ========================================================
 
-  if (!entrada && !citado) {
-    return m.reply(
-      menuIdiomas(usedPrefix, command)
-    )
-  }
+    if (!text && !citado) {
+      return m.reply(
+`╭━━━〔 🌐 *TRADUCTOR UNIVERSAL* 〕━━━╮
+┃
+┃ 📌 *Uso:*
+┃ • ${usedPrefix + command} <idioma> <texto>
+┃ • Responder un mensaje con:
+┃   ${usedPrefix + command} <idioma>
+┃
+┃ 📘 *Ejemplos:*
+┃ • ${usedPrefix + command} en Hola amigo
+┃ • ${usedPrefix + command} pt Buenos días
+┃ • ${usedPrefix + command} pl ¿Cómo estás?
+┃ • Responder mensaje → ${usedPrefix + command} en
+┃
+┃ 🌍 *Idiomas disponibles:*
+${Object.entries(idiomas)
+  .map(([codigo, nombre]) => `┃ • ${codigo} → ${nombre}`)
+  .join('\n')}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━╯`
+      )
+    }
 
-  // ============================================================
-  // 🔎 OBTENER IDIOMA Y TEXTO
-  // ============================================================
+    // ========================================================
+    // 🔎 PROCESAR COMANDO
+    // ========================================================
 
-  const partes = entrada
-    ? entrada.split(/\s+/)
-    : []
+    const entrada = limpiarTexto(text)
 
-  let lang = partes[0]?.toLowerCase() || 'es'
+    const partes = entrada
+      ? entrada.split(/\s+/)
+      : []
 
-  // Permitir códigos como EN, Es, PT...
-  lang = lang.replace(/[^a-z]/g, '')
+    let lang = partes[0]?.toLowerCase() || 'es'
 
-  let texto
+    let texto = partes
+      .slice(1)
+      .join(' ')
+      .trim()
 
-  // ============================================================
-  // 🌍 IDIOMA VÁLIDO
-  // ============================================================
+    // ========================================================
+    // 🧠 SI NO ES UN IDIOMA VÁLIDO
+    // ========================================================
 
-  if (idiomas[lang]) {
-    texto = partes.slice(1).join(' ')
+    if (!idiomas[lang]) {
+      lang = 'es'
 
-    // Si no hay texto escrito, usar mensaje citado
+      // Si escribió texto directamente, traducirlo al español
+      texto = entrada || citado
+    }
+
+    // Si no hay texto en el comando, usar el citado
     if (!texto) {
       texto = citado
     }
-  }
 
-  // ============================================================
-  // ❌ IDIOMA NO VÁLIDO
-  // ============================================================
+    texto = limpiarTexto(texto)
 
-  else {
+    // ========================================================
+    // ❌ SIN TEXTO
+    // ========================================================
 
-    // Si escribió algo pero el primer término
-    // no es un idioma, lo tratamos como texto
-    texto = entrada || citado
+    if (!texto) {
+      return m.reply(
+`❌ *No hay texto para traducir.*
 
-    lang = 'es'
-  }
+📌 Ejemplo:
+${usedPrefix + command} en Hola, ¿cómo estás?
 
-  texto = limpiarTexto(texto)
+O responde un mensaje con:
+${usedPrefix + command} en`
+      )
+    }
 
-  // ============================================================
-  // ⚠️ SIN TEXTO
-  // ============================================================
+    // ========================================================
+    // ⏳ REACCIÓN
+    // ========================================================
 
-  if (!texto) {
-    return m.reply(
-      `✏️ *No hay texto para traducir.*\n\n` +
-      `Ejemplo:\n` +
-      `*${usedPrefix + command} en Hola mundo*`
-    )
-  }
+    try {
+      await conn.sendMessage(m.chat, {
+        react: {
+          text: '⏳',
+          key: m.key
+        }
+      })
+    } catch {}
 
-  // ============================================================
-  // ⏳ REACCIÓN DE PROCESANDO
-  // ============================================================
-
-  try {
-    await conn.sendMessage(m.chat, {
-      react: {
-        text: '⏳',
-        key: m.key
-      }
-    })
-  } catch {}
-
-  // ============================================================
-  // 🌐 TRADUCCIÓN
-  // ============================================================
-
-  try {
+    // ========================================================
+    // 🌐 API GOOGLE TRANSLATE
+    // ========================================================
 
     const apiUrl =
       `https://translate.googleapis.com/translate_a/single` +
@@ -201,15 +159,9 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       `&sl=auto` +
       `&tl=${encodeURIComponent(lang)}` +
       `&dt=t` +
-      `&dt=rm` +
       `&q=${encodeURIComponent(texto)}`
 
-    const res = await fetch(apiUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0'
-      },
-      timeout: 15000
-    })
+    const res = await fetch(apiUrl)
 
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
@@ -217,13 +169,13 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 
     const data = await res.json()
 
-    if (!Array.isArray(data) || !Array.isArray(data[0])) {
-      throw new Error('Respuesta inválida de la API')
+    if (!data || !data[0]) {
+      throw new Error('La API no devolvió una traducción válida.')
     }
 
-    // ==========================================================
-    // 📝 CONSTRUIR TRADUCCIÓN
-    // ==========================================================
+    // ========================================================
+    // 📝 OBTENER TRADUCCIÓN
+    // ========================================================
 
     const traduccion = data[0]
       .map(parte => parte?.[0] || '')
@@ -231,48 +183,37 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       .trim()
 
     if (!traduccion) {
-      throw new Error('No se obtuvo traducción')
+      throw new Error('No se pudo obtener la traducción.')
     }
 
     // Idioma detectado
     const idiomaDetectado =
       typeof data[2] === 'string'
-        ? data[2].toLowerCase()
-        : 'auto'
+        ? data[2].toUpperCase()
+        : 'AUTO'
 
-    const nombreDetectado =
-      idiomas[idiomaDetectado] ||
-      idiomaDetectado.toUpperCase()
-
-    // ==========================================================
+    // ========================================================
     // 📤 RESULTADO
-    // ==========================================================
+    // ========================================================
 
-    const resultado = `
-╭━━━〔 🌐 *TRADUCCIÓN* 〕━━━╮
+    const resultado =
+`╭━━━〔 🌐 *TRADUCCIÓN* 〕━━━╮
 ┃
-┃ 🔤 *Destino:*
-┃ ${idiomas[lang]}
+┃ 🔤 *Destino:* ${idiomas[lang] || lang.toUpperCase()}
+┃ 🗣️ *Detectado:* ${idiomaDetectado}
 ┃
-┃ 🗣️ *Detectado:*
-┃ ${nombreDetectado}
-┃
-┣━━━━━━━━━━━━━━━━━━
-┃
-┃ 📥 *Original*
-┃
-┃ ${textooSeguro(texto)}
-┃
-┣━━━━━━━━━━━━━━━━━━
-┃
-┃ 📤 *Traducción*
-┃
-┃ ${textoSeguro(traduccion)}
-┃
-╰━━━━━━━━━━━━━━━━━━╯
-`.trim()
+╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-    // Reacción final
+📥 *Original:*
+${texto}
+
+📤 *Traducción:*
+${traduccion}`
+
+    // ========================================================
+    // ✅ REACCIÓN FINAL
+    // ========================================================
+
     try {
       await conn.sendMessage(m.chat, {
         react: {
@@ -286,35 +227,23 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 
   } catch (error) {
 
-    console.error(
-      '❌ Error en traductor:',
-      error
-    )
+    console.error('❌ Error en traductor:', error)
 
     try {
       await conn.sendMessage(m.chat, {
         react: {
-          text: '❌',
+          text: '⚠️',
           key: m.key
         }
       })
     } catch {}
 
     return m.reply(
-      `❌ *No se pudo realizar la traducción.*\n\n` +
-      `🔄 Intenta nuevamente en unos segundos.`
+`⚠️ *No se pudo realizar la traducción.*
+
+🔄 Intentá nuevamente en unos segundos.`
     )
   }
-}
-
-// ============================================================
-// 🛡️ SEGURIDAD VISUAL DEL TEXTO
-// ============================================================
-
-function textoSeguro(texto) {
-  return String(texto || '')
-    .replace(/\n/g, '\n┃ ')
-    .trim()
 }
 
 // ============================================================
@@ -327,15 +256,9 @@ handler.help = [
   'trad <idioma> <texto>'
 ]
 
-handler.tags = [
-  'utilidades'
-]
+handler.tags = ['utilidades']
 
-handler.command = [
-  'traducir',
-  'translate',
-  'trad'
-]
+handler.command = /^(traducir|translate|trad)$/i
 
 handler.group = false
 handler.limit = false

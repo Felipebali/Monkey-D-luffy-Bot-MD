@@ -42,7 +42,7 @@ let handler = async (m, { conn }) => {
 
 ━━━━━━━━━━━━━━━━━━
 
-🤖 *FelixCat-Bot*
+🤖 *Whatsapp-Bot*
 🟢 *¡Estoy funcionando!*
 
 📡 *Ping:* ${ping} ms

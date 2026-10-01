@@ -333,7 +333,7 @@ let handler = async (m, { conn }) => {
 
   msg +=
 `╭━━━〔 🔄 ACTUALIZADOR 〕━━━⬣
-┃ 🤖 *FelixCat-Bot*
+┃ 🤖 *Whatsapp-Bot*
 ┃ 📡 *Repositorio conectado*
 ╰━━━━━━━━━━━━━━━━━━━━⬣
 

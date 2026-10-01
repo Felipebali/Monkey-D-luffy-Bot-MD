@@ -121,14 +121,24 @@ function obtenerPais() {
 }
 
 // ============================================================
+// 👤 OBTENER JID DEL USUARIO
+// ============================================================
+
+function getUserJid(m, conn) {
+  try {
+    return conn.decodeJid
+      ? conn.decodeJid(m.sender)
+      : m.sender
+  } catch {
+    return m.sender
+  }
+}
+
+// ============================================================
 // 🌍 HANDLER PRINCIPAL
 // ============================================================
 
 let handler = async (m, { conn }) => {
-
-  // ----------------------------------------------------------
-  // 🎮 COMPROBAR JUEGOS
-  // ----------------------------------------------------------
 
   const chatSettings =
     global.db?.data?.chats?.[m.chat] || {}
@@ -145,13 +155,8 @@ let handler = async (m, { conn }) => {
     )
   }
 
-  // ----------------------------------------------------------
-  // 🗃️ BASE DE PARTIDAS
-  // ----------------------------------------------------------
-
   global.capitalGame = global.capitalGame || {}
 
-  // Evitar dos partidas simultáneas
   if (global.capitalGame[m.chat]) {
     return conn.sendMessage(
       m.chat,
@@ -163,10 +168,6 @@ let handler = async (m, { conn }) => {
       { quoted: m }
     )
   }
-
-  // ----------------------------------------------------------
-  // 🎲 GENERAR PARTIDA
-  // ----------------------------------------------------------
 
   const pais = obtenerPais()
   const capital = capitales[pais]
@@ -193,10 +194,6 @@ let handler = async (m, { conn }) => {
       },
       { quoted: m }
     )
-
-    // --------------------------------------------------------
-    // 💾 GUARDAR PARTIDA
-    // --------------------------------------------------------
 
     const messageId = msg?.key?.id
 
@@ -271,9 +268,9 @@ handler.before = async (m, { conn }) => {
   if (!game) return
   if (game.answered) return
 
-  // ----------------------------------------------------------
-  // 📌 SOLO RESPONDIENDO AL MENSAJE DEL JUEGO
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 📌 SOLO RESPUESTAS CITANDO LA PREGUNTA
+  // ==========================================================
 
   const quotedId =
     m.quoted?.key?.id ||
@@ -283,9 +280,22 @@ handler.before = async (m, { conn }) => {
   if (!quotedId) return
   if (quotedId !== game.messageId) return
 
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 👤 DATOS DEL USUARIO
+  // ==========================================================
+
+  const userJid = getUserJid(m, conn)
+
+  const nombre =
+    m.pushName ||
+    `Usuario ${userJid?.split('@')[0] || ''}`
+
+  const mention =
+    `@${userJid.split('@')[0]}`
+
+  // ==========================================================
   // 🔎 COMPARAR RESPUESTA
-  // ----------------------------------------------------------
+  // ==========================================================
 
   const respuestaUsuario =
     normalizeText(m.text)
@@ -293,59 +303,78 @@ handler.before = async (m, { conn }) => {
   const respuestaCorrecta =
     normalizeText(game.answer)
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // ❌ RESPUESTA INCORRECTA
-  // ----------------------------------------------------------
+  // ==========================================================
 
   if (respuestaUsuario !== respuestaCorrecta) {
 
     const mensajes = [
-      '❌ *Incorrecto.* Sigue intentando.',
-      '🤔 *No es esa.* Probá nuevamente.',
-      '❌ *Respuesta incorrecta.*',
-      '😅 *Casi...* pero esa no es.'
+      `❌ @${userJid.split('@')[0]} *¡Incorrecto!* 😅\n\n💬 Tu respuesta: *${m.text}*\n🔄 Sigue intentando.`,
+      
+      `🤔 @${userJid.split('@')[0]} *no es esa.*\n\n💬 Respondiste: *${m.text}*\n🎯 ¡Probá nuevamente!`,
+      
+      `❌ @${userJid.split('@')[0]} *respuesta incorrecta.*\n\n🧠 Esa no era la capital.\n🔥 ¡Todavía podés intentarlo!`,
+      
+      `😅 @${userJid.split('@')[0]} *casi... pero no.*\n\n💬 Respuesta recibida: *${m.text}*\n🌍 ¡Seguí intentando!`
     ]
 
     return conn.sendMessage(
       m.chat,
       {
-        text:
-          mensajes[
-            Math.floor(Math.random() * mensajes.length)
-          ]
+        text: mensajes[
+          Math.floor(Math.random() * mensajes.length)
+        ],
+        mentions: [userJid]
       },
       { quoted: m }
     )
   }
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // 🏆 RESPUESTA CORRECTA
-  // ----------------------------------------------------------
+  // ==========================================================
 
   game.answered = true
 
   clearTimeout(game.timeout)
 
-  const nombre =
-    m.pushName ||
-    `@${m.sender.split('@')[0]}`
-
   const mensajesCorrectos = [
-    `🎉 *¡CORRECTO, ${nombre}!*\n\n🌎 ${game.country} → 🏙️ *${game.answer}*`,
-    `🏆 *¡Muy bien, ${nombre}!*\n\nLa capital de *${game.country}* es *${game.answer}*.`,
-    `🔥 *¡Acertaste, ${nombre}!*\n\n🏙️ La respuesta era *${game.answer}*.`
+    `🎉 *¡CORRECTO!* 🎉
+
+👤 @${userJid.split('@')[0]}
+🌎 País: *${game.country}*
+🏙️ Capital: *${game.answer}*
+
+🏆 ¡Excelente respuesta!`,
+
+    `🏆 *¡MUY BIEN!* 🏆
+
+🎯 @${userJid.split('@')[0]} acertó correctamente.
+
+🌎 *${game.country}*
+🏙️ *${game.answer}*
+
+🔥 ¡Punto para vos!`,
+
+    `🔥 *¡ACERTASTE!* 🔥
+
+👤 @${userJid.split('@')[0]}
+💡 Respuesta: *${game.answer}*
+
+🌍 *${game.country}* → 🏙️ *${game.answer}*`
   ]
 
   await conn.sendMessage(
     m.chat,
     {
-      text:
-        mensajesCorrectos[
-          Math.floor(
-            Math.random() *
-            mensajesCorrectos.length
-          )
-        ]
+      text: mensajesCorrectos[
+        Math.floor(
+          Math.random() *
+          mensajesCorrectos.length
+        )
+      ],
+      mentions: [userJid]
     },
     { quoted: m }
   )

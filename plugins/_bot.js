@@ -37,7 +37,7 @@ let handler = async (m, { conn }) => {
 
   // 💎 MENSAJE PRO
   let texto = `
-╭━━━〔 👑 FELIXCAT BOT 〕━━━⬣
+╭━━━〔 👑 WHATSAPP-BOT 〕━━━⬣
 ┃ 🚀 Estado: *ONLINE*
 ┃ ⚡ Host: *BoxMine*
 ┃

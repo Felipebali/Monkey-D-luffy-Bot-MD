@@ -2,7 +2,13 @@ const handler = async (m, { conn, isAdmin }) => {
   const emoji = '🔪';
   const sender = m.sender.replace(/\D/g, '');
 
-  const ownersBot = ['59898719147', '59896026646', '59892363485']; // dueños del bot
+  // 👑 Obtener owners desde global.owner
+  const ownersBot = (global.owner || [])
+    .map(v => {
+      if (Array.isArray(v)) v = v[0];
+      return String(v || '').replace(/\D/g, '');
+    })
+    .filter(Boolean);
 
   // Obtener info del grupo
   let groupInfo;
@@ -12,12 +18,24 @@ const handler = async (m, { conn, isAdmin }) => {
     return conn.reply(m.chat, '❌ No se pudo obtener información del grupo.', m);
   }
 
-  const ownerGroup = groupInfo.owner ? groupInfo.owner.replace(/\D/g, '') : null;
+  const ownerGroup = groupInfo.owner
+    ? groupInfo.owner.replace(/\D/g, '')
+    : null;
+
   const botJid = conn.user.jid.replace(/\D/g, '');
-  const protectedList = [...ownersBot, botJid, ownerGroup].filter(Boolean);
+
+  const protectedList = [
+    ...ownersBot,
+    botJid,
+    ownerGroup
+  ].filter(Boolean);
 
   // ---------- PERMISO ----------
-  if (!isAdmin && !ownersBot.includes(sender) && sender !== ownerGroup) {
+  if (
+    !isAdmin &&
+    !ownersBot.includes(sender) &&
+    sender !== ownerGroup
+  ) {
     return conn.reply(
       m.chat,
       '❌ Solo admins, el dueño del grupo o los dueños del bot pueden usar este comando.',
@@ -26,14 +44,29 @@ const handler = async (m, { conn, isAdmin }) => {
   }
 
   // ---------- DETECTAR USUARIO ----------
-  let user = m.mentionedJid?.[0] || m.quoted?.sender;
-  if (!user) return conn.reply(m.chat, '📌 Debes mencionar o citar un mensaje para expulsar.', m);
+  let user =
+    m.mentionedJid?.[0] ||
+    m.quoted?.sender;
 
-  const normalize = jid => String(jid || '').replace(/\D/g, '');
+  if (!user) {
+    return conn.reply(
+      m.chat,
+      '📌 Debes mencionar o citar un mensaje para expulsar.',
+      m
+    );
+  }
+
+  const normalize = jid =>
+    String(jid || '').replace(/\D/g, '');
+
   const userNorm = normalize(user);
 
   // ---------- INTENTO DE EXPULSAR AL DUEÑO DEL GRUPO ----------
-  if (userNorm === ownerGroup && sender !== ownerGroup && !ownersBot.includes(sender)) {
+  if (
+    userNorm === ownerGroup &&
+    sender !== ownerGroup &&
+    !ownersBot.includes(sender)
+  ) {
     return conn.sendMessage(m.chat, {
       text: `😏 Tranquilo campeón... @${user.split('@')[0]} es el dueño del grupo.\nNi los dioses del código pueden echarlo.`,
       mentions: [user]
@@ -42,20 +75,31 @@ const handler = async (m, { conn, isAdmin }) => {
 
   // ---------- PROTEGIDOS ----------
   if (protectedList.includes(userNorm)) {
-    return conn.reply(m.chat, '😎 Es imposible eliminar a alguien protegido.', m);
-    }
+    return conn.reply(
+      m.chat,
+      '😎 Es imposible eliminar a alguien protegido.',
+      m
+    );
+  }
 
   // ---------- EXPULSAR ----------
   try {
-    await conn.groupParticipantsUpdate(m.chat, [user], 'remove');
+    await conn.groupParticipantsUpdate(
+      m.chat,
+      [user],
+      'remove'
+    );
 
     // Reacción (se mantiene)
-    try { await m.react(emoji); } catch {}
+    try {
+      await m.react(emoji);
+    } catch {}
 
     // ❌ No se envía mensaje de aviso aquí
 
   } catch (err) {
     console.log('Error expulsando:', err);
+
     return conn.reply(
       m.chat,
       '❌ No se pudo expulsar al usuario. Asegúrate de que el bot sea administrador y tenga permisos.',

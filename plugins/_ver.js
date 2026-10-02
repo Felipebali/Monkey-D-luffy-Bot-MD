@@ -2,6 +2,8 @@
 // 📥 "m" SIN PREFIJO
 // 👑 Solo owners
 // 📩 Recupera multimedia y lo envía al privado
+// 🚫 Sin reacciones
+// 🚫 Sin avisos si falla
 
 import fs from 'fs'
 import path from 'path'
@@ -29,10 +31,9 @@ let handler = async (m, { conn }) => {
   // 🔤 SOLO "m"
   // ==========================================================
 
-  const text =
-    String(m.text || '')
-      .trim()
-      .toLowerCase()
+  const text = String(m.text || '')
+    .trim()
+    .toLowerCase()
 
   if (text !== 'm') return
 
@@ -40,15 +41,12 @@ let handler = async (m, { conn }) => {
   // 👑 VERIFICAR OWNER
   // ==========================================================
 
-  const senderNumber =
-    String(m.sender || '')
-      .replace(/[^0-9]/g, '')
+  const senderNumber = String(m.sender || '')
+    .replace(/[^0-9]/g, '')
 
   const owners = getOwners()
 
-  if (!owners.includes(senderNumber)) {
-    return
-  }
+  if (!owners.includes(senderNumber)) return
 
   try {
 
@@ -58,12 +56,7 @@ let handler = async (m, { conn }) => {
 
     const q = m.quoted
 
-    if (!q) {
-
-      return m.reply(
-        '⚠️ Respondé a una imagen, video o sticker.'
-      )
-    }
+    if (!q) return
 
     // ========================================================
     // 📦 DETECTAR MULTIMEDIA
@@ -74,35 +67,19 @@ let handler = async (m, { conn }) => {
       q.mediaType ||
       ''
 
-    if (
-      !/webp|image|video/i.test(mime)
-    ) {
-
-      return m.reply(
-        '⚠️ El mensaje citado no contiene multimedia.'
-      )
-    }
+    if (!/webp|image|video/i.test(mime)) return
 
     // ========================================================
     // 📥 DESCARGAR
     // ========================================================
 
-    await m.react('📥')
+    let buffer = await q.download()
 
-    let buffer =
-      await q.download()
-
-    if (!buffer) {
-
-      await m.react('✖️')
-
-      return m.reply(
-        '⚠️ No se pudo descargar el archivo.'
-      )
-    }
+    if (!buffer) return
 
     let type = null
     let filenameSent = null
+    let sendMime = mime
 
     // ========================================================
     // 🖼️ STICKER WEBP → PNG
@@ -110,37 +87,20 @@ let handler = async (m, { conn }) => {
 
     if (/webp/i.test(mime)) {
 
-      const result =
-        await webp2png(buffer)
+      const result = await webp2png(buffer)
 
-      if (!result?.url) {
+      if (!result?.url) return
 
-        await m.react('✖️')
+      const response = await fetch(result.url)
 
-        return m.reply(
-          '⚠️ No se pudo convertir el sticker.'
-        )
-      }
+      if (!response.ok) return
 
-      const response =
-        await fetch(result.url)
-
-      if (!response.ok) {
-
-        await m.react('✖️')
-
-        return m.reply(
-          '⚠️ No se pudo obtener la imagen convertida.'
-        )
-      }
-
-      buffer =
-        Buffer.from(
-          await response.arrayBuffer()
-        )
+      buffer = Buffer.from(
+        await response.arrayBuffer()
+      )
 
       type = 'image'
-
+      sendMime = 'image/png'
       filenameSent = 'sticker.png'
     }
 
@@ -148,9 +108,7 @@ let handler = async (m, { conn }) => {
     // 🖼️ IMAGEN
     // ========================================================
 
-    else if (
-      mime.startsWith('image/')
-    ) {
+    else if (mime.startsWith('image/')) {
 
       type = 'image'
 
@@ -159,15 +117,15 @@ let handler = async (m, { conn }) => {
 
       filenameSent =
         `recuperado.${ext}`
+
+      sendMime = mime
     }
 
     // ========================================================
     // 🎥 VIDEO
     // ========================================================
 
-    else if (
-      mime.startsWith('video/')
-    ) {
+    else if (mime.startsWith('video/')) {
 
       type = 'video'
 
@@ -176,6 +134,8 @@ let handler = async (m, { conn }) => {
 
       filenameSent =
         `recuperado.${ext}`
+
+      sendMime = mime
     }
 
     // ========================================================
@@ -183,48 +143,35 @@ let handler = async (m, { conn }) => {
     // ========================================================
 
     else {
-
-      await m.react('✖️')
-
-      return m.reply(
-        '⚠️ Tipo de archivo no compatible.'
-      )
+      return
     }
 
     // ========================================================
     // 📁 CREAR CARPETA MEDIA
     // ========================================================
 
-    const mediaFolder =
-      './media'
+    const mediaFolder = './media'
 
     if (!fs.existsSync(mediaFolder)) {
-
-      fs.mkdirSync(
-        mediaFolder,
-        {
-          recursive: true
-        }
-      )
+      fs.mkdirSync(mediaFolder, {
+        recursive: true
+      })
     }
 
     // ========================================================
-    // 🧹 SINCRONIZAR MEDIA LIST
+    // 🧹 PREPARAR BASE DE DATOS
     // ========================================================
 
     if (!global.db.data) {
       global.db.data = {}
     }
 
-    if (!Array.isArray(
-      global.db.data.mediaList
-    )) {
-
+    if (!Array.isArray(global.db.data.mediaList)) {
       global.db.data.mediaList = []
     }
 
     // ========================================================
-    // 📄 GUARDAR ARCHIVO
+    // 📄 GENERAR NOMBRE ÚNICO
     // ========================================================
 
     const filename =
@@ -244,6 +191,10 @@ let handler = async (m, { conn }) => {
         finalName
       )
 
+    // ========================================================
+    // 💾 GUARDAR ARCHIVO
+    // ========================================================
+
     fs.writeFileSync(
       filepath,
       buffer
@@ -258,14 +209,9 @@ let handler = async (m, { conn }) => {
     if (m.isGroup) {
 
       try {
-
         chatInfo =
-          await conn.groupMetadata(
-            m.chat
-          )
-
+          await conn.groupMetadata(m.chat)
       } catch {
-
         chatInfo = null
       }
     }
@@ -308,7 +254,7 @@ let handler = async (m, { conn }) => {
     })
 
     // ========================================================
-    // 📩 ENVIAR AL PRIVADO DEL OWNER
+    // 📩 ENVIAR AL PRIVADO
     // ========================================================
 
     if (type === 'image') {
@@ -317,54 +263,40 @@ let handler = async (m, { conn }) => {
         m.sender,
         {
           image: buffer,
-          mimetype: 'image/png',
-          fileName: filenameSent,
-          caption:
-            '🌟 *Archivo recuperado correctamente.*'
-        },
-        {
-          quoted: null
+          mimetype: sendMime || 'image/png',
+          fileName: filenameSent
         }
       )
 
-    }
-
-    else if (type === 'video') {
+    } else if (type === 'video') {
 
       await conn.sendMessage(
         m.sender,
         {
           video: buffer,
-          mimetype:
-            mime || 'video/mp4',
-          fileName: filenameSent,
-          caption:
-            '🌟 *Video recuperado correctamente.*'
-        },
-        {
-          quoted: null
+          mimetype: sendMime || 'video/mp4',
+          fileName: filenameSent
         }
       )
     }
 
     // ========================================================
-    // ✅ FINALIZAR
+    // ✅ TERMINAR SILENCIOSAMENTE
     // ========================================================
 
-    await m.react('✅')
+    return
 
   } catch (e) {
+
+    // 🚫 Si ocurre cualquier error:
+    // no responde, no reacciona y no avisa al usuario.
 
     console.error(
       '❌ ERROR EN M:',
       e
     )
 
-    await m.react('✖️')
-
-    return m.reply(
-      '⚠️ Error al recuperar el archivo.'
-    )
+    return
   }
 }
 
@@ -384,13 +316,8 @@ handler.command = new RegExp()
 // 🏷️ CONFIGURACIÓN
 // ============================================================
 
-handler.help = [
-  'm'
-]
-
-handler.tags = [
-  'owner'
-]
+handler.help = ['m']
+handler.tags = ['owner']
 
 // ============================================================
 // 📤 EXPORTAR

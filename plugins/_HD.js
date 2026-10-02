@@ -1,199 +1,265 @@
-// 📂 plugins/hd.js
-// 🖼️ Mejorador de imágenes — FelixCat_Bot
-// 🚀 HD / Remini / Enhance
+// 📂 plugins/_HD.js
+// 🖼️ FelixCat_Bot — Mejorador HD
+// 🚀 Real-ESRGAN local
 
 import fetch from 'node-fetch'
 import FormData from 'form-data'
 
 // ============================================================
-// 🚀 HANDLER PRINCIPAL
+// ⚙️ CONFIGURACIÓN
+// ============================================================
+
+const ESRGAN_URL =
+  process.env.ESRGAN_URL ||
+  'http://127.0.0.1:5000/upscale'
+
+// ============================================================
+// 🖼️ OBTENER MIME
+// ============================================================
+
+function getMime(media) {
+  return (
+    media?.mimetype ||
+    media?.msg?.mimetype ||
+    media?.mediaType ||
+    ''
+  )
+}
+
+// ============================================================
+// 📦 OBTENER IMAGEN
+// ============================================================
+
+async function getImage(m) {
+  const quoted = m.quoted || m
+  const mime = getMime(quoted)
+
+  if (!/^image\/(jpeg|jpg|png|webp)$/i.test(mime)) {
+    return null
+  }
+
+  const buffer = await quoted.download()
+
+  if (!buffer || !Buffer.isBuffer(buffer)) {
+    return null
+  }
+
+  return {
+    buffer,
+    mime
+  }
+}
+
+// ============================================================
+// 🚀 HANDLER
 // ============================================================
 
 let handler = async (m, { conn }) => {
   try {
 
-    // ==========================================================
-    // 🖼️ OBTENER IMAGEN
-    // ==========================================================
+    // ========================================================
+    // 🖼️ BUSCAR IMAGEN
+    // ========================================================
 
-    const quoted = m.quoted || m
+    const image = await getImage(m)
 
-    const mime =
-      quoted.mimetype ||
-      quoted.msg?.mimetype ||
-      quoted.mediaType ||
-      ''
-
-    if (!/^image\/(jpe?g|png|webp)$/i.test(mime)) {
+    if (!image) {
       return m.reply(
-`🖼️ *MEJORAR IMAGEN*
+`🖼️ *MEJORADOR HD*
 
 ❌ No encontré una imagen válida.
 
 📌 Respondé a una imagen con:
+
 > .hd
 
 También podés usar:
+
 > .remini
 > .enhance`
       )
     }
 
-    // ==========================================================
-    // 📥 DESCARGAR IMAGEN
-    // ==========================================================
-
-    const media = await quoted.download()
-
-    if (!media || !Buffer.isBuffer(media)) {
-      return m.reply('❌ No se pudo descargar la imagen.')
-    }
-
-    // ==========================================================
-    // ⏳ MENSAJE DE PROCESAMIENTO
-    // ==========================================================
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        text:
-`╭━━━〔 ✨ *MEJORANDO IMAGEN* 〕━━━╮
-┃
-┃ 🖼️ Procesando imagen...
-┃ 🔍 Mejorando resolución
-┃ ✨ Optimizando detalles
-┃ 🚀 Un momento...
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━╯`
-      },
-      { quoted: m }
-    )
-
-    // ==========================================================
-    // 🚀 PIXELCUT UPSCALE
-    // ==========================================================
-
-    const filename =
-      `felixcat_${Date.now()}.jpg`
+    // ========================================================
+    // 📤 CREAR FORMULARIO
+    // ========================================================
 
     const form = new FormData()
 
     form.append(
       'image',
-      media,
+      image.buffer,
       {
-        filename,
-        contentType: mime
+        filename: `image_${Date.now()}.jpg`,
+        contentType: image.mime
       }
     )
 
-    form.append('scale', '2')
+    // ========================================================
+    // 🚀 ENVIAR A REAL-ESRGAN
+    // ========================================================
 
     const response = await fetch(
-      'https://api2.pixelcut.app/image/upscale/v1',
+      ESRGAN_URL,
       {
         method: 'POST',
         headers: {
-          ...form.getHeaders(),
-          'accept': 'application/json',
-          'x-client-version': 'web',
-          'x-locale': 'en',
-          'user-agent':
-            'Mozilla/5.0'
+          ...form.getHeaders()
         },
         body: form
       }
     )
 
-    // ==========================================================
-    // 📡 COMPROBAR RESPUESTA
-    // ==========================================================
+    // ========================================================
+    // ❌ ERROR
+    // ========================================================
 
     if (!response.ok) {
+      const errorText =
+        await response.text().catch(() => '')
+
+      console.error(
+        'Real-ESRGAN:',
+        response.status,
+        errorText
+      )
+
       throw new Error(
-        `La API respondió con HTTP ${response.status}`
+        `Servidor Real-ESRGAN respondió ${response.status}`
       )
     }
+
+    // ========================================================
+    // 📥 RESULTADO
+    // ========================================================
 
     const contentType =
       response.headers.get('content-type') || ''
 
-    if (!contentType.includes('application/json')) {
-      throw new Error(
-        'La API no devolvió una respuesta JSON válida.'
-      )
+    let resultBuffer
+
+    // ========================================================
+    // 🖼️ IMAGEN DIRECTA
+    // ========================================================
+
+    if (contentType.startsWith('image/')) {
+
+      resultBuffer =
+        Buffer.from(
+          await response.arrayBuffer()
+        )
+
     }
 
-    const data = await response.json()
+    // ========================================================
+    // 📦 JSON
+    // ========================================================
 
-    // ==========================================================
-    // 🔗 OBTENER RESULTADO
-    // ==========================================================
+    else {
 
-    const resultUrl =
-      data?.result_url ||
-      data?.url ||
-      data?.result?.url
+      const data =
+        await response.json()
+
+      const result =
+        data?.url ||
+        data?.result_url ||
+        data?.image ||
+        data?.output
+
+      if (!result) {
+        throw new Error(
+          'Real-ESRGAN no devolvió una imagen.'
+        )
+      }
+
+      // ------------------------------------------------------
+      // BASE64
+      // ------------------------------------------------------
+
+      if (
+        typeof result === 'string' &&
+        result.startsWith('data:image')
+      ) {
+
+        const base64 =
+          result.split(',')[1]
+
+        resultBuffer =
+          Buffer.from(
+            base64,
+            'base64'
+          )
+
+      }
+
+      // ------------------------------------------------------
+      // URL
+      // ------------------------------------------------------
+
+      else if (
+        typeof result === 'string' &&
+        /^https?:\/\//i.test(result)
+      ) {
+
+        const resultResponse =
+          await fetch(result)
+
+        if (!resultResponse.ok) {
+          throw new Error(
+            'No se pudo descargar la imagen mejorada.'
+          )
+        }
+
+        resultBuffer =
+          Buffer.from(
+            await resultResponse.arrayBuffer()
+          )
+
+      }
+
+      else {
+        throw new Error(
+          'Formato de respuesta desconocido.'
+        )
+      }
+    }
+
+    // ========================================================
+    // 🔎 VALIDAR
+    // ========================================================
 
     if (
-      !resultUrl ||
-      typeof resultUrl !== 'string' ||
-      !/^https?:\/\//i.test(resultUrl)
+      !resultBuffer ||
+      !resultBuffer.length
     ) {
-      console.error(
-        'Respuesta de Pixelcut:',
-        data
-      )
-
-      throw new Error(
-        'La API no devolvió la imagen procesada.'
-      )
-    }
-
-    // ==========================================================
-    // 📥 DESCARGAR RESULTADO
-    // ==========================================================
-
-    const resultResponse =
-      await fetch(resultUrl)
-
-    if (!resultResponse.ok) {
-      throw new Error(
-        `No se pudo descargar el resultado (${resultResponse.status}).`
-      )
-    }
-
-    const resultBuffer =
-      Buffer.from(
-        await resultResponse.arrayBuffer()
-      )
-
-    if (!resultBuffer.length) {
       throw new Error(
         'La imagen procesada está vacía.'
       )
     }
 
-    // ==========================================================
-    // 📤 ENVIAR IMAGEN HD
-    // ==========================================================
+    // ========================================================
+    // 📤 ENVIAR RESULTADO
+    // ========================================================
 
     await conn.sendMessage(
       m.chat,
       {
         image: resultBuffer,
         mimetype: 'image/jpeg',
+        fileName:
+          `FelixCat_HD_${Date.now()}.jpg`,
         caption:
-`╭━━━〔 🚀 *IMAGEN MEJORADA* 〕━━━╮
+`╭━━━〔 ✨ *FELIXCAT HD* 〕━━━╮
 ┃
-┃ ✨ Calidad mejorada
+┃ 🖼️ Imagen mejorada
 ┃ 🔍 Resolución optimizada
-┃ 🖼️ Procesamiento HD
+┃ 🚀 Real-ESRGAN
 ┃
-╰━━━━━━━━━━━━━━━━━━━━━━╯
-> FelixCat_Bot ⚡`
+╰━━━━━━━━━━━━━━━━━━━━━━╯`
       },
-      { quoted: m }
+      {
+        quoted: m
+      }
     )
 
   } catch (error) {
@@ -206,9 +272,10 @@ También podés usar:
     await m.reply(
 `❌ *NO SE PUDO MEJORAR LA IMAGEN*
 
-⚠️ La API de mejora no respondió correctamente.
+⚠️ El servidor Real-ESRGAN no está disponible.
 
-🔄 Probá nuevamente en unos segundos.`
+🔧 Servidor configurado:
+${ESRGAN_URL}`
     )
   }
 }

@@ -1,7 +1,7 @@
 // ============================================================
 // 📂 plugins/welcome.js
 // 🎉 WELCOME / LEAVE — FELIXCAT BOT
-// 🔘 TOGGLE — SIN ON / OFF
+// 🔘 TOGGLE SIN ON / OFF
 // ============================================================
 
 const DEFAULT_WELCOME =
@@ -15,54 +15,68 @@ const DEFAULT_LEAVE =
 😢 ¡Hasta pronto!`
 
 // ============================================================
-// 🔧 ASEGURAR CONFIGURACIÓN
+// 🔧 ASEGURAR CONFIGURACIÓN DEL CHAT
 // ============================================================
 
 function ensureChat(chatId) {
 
-    if (!global.db)
-        global.db = {}
+    if (!global.db) {
+        global.db = { data: { chats: {} } }
+    }
 
-    if (!global.db.data)
+    if (!global.db.data) {
         global.db.data = {}
+    }
 
-    if (!global.db.data.chats)
+    if (!global.db.data.chats) {
         global.db.data.chats = {}
+    }
 
-    if (!global.db.data.chats[chatId])
+    if (!global.db.data.chats[chatId]) {
         global.db.data.chats[chatId] = {}
+    }
 
     const chat = global.db.data.chats[chatId]
 
-    if (typeof chat.welcome !== 'boolean')
+    if (typeof chat.welcome !== 'boolean') {
         chat.welcome = false
+    }
 
-    if (!chat.welcomeMsg)
+    if (!chat.welcomeMsg) {
         chat.welcomeMsg = DEFAULT_WELCOME
+    }
 
-    if (!chat.leaveMsg)
+    if (!chat.leaveMsg) {
         chat.leaveMsg = DEFAULT_LEAVE
+    }
 
-    if (!Array.isArray(chat.participants))
+    if (!Array.isArray(chat.participants)) {
         chat.participants = []
+    }
 
-    if (typeof chat.welcomePhoto !== 'boolean')
+    if (typeof chat.welcomePhoto !== 'boolean') {
         chat.welcomePhoto = false
+    }
 
-    if (typeof chat.welcomeGroupPhoto !== 'boolean')
+    if (typeof chat.welcomeGroupPhoto !== 'boolean') {
         chat.welcomeGroupPhoto = false
+    }
 
-    if (typeof chat.welcomeMention !== 'boolean')
+    if (typeof chat.welcomeMention !== 'boolean') {
         chat.welcomeMention = true
+    }
 
-    if (typeof chat.welcomeAntiSpam !== 'boolean')
+    if (typeof chat.welcomeAntiSpam !== 'boolean') {
         chat.welcomeAntiSpam = true
+    }
 
-    if (typeof chat.welcomeLastEvent !== 'number')
+    if (!chat.welcomeLastEvent) {
         chat.welcomeLastEvent = 0
+    }
 
     return chat
 }
+
 
 // ============================================================
 // 🧹 NORMALIZAR JID
@@ -70,29 +84,32 @@ function ensureChat(chatId) {
 
 function normalizeJid(jid, conn) {
 
-    if (!jid)
-        return null
+    if (!jid) return null
 
     try {
 
-        if (conn?.decodeJid)
+        if (conn?.decodeJid) {
             jid = conn.decodeJid(jid)
+        }
 
     } catch {}
 
     jid = String(jid)
 
-    if (jid.includes('@'))
+    if (jid.includes('@')) {
         return jid
+    }
 
     const number =
         jid.replace(/[^0-9]/g, '')
 
-    if (!number)
+    if (!number) {
         return null
+    }
 
     return `${number}@s.whatsapp.net`
 }
+
 
 // ============================================================
 // 🔢 COMPARAR JIDS
@@ -103,11 +120,13 @@ function sameJid(a, b, conn) {
     a = normalizeJid(a, conn)
     b = normalizeJid(b, conn)
 
-    if (!a || !b)
+    if (!a || !b) {
         return false
+    }
 
-    if (a === b)
+    if (a === b) {
         return true
+    }
 
     const clean = jid =>
         String(jid)
@@ -118,19 +137,22 @@ function sameJid(a, b, conn) {
     return clean(a) === clean(b)
 }
 
+
 // ============================================================
 // 🔢 NÚMERO
 // ============================================================
 
 function getNumber(jid) {
 
-    if (!jid)
+    if (!jid) {
         return ''
+    }
 
     return String(jid)
         .split('@')[0]
         .split(':')[0]
 }
+
 
 // ============================================================
 // 🏷️ MENCIÓN
@@ -140,6 +162,7 @@ function mention(jid) {
 
     return `@${getNumber(jid)}`
 }
+
 
 // ============================================================
 // 🧹 JIDS ÚNICOS
@@ -154,8 +177,9 @@ function uniqueJids(list, conn) {
         const normalized =
             normalizeJid(jid, conn)
 
-        if (!normalized)
+        if (!normalized) {
             continue
+        }
 
         if (
             result.some(
@@ -166,14 +190,16 @@ function uniqueJids(list, conn) {
                         conn
                     )
             )
-        )
+        ) {
             continue
+        }
 
         result.push(normalized)
     }
 
     return result
 }
+
 
 // ============================================================
 // 📝 VARIABLES
@@ -186,7 +212,7 @@ function replaceVariables(
         group = '',
         count = 0,
         members = '',
-        bot = 'FelixCat-Bot'
+        bot = 'FelixCat_Bot'
     } = {}
 ) {
 
@@ -197,6 +223,7 @@ function replaceVariables(
         .replace(/@members/gi, members)
         .replace(/@bot/gi, bot)
 }
+
 
 // ============================================================
 // 👥 MIEMBROS
@@ -212,6 +239,7 @@ function buildMembers(users, conn) {
         .join('\n')
 }
 
+
 // ============================================================
 // 🤖 NOMBRE DEL BOT
 // ============================================================
@@ -221,9 +249,10 @@ function getBotName() {
     return (
         global.botname ||
         global.botName ||
-        'FelixCat-Bot'
+        'FelixCat_Bot'
     )
 }
+
 
 // ============================================================
 // 📸 FOTO USUARIO
@@ -244,8 +273,9 @@ async function getUserPhoto(conn, jid) {
     }
 }
 
+
 // ============================================================
-// 🖼️ FOTO GRUPO
+// 🏠 FOTO GRUPO
 // ============================================================
 
 async function getGroupPhoto(conn, jid) {
@@ -263,8 +293,9 @@ async function getGroupPhoto(conn, jid) {
     }
 }
 
+
 // ============================================================
-// 🎉 MENSAJE BIENVENIDA
+// 🎉 MENSAJE DE BIENVENIDA
 // ============================================================
 
 function buildWelcomeMessage({
@@ -277,7 +308,10 @@ function buildWelcomeMessage({
 }) {
 
     const list =
-        uniqueJids(users, conn)
+        uniqueJids(
+            users,
+            conn
+        )
 
     const multiple =
         list.length > 1
@@ -288,7 +322,10 @@ function buildWelcomeMessage({
             : mention(list[0])
 
     const members =
-        buildMembers(list, conn)
+        buildMembers(
+            list,
+            conn
+        )
 
     const body =
         replaceVariables(
@@ -326,8 +363,9 @@ ${body
     }
 }
 
+
 // ============================================================
-// 👋 MENSAJE DESPEDIDA
+// 👋 MENSAJE DE DESPEDIDA
 // ============================================================
 
 function buildLeaveMessage({
@@ -340,7 +378,10 @@ function buildLeaveMessage({
 }) {
 
     const list =
-        uniqueJids(users, conn)
+        uniqueJids(
+            users,
+            conn
+        )
 
     const multiple =
         list.length > 1
@@ -351,7 +392,10 @@ function buildLeaveMessage({
             : mention(list[0])
 
     const members =
-        buildMembers(list, conn)
+        buildMembers(
+            list,
+            conn
+        )
 
     const body =
         replaceVariables(
@@ -389,8 +433,9 @@ ${body
     }
 }
 
+
 // ============================================================
-// 🚀 HANDLER
+// 🚀 HANDLER PRINCIPAL
 // ============================================================
 
 let handler = async (
@@ -404,210 +449,222 @@ let handler = async (
     }
 ) => {
 
-    // ========================================================
-    // 👥 SOLO GRUPOS
-    // ========================================================
+    try {
 
-    if (!m.isGroup) {
+        // ====================================================
+        // 👥 SOLO GRUPOS
+        // ====================================================
 
-        return m.reply(
-            '❌ Este comando solamente funciona en grupos.'
-        )
-    }
+        if (!m.isGroup) {
 
-    // ========================================================
-    // 👮 ADMIN / OWNER
-    // ========================================================
+            return m.reply(
+                '❌ Este comando solamente funciona en grupos.'
+            )
+        }
 
-    if (!isAdmin && !isOwner) {
+        // ====================================================
+        // 👮 ADMIN / OWNER
+        // ====================================================
 
-        return m.reply(
-            '⚠️ Solo los administradores pueden configurar el sistema de bienvenida.'
-        )
-    }
+        if (!isAdmin && !isOwner) {
 
-    const chat =
-        ensureChat(m.chat)
+            return m.reply(
+                '⚠️ Solo los administradores pueden configurar el sistema de bienvenida.'
+            )
+        }
 
-    const cmd =
-        String(command || '')
-            .toLowerCase()
-            .trim()
+        const chat =
+            ensureChat(m.chat)
 
-    const args =
-        String(text || '')
-            .trim()
+        const cmd =
+            String(command || '')
+                .toLowerCase()
+                .trim()
 
-    // ========================================================
-    // 🎉 WELCOME — TOGGLE
-    // ========================================================
+        const args =
+            String(text || '')
+                .trim()
 
-    if (
-        ['welcome', 'welc', 'wl']
-            .includes(cmd)
-    ) {
 
-        chat.welcome =
-            !chat.welcome
+        // ====================================================
+        // 🎉 WELCOME — TOGGLE
+        // ====================================================
 
-        return m.reply(
+        if (
+            [
+                'welcome',
+                'welc',
+                'wl',
+                'wlecom'
+            ].includes(cmd)
+        ) {
+
+            chat.welcome =
+                !chat.welcome
+
+            return m.reply(
 `╭━━━〔 🎉 WELCOME 〕━━━╮
-
-${chat.welcome
-    ? '🟢 *SISTEMA ACTIVADO*'
-    : '🔴 *SISTEMA DESACTIVADO*'}
-
-🎉 Bienvenidas:
-${chat.welcome
-    ? '🟢 ACTIVADAS'
-    : '🔴 DESACTIVADAS'}
-
-👋 Despedidas:
-${chat.welcome
-    ? '🟢 ACTIVADAS'
-    : '🔴 DESACTIVADAS'}
-
-━━━━━━━━━━━━━━━━━━━━
-
-💡 Escribí nuevamente:
-*.welcome*
-
-para cambiar el estado.
-
+│
+│ ${
+    chat.welcome
+        ? '🟢 *SISTEMA ACTIVADO*'
+        : '🔴 *SISTEMA DESACTIVADO*'
+}
+│
+│ 🎉 Bienvenidas:
+│ ${
+    chat.welcome
+        ? '🟢 ACTIVADAS'
+        : '🔴 DESACTIVADAS'
+}
+│
+│ 👋 Despedidas:
+│ ${
+    chat.welcome
+        ? '🟢 ACTIVADAS'
+        : '🔴 DESACTIVADAS'
+}
+│
 ╰━━━━━━━━━━━━━━━━━━━━╯`
-        )
-    }
+            )
+        }
 
-    // ========================================================
-    // ✏️ SET1
-    // ========================================================
 
-    if (cmd === 'set1') {
+        // ====================================================
+        // ✏️ SET1
+        // ====================================================
 
-        if (!args) {
+        if (cmd === 'set1') {
 
-            return m.reply(
+            if (!args) {
+
+                return m.reply(
 `╭━━━〔 ✏️ SET1 〕━━━╮
-
-Configura el mensaje de bienvenida.
-
-Uso:
-
-*.set1 <mensaje>*
-
-Variables:
-
-👤 @user
-🏠 @group
-👥 @count
-🧑‍🤝‍🧑 @members
-🤖 @bot
-
-Ejemplo:
-
-*.set1 🎉 Bienvenido @user a @group. Somos @count integrantes.*
-
+│
+│ Configura el mensaje de bienvenida.
+│
+│ Uso:
+│ *.set1 <mensaje>*
+│
+│ Variables:
+│
+│ 👤 @user
+│ 🏠 @group
+│ 👥 @count
+│ 🧑‍🤝‍🧑 @members
+│ 🤖 @bot
+│
+│ Ejemplo:
+│
+│ *.set1 🎉 Bienvenido @user a @group*
+│
 ╰━━━━━━━━━━━━━━━━━━━━╯`
+                )
+            }
+
+            chat.welcomeMsg =
+                args
+
+            return m.reply(
+`✅ *BIENVENIDA ACTUALIZADA*
+
+📝 ${args}`
             )
         }
 
-        chat.welcomeMsg = args
 
-        return m.reply(
-`╭━━━〔 ✅ WELCOME ACTUALIZADO 〕━━━╮
+        // ====================================================
+        // ✏️ SETWELCOME
+        // ====================================================
 
-📝 Nuevo mensaje:
+        if (cmd === 'setwelcome') {
 
-${args}
+            if (!args) {
+                return m.reply(
+                    '❌ Escribe el nuevo mensaje de bienvenida.'
+                )
+            }
 
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
-        )
-    }
+            chat.welcomeMsg =
+                args
 
-    // ========================================================
-    // ✏️ SETWELCOME
-    // ========================================================
-
-    if (cmd === 'setwelcome') {
-
-        if (!args)
             return m.reply(
-                '❌ Escribí el nuevo mensaje de bienvenida.'
+                '✅ Mensaje de bienvenida actualizado.'
             )
+        }
 
-        chat.welcomeMsg = args
 
-        return m.reply(
-            '✅ Mensaje de bienvenida actualizado.'
-        )
-    }
+        // ====================================================
+        // ✏️ SET2
+        // ====================================================
 
-    // ========================================================
-    // ✏️ SET2
-    // ========================================================
+        if (cmd === 'set2') {
 
-    if (cmd === 'set2') {
+            if (!args) {
 
-        if (!args) {
-
-            return m.reply(
+                return m.reply(
 `╭━━━〔 ✏️ SET2 〕━━━╮
-
-Configura el mensaje de despedida.
-
-Uso:
-
-*.set2 <mensaje>*
-
-Variables:
-
-👤 @user
-🏠 @group
-👥 @count
-🧑‍🤝‍🧑 @members
-🤖 @bot
-
+│
+│ Configura el mensaje de despedida.
+│
+│ Uso:
+│ *.set2 <mensaje>*
+│
+│ Variables:
+│
+│ 👤 @user
+│ 🏠 @group
+│ 👥 @count
+│ 🧑‍🤝‍🧑 @members
+│ 🤖 @bot
+│
 ╰━━━━━━━━━━━━━━━━━━━━╯`
-            )
-        }
+                )
+            }
 
-        chat.leaveMsg = args
+            chat.leaveMsg =
+                args
 
-        return m.reply(
+            return m.reply(
 `✅ *DESPEDIDA ACTUALIZADA*
 
 📝 ${args}`
-        )
-    }
-
-    // ========================================================
-    // ✏️ SETLEAVE
-    // ========================================================
-
-    if (cmd === 'setleave') {
-
-        if (!args)
-            return m.reply(
-                '❌ Escribí el nuevo mensaje de despedida.'
             )
+        }
 
-        chat.leaveMsg = args
 
-        return m.reply(
-            '✅ Mensaje de despedida actualizado.'
-        )
-    }
+        // ====================================================
+        // ✏️ SETLEAVE
+        // ====================================================
 
-    // ========================================================
-    // 🖼️ WELCOME FOTO — TOGGLE
-    // ========================================================
+        if (cmd === 'setleave') {
 
-    if (cmd === 'welcomefoto') {
+            if (!args) {
 
-        chat.welcomePhoto =
-            !chat.welcomePhoto
+                return m.reply(
+                    '❌ Escribe el nuevo mensaje de despedida.'
+                )
+            }
 
-        return m.reply(
+            chat.leaveMsg =
+                args
+
+            return m.reply(
+                '✅ Mensaje de despedida actualizado.'
+            )
+        }
+
+
+        // ====================================================
+        // 🖼️ FOTO USUARIO
+        // ====================================================
+
+        if (cmd === 'welcomefoto') {
+
+            chat.welcomePhoto =
+                !chat.welcomePhoto
+
+            return m.reply(
 `🖼️ *FOTO DEL USUARIO*
 
 Estado:
@@ -618,21 +675,21 @@ ${
         : '🔴 DESACTIVADA'
 }
 
-💡 Usá nuevamente *.welcomefoto*
-para cambiarlo.`
-        )
-    }
+💡 Escribe *.welcomefoto* nuevamente para cambiarlo.`
+            )
+        }
 
-    // ========================================================
-    // 🏠 WELCOME GROUP — TOGGLE
-    // ========================================================
 
-    if (cmd === 'welcomegroup') {
+        // ====================================================
+        // 🏠 FOTO GRUPO
+        // ====================================================
 
-        chat.welcomeGroupPhoto =
-            !chat.welcomeGroupPhoto
+        if (cmd === 'welcomegroup') {
 
-        return m.reply(
+            chat.welcomeGroupPhoto =
+                !chat.welcomeGroupPhoto
+
+            return m.reply(
 `🏠 *FOTO DEL GRUPO*
 
 Estado:
@@ -643,268 +700,230 @@ ${
         : '🔴 DESACTIVADA'
 }
 
-💡 Usá nuevamente *.welcomegroup*
-para cambiarlo.`
-        )
-    }
-
-    // ========================================================
-    // 🧪 TEST WELCOME
-    // ========================================================
-
-    if (cmd === 'testwelcome') {
-
-        const meta =
-            await conn.groupMetadata(
-                m.chat
+💡 Escribe *.welcomegroup* nuevamente para cambiarlo.`
             )
+        }
 
-        const members =
-            meta.participants
-                ?.map(p => p.id)
-                .filter(Boolean) || []
 
-        const data =
-            buildWelcomeMessage({
-                users: [m.sender],
-                groupName:
-                    meta.subject ||
-                    'este grupo',
-                count:
-                    members.length,
-                custom:
-                    chat.welcomeMsg,
-                botName:
-                    getBotName(),
-                conn
-            })
+        // ====================================================
+        // 🧪 TEST WELCOME
+        // ====================================================
 
-        return conn.sendMessage(
-            m.chat,
-            {
-                text:
-                    data.message,
-                mentions:
-                    data.mentions
-            },
-            {
-                quoted: m
-            }
-        )
-    }
+        if (cmd === 'testwelcome') {
 
-    // ========================================================
-    // 🧪 TEST LEAVE
-    // ========================================================
+            const meta =
+                await conn.groupMetadata(
+                    m.chat
+                )
 
-    if (cmd === 'testleave') {
+            const members =
+                meta.participants
+                    ?.map(p => p.id)
+                    .filter(Boolean) ||
+                []
 
-        const meta =
-            await conn.groupMetadata(
-                m.chat
+            const data =
+                buildWelcomeMessage({
+                    users: [
+                        m.sender
+                    ],
+                    groupName:
+                        meta.subject ||
+                        'este grupo',
+                    count:
+                        members.length,
+                    custom:
+                        chat.welcomeMsg,
+                    botName:
+                        getBotName(),
+                    conn
+                })
+
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
+                        data.message,
+                    mentions:
+                        data.mentions
+                },
+                {
+                    quoted: m
+                }
             )
+        }
 
-        const members =
-            meta.participants
-                ?.map(p => p.id)
-                .filter(Boolean) || []
 
-        const data =
-            buildLeaveMessage({
-                users: [m.sender],
-                groupName:
-                    meta.subject ||
-                    'este grupo',
-                count:
-                    members.length,
-                custom:
-                    chat.leaveMsg,
-                botName:
-                    getBotName(),
-                conn
-            })
+        // ====================================================
+        // 🧪 TEST LEAVE
+        // ====================================================
 
-        return conn.sendMessage(
-            m.chat,
-            {
-                text:
-                    data.message,
-                mentions:
-                    data.mentions
-            },
-            {
-                quoted: m
-            }
-        )
-    }
+        if (cmd === 'testleave') {
 
-    // ========================================================
-    // 📋 STATUS
-    // ========================================================
+            const meta =
+                await conn.groupMetadata(
+                    m.chat
+                )
 
-    if (cmd === 'welcomestatus') {
+            const members =
+                meta.participants
+                    ?.map(p => p.id)
+                    .filter(Boolean) ||
+                []
 
-        return m.reply(
+            const data =
+                buildLeaveMessage({
+                    users: [
+                        m.sender
+                    ],
+                    groupName:
+                        meta.subject ||
+                        'este grupo',
+                    count:
+                        members.length,
+                    custom:
+                        chat.leaveMsg,
+                    botName:
+                        getBotName(),
+                    conn
+                })
+
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
+                        data.message,
+                    mentions:
+                        data.mentions
+                },
+                {
+                    quoted: m
+                }
+            )
+        }
+
+
+        // ====================================================
+        // 📋 STATUS
+        // ====================================================
+
+        if (cmd === 'welcomestatus') {
+
+            return m.reply(
 `╭━━━〔 ⚙️ WELCOME STATUS 〕━━━╮
-
-🎉 Sistema:
-${
+│
+│ 🎉 Sistema:
+│ ${
     chat.welcome
         ? '🟢 ACTIVADO'
         : '🔴 DESACTIVADO'
 }
-
-🖼️ Foto usuario:
-${
+│
+│ 🖼️ Foto usuario:
+│ ${
     chat.welcomePhoto
         ? '🟢 ACTIVADA'
         : '🔴 DESACTIVADA'
 }
-
-🏠 Foto grupo:
-${
+│
+│ 🏠 Foto grupo:
+│ ${
     chat.welcomeGroupPhoto
         ? '🟢 ACTIVADA'
         : '🔴 DESACTIVADA'
 }
-
-📢 Menciones:
-${
+│
+│ 📢 Menciones:
+│ ${
     chat.welcomeMention
         ? '🟢 ACTIVADAS'
         : '🔴 DESACTIVADAS'
 }
-
-🛡️ Anti-duplicados:
-${
+│
+│ 🛡️ Anti-duplicados:
+│ ${
     chat.welcomeAntiSpam
         ? '🟢 ACTIVADO'
         : '🔴 DESACTIVADO'
 }
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
 
-━━━━━━━━━━━━━━━━━━━━
-
-🎉 MENSAJE DE BIENVENIDA
+🎉 *BIENVENIDA*
 
 ${chat.welcomeMsg}
 
 ━━━━━━━━━━━━━━━━━━━━
 
-👋 MENSAJE DE DESPEDIDA
+👋 *DESPEDIDA*
 
-${chat.leaveMsg}
+${chat.leaveMsg}`
+            )
+        }
 
+
+        // ====================================================
+        // 🧹 RESET
+        // ====================================================
+
+        if (cmd === 'clearwel') {
+
+            chat.welcome = false
+
+            chat.welcomeMsg =
+                DEFAULT_WELCOME
+
+            chat.leaveMsg =
+                DEFAULT_LEAVE
+
+            chat.welcomePhoto = false
+
+            chat.welcomeGroupPhoto = false
+
+            chat.welcomeMention = true
+
+            chat.welcomeAntiSpam = true
+
+            chat.participants = []
+
+            chat.welcomeLastEvent = 0
+
+            return m.reply(
+`╭━━━〔 🧹 RESET WELCOME 〕━━━╮
+│
+│ 🔴 Sistema desactivado
+│ 🔄 Mensajes restaurados
+│ 🖼️ Fotos desactivadas
+│ 👥 Participantes reiniciados
+│ ⚙️ Configuración restaurada
+│
 ╰━━━━━━━━━━━━━━━━━━━━╯`
+            )
+        }
+
+    } catch (error) {
+
+        console.error(
+            '❌ ERROR welcome.js:',
+            error
         )
-    }
-
-    // ========================================================
-    // 🧹 RESET
-    // ========================================================
-
-    if (cmd === 'clearwel') {
-
-        chat.welcome = false
-        chat.welcomeMsg = DEFAULT_WELCOME
-        chat.leaveMsg = DEFAULT_LEAVE
-        chat.welcomePhoto = false
-        chat.welcomeGroupPhoto = false
-        chat.welcomeMention = true
-        chat.welcomeAntiSpam = true
-        chat.participants = []
-        chat.welcomeLastEvent = 0
 
         return m.reply(
-`╭━━━〔 🧹 WELCOME RESET 〕━━━╮
-
-🔴 Sistema desactivado.
-🔄 Mensajes restaurados.
-🖼️ Fotos desactivadas.
-👥 Participantes reiniciados.
-⚙️ Configuración restaurada.
-
-╰━━━━━━━━━━━━━━━━━━━━╯`
-        )
-    }
-
-    // ========================================================
-    // ❓ AYUDA
-    // ========================================================
-
-    if (
-        cmd === 'welcomehelp' ||
-        cmd === 'welcomeayuda'
-    ) {
-
-        return m.reply(
-`╭━━━〔 🎉 WELCOME HELP 〕━━━╮
-
-🎉 *ACTIVAR / DESACTIVAR*
-
-*.welcome*
-*.welc*
-*.wl*
-
-━━━━━━━━━━━━━━━━━━━━
-
-✏️ *MENSAJES*
-
-*.set1 <mensaje>*
-*.setwelcome <mensaje>*
-
-*.set2 <mensaje>*
-*.setleave <mensaje>*
-
-━━━━━━━━━━━━━━━━━━━━
-
-🖼️ *FOTOS*
-
-*.welcomefoto*
-*.welcomegroup*
-
-━━━━━━━━━━━━━━━━━━━━
-
-🧪 *PRUEBAS*
-
-*.testwelcome*
-*.testleave*
-
-━━━━━━━━━━━━━━━━━━━━
-
-⚙️ *CONFIGURACIÓN*
-
-*.welcomestatus*
-
-━━━━━━━━━━━━━━━━━━━━
-
-🧹 *REINICIAR*
-
-*.clearwel*
-
-━━━━━━━━━━━━━━━━━━━━
-
-📝 *VARIABLES*
-
-👤 @user
-🏠 @group
-👥 @count
-🧑‍🤝‍🧑 @members
-🤖 @bot
-
-╰━━━━━━━━━━━━━━━━━━━━╯`
+            '❌ Ocurrió un error ejecutando el comando.'
         )
     }
 }
 
+
 // ============================================================
-// 🔥 DETECTOR DE ENTRADAS / SALIDAS
+// 🔥 DETECTOR AUTOMÁTICO
 // ============================================================
 
-handler.before =
-async function (m) {
+handler.before = async function (m) {
 
-    if (!m?.isGroup)
+    if (!m.isGroup) {
         return
+    }
 
     const conn = this
 
@@ -913,8 +932,9 @@ async function (m) {
         const chat =
             ensureChat(m.chat)
 
-        if (!chat.welcome)
+        if (!chat.welcome) {
             return
+        }
 
         const meta =
             await conn.groupMetadata(
@@ -925,17 +945,15 @@ async function (m) {
             uniqueJids(
                 meta.participants
                     ?.map(p => p.id)
-                    .filter(Boolean) || [],
+                    .filter(Boolean) ||
+                [],
                 conn
             )
 
-        // ====================================================
-        // 🆕 PRIMERA SINCRONIZACIÓN
-        // ====================================================
-
+        // Primera sincronización
         if (
             !Array.isArray(chat.participants) ||
-            !chat.participants.length
+            chat.participants.length === 0
         ) {
 
             chat.participants =
@@ -1004,6 +1022,7 @@ async function (m) {
                 > 3000
             )
 
+
         // ====================================================
         // 🎉 BIENVENIDA
         // ====================================================
@@ -1027,47 +1046,41 @@ async function (m) {
                     conn
                 })
 
-            const userPhoto =
+            let photo = null
+
+            // Primero intenta foto del usuario
+            if (
                 added.length === 1 &&
                 chat.welcomePhoto
-                    ? await getUserPhoto(
+            ) {
+
+                photo =
+                    await getUserPhoto(
                         conn,
                         added[0]
                     )
-                    : null
+            }
 
-            const groupPhoto =
+            // Si no hay, intenta foto del grupo
+            if (
+                !photo &&
                 chat.welcomeGroupPhoto
-                    ? await getGroupPhoto(
+            ) {
+
+                photo =
+                    await getGroupPhoto(
                         conn,
                         m.chat
                     )
-                    : null
+            }
 
-            if (userPhoto) {
-
-                await conn.sendMessage(
-                    m.chat,
-                    {
-                        image: {
-                            url:
-                                userPhoto
-                        },
-                        caption:
-                            data.message,
-                        mentions:
-                            data.mentions
-                    }
-                )
-
-            } else if (groupPhoto) {
+            if (photo) {
 
                 await conn.sendMessage(
                     m.chat,
                     {
                         image: {
-                            url:
-                                groupPhoto
+                            url: photo
                         },
                         caption:
                             data.message,
@@ -1092,6 +1105,7 @@ async function (m) {
             chat.welcomeLastEvent =
                 now
         }
+
 
         // ====================================================
         // 👋 DESPEDIDA
@@ -1130,6 +1144,7 @@ async function (m) {
                 Date.now()
         }
 
+
         // ====================================================
         // 💾 GUARDAR PARTICIPANTES
         // ====================================================
@@ -1140,21 +1155,22 @@ async function (m) {
     } catch (error) {
 
         console.error(
-            '❌ Error en welcome.js:',
+            '❌ Error detector welcome:',
             error
         )
     }
 }
 
+
 // ============================================================
-// 📚 AYUDA
+// 📋 COMANDOS
 // ============================================================
 
-handler.help = [
-
+handler.command = [
     'welcome',
     'welc',
     'wl',
+    'wlecom',
 
     'set1',
     'setwelcome',
@@ -1170,45 +1186,57 @@ handler.help = [
 
     'welcomestatus',
 
-    'welcomehelp',
-    'welcomeayuda',
-
     'clearwel'
 ]
 
+
 // ============================================================
-// 🏷️ TAGS
+// 📚 AYUDA
+// ============================================================
+
+handler.help = [
+    'welcome',
+    'welc',
+    'wl',
+    'wlecom',
+
+    'set1',
+    'setwelcome',
+
+    'set2',
+    'setleave',
+
+    'welcomefoto',
+    'welcomegroup',
+
+    'testwelcome',
+    'testleave',
+
+    'welcomestatus',
+    'clearwel'
+]
+
+
+// ============================================================
+// 🏷️ CATEGORÍAS
 // ============================================================
 
 handler.tags = [
+    'fun',
     'grupo',
     'admin'
 ]
 
-// ============================================================
-// ⚡ COMANDOS
-// ============================================================
-// IMPORTANTE:
-// Se usa REGEX para que los loaders que no aceptan arrays
-// funcionen correctamente.
 
 // ============================================================
-
-handler.command =
-/^(welcome|welc|wl|set1|setwelcome|set2|setleave|welcomefoto|welcomegroup|testwelcome|testleave|welcomestatus|welcomehelp|welcomeayuda|clearwel)$/i
-
-// ============================================================
-// 👥 GRUPO
+// 👥 GRUPOS
 // ============================================================
 
 handler.group = true
 
+
 // ============================================================
-// ⚠️ NO poner handler.admin = true
-// ============================================================
-// La comprobación de administrador se hace dentro del handler.
-// Esto evita que algunos loaders descarten el plugin antes
-// de ejecutar el código.
+// 📤 EXPORT
 // ============================================================
 
 export default handler

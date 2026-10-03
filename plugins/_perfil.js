@@ -1,6 +1,7 @@
 // ============================================================
 // 📂 plugins/perfil.js
 // 👤 PERFIL COMPLETO — WHATSAPP-BOT
+// ✨ Diseño visual PRO
 // 🧬 Compatible con hermanos.js — hasta 3 hermanos
 // ❤️ Pareja + hermanos + insignias + bio + género + cumpleaños
 // ============================================================
@@ -14,24 +15,46 @@ import path from 'path'
 
 const DATABASE_DIR = './database'
 
-const PERFIL_FILE = path.join(DATABASE_DIR, 'perfiles.json')
-const PAREJAS_FILE = path.join(DATABASE_DIR, 'parejas.json')
-const HERMANOS_FILE = path.join(DATABASE_DIR, 'hermanos.json')
+const PERFIL_FILE = path.join(
+    DATABASE_DIR,
+    'perfiles.json'
+)
+
+const PAREJAS_FILE = path.join(
+    DATABASE_DIR,
+    'parejas.json'
+)
+
+const HERMANOS_FILE = path.join(
+    DATABASE_DIR,
+    'hermanos.json'
+)
 
 if (!fs.existsSync(DATABASE_DIR)) {
-    fs.mkdirSync(DATABASE_DIR, { recursive: true })
+    fs.mkdirSync(DATABASE_DIR, {
+        recursive: true
+    })
 }
 
 if (!fs.existsSync(PERFIL_FILE)) {
-    fs.writeFileSync(PERFIL_FILE, JSON.stringify({}, null, 2))
+    fs.writeFileSync(
+        PERFIL_FILE,
+        JSON.stringify({}, null, 2)
+    )
 }
 
 if (!fs.existsSync(PAREJAS_FILE)) {
-    fs.writeFileSync(PAREJAS_FILE, JSON.stringify({}, null, 2))
+    fs.writeFileSync(
+        PAREJAS_FILE,
+        JSON.stringify({}, null, 2)
+    )
 }
 
 if (!fs.existsSync(HERMANOS_FILE)) {
-    fs.writeFileSync(HERMANOS_FILE, JSON.stringify({}, null, 2))
+    fs.writeFileSync(
+        HERMANOS_FILE,
+        JSON.stringify({}, null, 2)
+    )
 }
 
 // ============================================================
@@ -40,8 +63,14 @@ if (!fs.existsSync(HERMANOS_FILE)) {
 
 function loadJSON(file) {
     try {
-        const data = fs.readFileSync(file, 'utf8')
-        return JSON.parse(data || '{}')
+        const data = fs.readFileSync(
+            file,
+            'utf8'
+        )
+
+        return JSON.parse(
+            data || '{}'
+        )
     } catch {
         return {}
     }
@@ -51,10 +80,17 @@ function saveJSON(file, data) {
     try {
         fs.writeFileSync(
             file,
-            JSON.stringify(data, null, 2)
+            JSON.stringify(
+                data,
+                null,
+                2
+            )
         )
     } catch (e) {
-        console.error(`❌ Error guardando ${file}:`, e)
+        console.error(
+            `❌ Error guardando ${file}:`,
+            e
+        )
     }
 }
 
@@ -63,7 +99,10 @@ function saveJSON(file, data) {
 // ============================================================
 
 function normalizeJid(jid, conn) {
-    if (!jid) return null
+
+    if (!jid) {
+        return null
+    }
 
     try {
         if (conn?.decodeJid) {
@@ -73,19 +112,34 @@ function normalizeJid(jid, conn) {
 
     jid = String(jid).trim()
 
-    if (!jid) return null
-
-    if (jid.endsWith('@c.us')) {
-        return jid.replace('@c.us', '@s.whatsapp.net')
+    if (!jid) {
+        return null
     }
 
-    if (jid.includes('@')) {
+    if (
+        jid.endsWith('@c.us')
+    ) {
+        return jid.replace(
+            '@c.us',
+            '@s.whatsapp.net'
+        )
+    }
+
+    if (
+        jid.includes('@')
+    ) {
         return jid
     }
 
-    const number = jid.replace(/[^0-9]/g, '')
+    const number =
+        jid.replace(
+            /[^0-9]/g,
+            ''
+        )
 
-    if (!number) return null
+    if (!number) {
+        return null
+    }
 
     return `${number}@s.whatsapp.net`
 }
@@ -95,42 +149,84 @@ function normalizeJid(jid, conn) {
 // ============================================================
 
 function sameUser(a, b, conn) {
-    a = normalizeJid(a, conn)
-    b = normalizeJid(b, conn)
 
-    if (!a || !b) return false
+    a = normalizeJid(
+        a,
+        conn
+    )
 
-    if (a === b) return true
+    b = normalizeJid(
+        b,
+        conn
+    )
+
+    if (!a || !b) {
+        return false
+    }
+
+    if (a === b) {
+        return true
+    }
 
     const clean = jid =>
         String(jid)
             .split(':')[0]
             .split('@')[0]
-            .replace(/[^0-9]/g, '')
+            .replace(
+                /[^0-9]/g,
+                ''
+            )
 
     const A = clean(a)
     const B = clean(b)
 
-    return Boolean(A && B && A === B)
+    return Boolean(
+        A &&
+        B &&
+        A === B
+    )
 }
 
 // ============================================================
-// 🔎 BUSCAR JID DENTRO DEL JSON
+// 🔎 BUSCAR JID
 // ============================================================
 
-function findJid(data, jid, conn) {
-    if (!jid) return null
+function findJid(
+    data,
+    jid,
+    conn
+) {
 
-    jid = normalizeJid(jid, conn)
+    if (!jid) {
+        return null
+    }
 
-    if (!jid) return null
+    jid =
+        normalizeJid(
+            jid,
+            conn
+        )
+
+    if (!jid) {
+        return null
+    }
 
     if (data[jid]) {
         return jid
     }
 
-    for (const id of Object.keys(data)) {
-        if (sameUser(id, jid, conn)) {
+    for (
+        const id
+        of Object.keys(data)
+    ) {
+
+        if (
+            sameUser(
+                id,
+                jid,
+                conn
+            )
+        ) {
             return id
         }
     }
@@ -143,7 +239,10 @@ function findJid(data, jid, conn) {
 // ============================================================
 
 function tag(jid) {
-    if (!jid) return '@usuario'
+
+    if (!jid) {
+        return '@usuario'
+    }
 
     return '@' +
         String(jid)
@@ -152,18 +251,28 @@ function tag(jid) {
 }
 
 // ============================================================
-// 🎯 OBTENER OBJETIVO
+// 🎯 TARGET
 // ============================================================
 
-function getTarget(m, conn) {
-    if (m.mentionedJid?.length) {
+function getTarget(
+    m,
+    conn
+) {
+
+    if (
+        m.mentionedJid?.length
+    ) {
+
         return normalizeJid(
             m.mentionedJid[0],
             conn
         )
     }
 
-    if (m.quoted?.sender) {
+    if (
+        m.quoted?.sender
+    ) {
+
         return normalizeJid(
             m.quoted.sender,
             conn
@@ -174,17 +283,23 @@ function getTarget(m, conn) {
 }
 
 // ============================================================
-// 📅 FORMATEAR FECHA
+// 📅 FECHA
 // ============================================================
 
 function formatDate(value) {
+
     if (!value) {
         return 'No registrada'
     }
 
-    const date = new Date(value)
+    const date =
+        new Date(value)
 
-    if (isNaN(date.getTime())) {
+    if (
+        isNaN(
+            date.getTime()
+        )
+    ) {
         return 'No registrada'
     }
 
@@ -203,11 +318,19 @@ function formatDate(value) {
 // ============================================================
 
 function daysBetween(value) {
-    if (!value) return 0
 
-    const date = new Date(value)
+    if (!value) {
+        return 0
+    }
 
-    if (isNaN(date.getTime())) {
+    const date =
+        new Date(value)
+
+    if (
+        isNaN(
+            date.getTime()
+        )
+    ) {
         return 0
     }
 
@@ -227,15 +350,24 @@ function daysBetween(value) {
 // ============================================================
 
 function calculateAge(birth) {
-    if (!birth) return null
 
-    const date = new Date(birth)
-
-    if (isNaN(date.getTime())) {
+    if (!birth) {
         return null
     }
 
-    const now = new Date()
+    const date =
+        new Date(birth)
+
+    if (
+        isNaN(
+            date.getTime()
+        )
+    ) {
+        return null
+    }
+
+    const now =
+        new Date()
 
     let age =
         now.getFullYear() -
@@ -249,7 +381,8 @@ function calculateAge(birth) {
         month < 0 ||
         (
             month === 0 &&
-            now.getDate() < date.getDate()
+            now.getDate() <
+            date.getDate()
         )
     ) {
         age--
@@ -259,11 +392,18 @@ function calculateAge(birth) {
 }
 
 // ============================================================
-// ♑ SIGNO
+// ♑ ZODIACO
 // ============================================================
 
-function zodiac(day, month) {
-    if (!day || !month) {
+function zodiac(
+    day,
+    month
+) {
+
+    if (
+        !day ||
+        !month
+    ) {
         return '❔ Desconocido'
     }
 
@@ -282,12 +422,14 @@ function zodiac(day, month) {
         ['♐ Sagitario', 21]
     ]
 
-    const index = month - 1
+    const index =
+        month - 1
 
     if (
         day <=
         signs[index][1]
     ) {
+
         return signs[index][0]
     }
 
@@ -300,35 +442,52 @@ function zodiac(day, month) {
 // 🎂 DÍAS PARA CUMPLEAÑOS
 // ============================================================
 
-function daysToBirthday(birth) {
-    if (!birth) return null
+function daysToBirthday(
+    birth
+) {
 
-    const date = new Date(birth)
-
-    if (isNaN(date.getTime())) {
+    if (!birth) {
         return null
     }
 
-    const now = new Date()
+    const date =
+        new Date(birth)
 
-    const today = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate()
-    )
+    if (
+        isNaN(
+            date.getTime()
+        )
+    ) {
+        return null
+    }
 
-    let next = new Date(
-        now.getFullYear(),
-        date.getMonth(),
-        date.getDate()
-    )
+    const now =
+        new Date()
 
-    if (next < today) {
-        next = new Date(
-            now.getFullYear() + 1,
+    const today =
+        new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate()
+        )
+
+    let next =
+        new Date(
+            now.getFullYear(),
             date.getMonth(),
             date.getDate()
         )
+
+    if (
+        next < today
+    ) {
+
+        next =
+            new Date(
+                now.getFullYear() + 1,
+                date.getMonth(),
+                date.getDate()
+            )
     }
 
     return Math.ceil(
@@ -344,9 +503,15 @@ function daysToBirthday(birth) {
 // ============================================================
 
 function getOwners(conn) {
-    return (global.owner || [])
+
+    return (
+        global.owner || []
+    )
         .map(v => {
-            if (Array.isArray(v)) {
+
+            if (
+                Array.isArray(v)
+            ) {
                 v = v[0]
             }
 
@@ -359,11 +524,16 @@ function getOwners(conn) {
 }
 
 // ============================================================
-// 🛡️ ES OWNER
+// 🛡️ OWNER
 // ============================================================
 
-function isOwner(m, conn) {
-    const owners = getOwners(conn)
+function isOwner(
+    m,
+    conn
+) {
+
+    const owners =
+        getOwners(conn)
 
     return owners.some(
         owner =>
@@ -379,9 +549,16 @@ function isOwner(m, conn) {
 // 👮 ROL
 // ============================================================
 
-async function getRole(m, conn, target) {
+async function getRole(
+    m,
+    conn,
+    target
+) {
+
     try {
-        const owners = getOwners(conn)
+
+        const owners =
+            getOwners(conn)
 
         if (
             owners.some(
@@ -422,7 +599,9 @@ async function getRole(m, conn, target) {
             return '👑 Creador'
         }
 
-        if (participant?.admin) {
+        if (
+            participant?.admin
+        ) {
             return '🛡️ Administrador'
         }
 
@@ -433,16 +612,6 @@ async function getRole(m, conn, target) {
 
 // ============================================================
 // 🧬 OBTENER TODOS LOS HERMANOS
-//
-// Compatible con:
-//
-// 1. hermano: "jid"
-//
-// 2. hermanos: []
-//
-// 3. Busca relaciones inversas
-//
-// Máximo 3
 // ============================================================
 
 function getAllBrothers(
@@ -450,13 +619,17 @@ function getAllBrothers(
     target,
     conn
 ) {
+
     const result = []
 
     const addBrother = (
         jid,
         data = {}
     ) => {
-        if (!jid) return
+
+        if (!jid) {
+            return
+        }
 
         const normalized =
             normalizeJid(
@@ -464,7 +637,9 @@ function getAllBrothers(
                 conn
             )
 
-        if (!normalized) return
+        if (!normalized) {
+            return
+        }
 
         if (
             sameUser(
@@ -489,7 +664,9 @@ function getAllBrothers(
             return
         }
 
-        if (result.length >= 3) {
+        if (
+            result.length >= 3
+        ) {
             return
         }
 
@@ -520,10 +697,12 @@ function getAllBrothers(
                 data.hermanos
             )
         ) {
+
             for (
                 const brother
                 of data.hermanos
             ) {
+
                 const jid =
                     typeof brother === 'string'
                         ? brother
@@ -546,6 +725,7 @@ function getAllBrothers(
         if (
             data.hermano
         ) {
+
             addBrother(
                 data.hermano,
                 data
@@ -565,7 +745,10 @@ function getAllBrothers(
             hermanosDB
         )
     ) {
-        if (result.length >= 3) {
+
+        if (
+            result.length >= 3
+        ) {
             break
         }
 
@@ -580,10 +763,12 @@ function getAllBrothers(
                 userData.hermanos
             )
         ) {
+
             for (
                 const brother
                 of userData.hermanos
             ) {
+
                 const jid =
                     typeof brother === 'string'
                         ? brother
@@ -599,6 +784,7 @@ function getAllBrothers(
         if (
             userData.hermano
         ) {
+
             lista.push(
                 userData.hermano
             )
@@ -624,11 +810,14 @@ function getAllBrothers(
         )
     }
 
-    return result.slice(0, 3)
+    return result.slice(
+        0,
+        3
+    )
 }
 
 // ============================================================
-// 🧬 INFORMACIÓN DE HERMANO
+// 🧬 INFORMACIÓN DEL HERMANO
 // ============================================================
 
 function brotherInfo(
@@ -636,7 +825,9 @@ function brotherInfo(
     hermanosDB,
     conn
 ) {
-    const jid = brother.jid
+
+    const jid =
+        brother.jid
 
     const realId =
         findJid(
@@ -683,29 +874,45 @@ function brotherInfo(
 }
 
 // ============================================================
-// 🏅 RANGO HERMANO
+// 🏅 RANGO
 // ============================================================
 
-function rangoHermano(nivel) {
-    nivel = Number(nivel || 0)
+function rangoHermano(
+    nivel
+) {
 
-    if (nivel >= 300) {
+    nivel =
+        Number(
+            nivel || 0
+        )
+
+    if (
+        nivel >= 300
+    ) {
         return '👑 Hermanos Supremos'
     }
 
-    if (nivel >= 200) {
+    if (
+        nivel >= 200
+    ) {
         return '🔥 Hermanos Legendarios'
     }
 
-    if (nivel >= 120) {
+    if (
+        nivel >= 120
+    ) {
         return '💪 Hermanos Fuertes'
     }
 
-    if (nivel >= 60) {
+    if (
+        nivel >= 60
+    ) {
         return '🤝 Hermanos Reales'
     }
 
-    if (nivel >= 30) {
+    if (
+        nivel >= 30
+    ) {
         return '🙂 Hermanos Cercanos'
     }
 
@@ -744,7 +951,7 @@ const insigniasDisponibles = {
 }
 
 // ============================================================
-// 🚀 HANDLER PRINCIPAL
+// 🚀 HANDLER
 // ============================================================
 
 let handler = async (
@@ -780,7 +987,7 @@ let handler = async (
             )
 
         // ====================================================
-        // 🎯 TARGET
+        // 🎯 OBJETIVO
         // ====================================================
 
         const target =
@@ -801,14 +1008,23 @@ let handler = async (
         // 👤 CREAR PERFIL
         // ====================================================
 
-        if (!perfiles[targetId]) {
+        if (
+            !perfiles[targetId]
+        ) {
 
             perfiles[targetId] = {
+
                 bio: '',
+
                 genero: '',
+
                 birth: null,
-                registered: Date.now(),
+
+                registered:
+                    Date.now(),
+
                 insignias: []
+
             }
 
             saveJSON(
@@ -825,6 +1041,7 @@ let handler = async (
                 perfil.insignias
             )
         ) {
+
             perfil.insignias = []
         }
 
@@ -840,17 +1057,18 @@ let handler = async (
                 text?.trim()
 
             if (!nuevo) {
+
                 return m.reply(
-                    '✏️ Usa:\n\n' +
-                    '*.setbr <fecha de nacimiento>*\n\n' +
-                    'Ejemplo:\n' +
+                    '🎂 *CONFIGURAR CUMPLEAÑOS*\n\n' +
+                    '📌 Uso:\n' +
+                    '*.setbr DD/MM/AAAA*\n\n' +
+                    '💡 Ejemplo:\n' +
                     '*.setbr 31/12/1998*'
                 )
             }
 
             let fecha = null
 
-            // DD/MM/YYYY
             const match =
                 nuevo.match(
                     /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
@@ -859,13 +1077,19 @@ let handler = async (
             if (match) {
 
                 const dia =
-                    Number(match[1])
+                    Number(
+                        match[1]
+                    )
 
                 const mes =
-                    Number(match[2]) - 1
+                    Number(
+                        match[2]
+                    ) - 1
 
                 const año =
-                    Number(match[3])
+                    Number(
+                        match[3]
+                    )
 
                 fecha =
                     new Date(
@@ -877,7 +1101,9 @@ let handler = async (
             } else {
 
                 fecha =
-                    new Date(nuevo)
+                    new Date(
+                        nuevo
+                    )
             }
 
             if (
@@ -888,8 +1114,8 @@ let handler = async (
             ) {
 
                 return m.reply(
-                    '❌ Fecha no válida.\n\n' +
-                    'Ejemplo:\n' +
+                    '❌ *Fecha inválida*\n\n' +
+                    'Usa por ejemplo:\n' +
                     '*.setbr 31/12/1998*'
                 )
             }
@@ -903,8 +1129,9 @@ let handler = async (
             )
 
             return m.reply(
-                `🎂 *FECHA DE NACIMIENTO ACTUALIZADA*\n\n` +
-                `📅 ${formatDate(perfil.birth)}`
+                `🎂 *CUMPLEAÑOS ACTUALIZADO*\n\n` +
+                `📅 ${formatDate(perfil.birth)}\n` +
+                `🎉 ¡Tu fecha quedó guardada!`
             )
         }
 
@@ -921,9 +1148,14 @@ let handler = async (
 
             if (!nuevaBio) {
 
-                if (perfil.bio) {
+                if (
+                    perfil.bio
+                ) {
+
                     return m.reply(
-                        `📝 *TU BIOGRAFÍA*\n\n${perfil.bio}`
+                        `╭━━〔 📝 *BIOGRAFÍA* 〕━━╮\n\n` +
+                        `${perfil.bio}\n\n` +
+                        `╰━━━━━━━━━━━━━━━━━━╯`
                     )
                 }
 
@@ -942,7 +1174,8 @@ let handler = async (
             )
 
             return m.reply(
-                '✅ *Biografía actualizada correctamente.*'
+                '✅ *BIOGRAFÍA ACTUALIZADA*\n\n' +
+                '📝 Tu nueva biografía fue guardada.'
             )
         }
 
@@ -960,11 +1193,10 @@ let handler = async (
             if (!genero) {
 
                 return m.reply(
-                    `⚧️ Tu género actual: ${
-                        perfil.genero ||
-                        'No especificado'
-                    }\n\n` +
-                    `Usa *.genero <género>*`
+                    `⚧️ *GÉNERO ACTUAL*\n\n` +
+                    `${perfil.genero || 'No especificado'}\n\n` +
+                    `📌 Usa:\n` +
+                    `*.genero <género>*`
                 )
             }
 
@@ -977,12 +1209,13 @@ let handler = async (
             )
 
             return m.reply(
-                `✅ Género actualizado: *${genero}*`
+                `✅ *GÉNERO ACTUALIZADO*\n\n` +
+                `⚧️ ${genero}`
             )
         }
 
         // ====================================================
-        // 🏅 OTORGAR INSIGNIA
+        // 🏅 OTORGAR
         // ====================================================
 
         if (
@@ -995,6 +1228,7 @@ let handler = async (
                     conn
                 )
             ) {
+
                 return m.reply(
                     '🚫 Solo el dueño puede otorgar insignias.'
                 )
@@ -1007,13 +1241,16 @@ let handler = async (
                 )
 
             if (!objetivo) {
+
                 return m.reply(
                     '❌ Menciona o responde al usuario.'
                 )
             }
 
             const partes =
-                String(text || '')
+                String(
+                    text || ''
+                )
                     .trim()
                     .split(/\s+/)
 
@@ -1037,7 +1274,7 @@ let handler = async (
                     )
                         .map(
                             ([id, nombre]) =>
-                                `• ${id} — ${nombre}`
+                                `┃ ${id} → ${nombre}`
                         )
                         .join('\n')
                 )
@@ -1055,14 +1292,18 @@ let handler = async (
                     perfiles[jid].insignias
                 )
             ) {
+
                 perfiles[jid].insignias = []
             }
 
             if (
                 perfiles[jid]
                     .insignias
-                    .includes(insignia)
+                    .includes(
+                        insignia
+                    )
             ) {
+
                 return m.reply(
                     '⚠️ Ese usuario ya tiene esa insignia.'
                 )
@@ -1083,11 +1324,16 @@ let handler = async (
                 m.chat,
                 {
                     text:
-`🏅 *INSIGNIA OTORGADA*
+`╭━━〔 🏅 *INSIGNIA* 〕━━╮
 
-👤 ${tag(jid)}
-🎖️ ${insigniasDisponibles[insignia]}`,
-                    mentions: [jid]
+👤 Usuario: ${tag(jid)}
+
+🎖️ ${insigniasDisponibles[insignia]}
+
+╰━━━━━━━━━━━━━━━━━━╯`,
+                    mentions: [
+                        jid
+                    ]
                 },
                 {
                     quoted: m
@@ -1096,7 +1342,7 @@ let handler = async (
         }
 
         // ====================================================
-        // ❌ QUITAR INSIGNIA
+        // ❌ QUITAR
         // ====================================================
 
         if (
@@ -1109,6 +1355,7 @@ let handler = async (
                     conn
                 )
             ) {
+
                 return m.reply(
                     '🚫 Solo el dueño puede quitar insignias.'
                 )
@@ -1121,13 +1368,16 @@ let handler = async (
                 )
 
             if (!objetivo) {
+
                 return m.reply(
                     '❌ Menciona o responde al usuario.'
                 )
             }
 
             const partes =
-                String(text || '')
+                String(
+                    text || ''
+                )
                     .trim()
                     .split(/\s+/)
 
@@ -1145,13 +1395,13 @@ let handler = async (
             if (!insignia) {
 
                 return m.reply(
-                    `❌ Debes indicar una insignia.\n\n` +
+                    `❌ *INDICA UNA INSIGNIA*\n\n` +
                     Object.entries(
                         insigniasDisponibles
                     )
                         .map(
                             ([id, nombre]) =>
-                                `• ${id} — ${nombre}`
+                                `┃ ${id} → ${nombre}`
                         )
                         .join('\n')
                 )
@@ -1169,6 +1419,7 @@ let handler = async (
                     perfiles[jid].insignias
                 )
             ) {
+
                 return m.reply(
                     '❌ Ese usuario no tiene insignias.'
                 )
@@ -1184,6 +1435,7 @@ let handler = async (
             if (
                 index === -1
             ) {
+
                 return m.reply(
                     '❌ Ese usuario no tiene esa insignia.'
                 )
@@ -1205,11 +1457,16 @@ let handler = async (
                 m.chat,
                 {
                     text:
-`🗑️ *INSIGNIA ELIMINADA*
+`╭━━〔 🗑️ *INSIGNIA ELIMINADA* 〕━━╮
 
-👤 ${tag(jid)}
-🎖️ ${insigniasDisponibles[insignia]}`,
-                    mentions: [jid]
+👤 Usuario: ${tag(jid)}
+
+🎖️ ${insigniasDisponibles[insignia]}
+
+╰━━━━━━━━━━━━━━━━━━━━━━╯`,
+                    mentions: [
+                        jid
+                    ]
                 },
                 {
                     quoted: m
@@ -1239,9 +1496,13 @@ let handler = async (
                     m.chat,
                     {
                         text:
-`🏅 *INSIGNIAS DE ${tag(targetId)}*
+`╭━━〔 🏅 *INSIGNIAS* 〕━━╮
 
-No tiene insignias actualmente.`,
+👤 ${tag(targetId)}
+
+😿 No tiene insignias actualmente.
+
+╰━━━━━━━━━━━━━━━━━━╯`,
                         mentions: [
                             targetId
                         ]
@@ -1255,8 +1516,8 @@ No tiene insignias actualmente.`,
             const texto =
                 lista
                     .map(
-                        x =>
-                            `• ${
+                        (x, i) =>
+                            `${i + 1}. ${
                                 insigniasDisponibles[x] ||
                                 x
                             }`
@@ -1267,9 +1528,13 @@ No tiene insignias actualmente.`,
                 m.chat,
                 {
                     text:
-`🏅 *INSIGNIAS DE ${tag(targetId)}*
+`╭━━〔 🏅 *INSIGNIAS* 〕━━╮
 
-${texto}`,
+👤 ${tag(targetId)}
+
+${texto}
+
+╰━━━━━━━━━━━━━━━━━━╯`,
                     mentions: [
                         targetId
                     ]
@@ -1309,10 +1574,6 @@ ${texto}`,
 
             } else {
 
-                // =================================================
-                // 🔄 BUSCAR RELACIÓN INVERSA
-                // =================================================
-
                 for (
                     const [
                         id,
@@ -1343,7 +1604,7 @@ ${texto}`,
             }
 
             // ==================================================
-            // 🧬 TODOS LOS HERMANOS
+            // 🧬 HERMANOS
             // ==================================================
 
             const hermanos =
@@ -1364,7 +1625,7 @@ ${texto}`,
                 )
 
             // ==================================================
-            // 🎂 DATOS PERSONALES
+            // 🎂 DATOS
             // ==================================================
 
             const edad =
@@ -1419,7 +1680,7 @@ ${texto}`,
                     : []
 
             // ==================================================
-            // 📸 FOTO DE PERFIL
+            // 📸 FOTO
             // ==================================================
 
             let ppUrl = null
@@ -1444,69 +1705,93 @@ ${texto}`,
                 null
 
             // ==================================================
-            // 📝 PERFIL BASE
+            // 🎨 CABECERA
             // ==================================================
 
             let texto =
 `╭━━━〔 👤 *PERFIL* 〕━━━╮
+┃
+┃ 👤 *Usuario*
+┃ ${tag(targetId)}
+┃
+┃ ${role}
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
 
-👤 *Usuario:* ${tag(targetId)}
-${role}
+            // ==================================================
+            // 📝 INFORMACIÓN
+            // ==================================================
 
-📝 *Bio:*
-${perfil.bio || 'Sin biografía'}
+            texto +=
+`
 
-⚧️ *Género:* ${
-    perfil.genero ||
-    'No especificado'
-}
-
-🎂 *Edad:* ${
+╭━━〔 📋 *INFORMACIÓN* 〕━━╮
+┃
+┃ 📝 *Bio*
+┃ ${perfil.bio || 'Sin biografía'}
+┃
+┃ ⚧️ *Género*
+┃ ${perfil.genero || 'No especificado'}
+┃
+┃ 🎂 *Edad*
+┃ ${
     edad !== null
         ? `${edad} años`
         : 'No registrada'
 }
-
-♈ *Signo:* ${signo}
-
-🎂 *Cumpleaños:* ${
+┃
+┃ ♈ *Signo*
+┃ ${signo}
+┃
+┃ 🎉 *Cumpleaños*
+┃ ${
     cumple !== null
         ? `faltan ${cumple} días`
         : 'No registrado'
 }
-
-📅 *Registrado:* ${
-    formatDate(
-        registered
-    )
-}`
+┃
+┃ 📅 *Registrado*
+┃ ${formatDate(registered)}
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
 
             // ==================================================
             // ❤️ PAREJA
             // ==================================================
 
             texto +=
-`\n\n❤️ *RELACIÓN*\n`
+`
+
+╭━━〔 ❤️ *VIDA AMOROSA* 〕━━╮
+┃`
 
             if (
                 parejaJid
             ) {
 
                 texto +=
-`💞 Pareja: ${tag(parejaJid)}\n`
+`
+┃ 💞 *Pareja*
+┃ ${tag(parejaJid)}
+┃
+┃ 💕 Estado: En una relación`
 
             } else {
 
                 texto +=
-`💔 Soltero/a\n`
+`
+┃ 💔 *Estado*
+┃ Soltero/a`
             }
+
+            texto +=
+`
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
 
             // ==================================================
             // 🧬 HERMANOS
             // ==================================================
-
-            texto +=
-`\n🧬 *HERMANOS*`
 
             const mentions = [
                 targetId
@@ -1515,22 +1800,33 @@ ${perfil.bio || 'Sin biografía'}
             if (
                 parejaJid
             ) {
+
                 mentions.push(
                     parejaJid
                 )
             }
+
+            texto +=
+`
+
+╭━━〔 🧬 *FAMILIA* 〕━━╮
+┃
+┃ 🤝 *Hermanos*
+┃ ${brotherData.length}/3
+┃`
 
             if (
                 !brotherData.length
             ) {
 
                 texto +=
-`\n😹 No tiene hermanos registrados.`
+`
+┃
+┃ 😿 No tiene hermanos
+┃ registrados.
+┃`
 
             } else {
-
-                texto +=
-`\n`
 
                 brotherData.forEach(
                     (
@@ -1548,12 +1844,14 @@ ${perfil.bio || 'Sin biografía'}
 
                         texto +=
 `
-${numero}. 🤝 ${tag(brother.jid)}
-   💪 Nivel: ${brother.nivel}
-   🏅 ${rangoHermano(brother.nivel)}
-   🎮 Interacciones: ${brother.interacciones}
-   📅 Desde: ${formatDate(brother.fecha)}
-   🕒 ${dias} días`
+┃
+┃ ${numero}. 🤝 ${tag(brother.jid)}
+┃ ├─ 💪 Nivel: ${brother.nivel}
+┃ ├─ 🏅 ${rangoHermano(brother.nivel)}
+┃ ├─ 🎮 Interacciones: ${brother.interacciones}
+┃ ├─ 📅 Desde: ${formatDate(brother.fecha)}
+┃ └─ 🕒 ${dias} días
+┃`
 
                         mentions.push(
                             brother.jid
@@ -1562,33 +1860,51 @@ ${numero}. 🤝 ${tag(brother.jid)}
                 )
             }
 
+            texto +=
+`
+╰━━━━━━━━━━━━━━━━━━━━╯`
+
             // ==================================================
             // 🏅 INSIGNIAS
             // ==================================================
 
             texto +=
-`\n\n🏅 *INSIGNIAS*\n`
+`
+
+╭━━〔 🏅 *INSIGNIAS* 〕━━╮
+┃`
 
             if (
                 insignias.length
             ) {
 
-                texto +=
-                    insignias
-                        .map(
-                            x =>
-                                `• ${
-                                    insigniasDisponibles[x] ||
-                                    x
-                                }`
-                        )
-                        .join('\n')
+                insignias.forEach(
+                    (
+                        insignia,
+                        index
+                    ) => {
+
+                        texto +=
+`
+┃ ${index + 1}. ${
+    insigniasDisponibles[insignia] ||
+    insignia
+}`
+
+                    }
+                )
 
             } else {
 
                 texto +=
-                    'Sin insignias'
+`
+┃ 😿 Sin insignias`
             }
+
+            texto +=
+`
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
 
             // ==================================================
             // 📊 RESUMEN
@@ -1597,26 +1913,27 @@ ${numero}. 🤝 ${tag(brother.jid)}
             texto +=
 `
 
-━━━━━━━━━━━━━━━━━━━━
-🧬 *Resumen familiar*
-
-❤️ Pareja: ${
+╭━━〔 📊 *RESUMEN* 〕━━╮
+┃
+┃ ❤️ Pareja:
+┃ ${
     parejaJid
-        ? 'Sí'
-        : 'No'
+        ? '💞 Sí'
+        : '💔 No'
 }
+┃
+┃ 🤝 Hermanos:
+┃ ${brotherData.length}/3
+┃
+┃ 🏅 Insignias:
+┃ ${insignias.length}
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯
 
-🤝 Hermanos: ${
-    brotherData.length
-}/3
-
-🏅 Insignias: ${
-    insignias.length
-}
-━━━━━━━━━━━━━━━━━━━━`
+> ✨ *WhatsApp-Bot • Perfil personal*`
 
             // ==================================================
-            // 📤 ENVIAR CON FOTO
+            // 📤 FOTO + PERFIL
             // ==================================================
 
             if (
@@ -1640,7 +1957,7 @@ ${numero}. 🤝 ${tag(brother.jid)}
             }
 
             // ==================================================
-            // 📤 ENVIAR SIN FOTO
+            // 📤 TEXTO
             // ==================================================
 
             return conn.sendMessage(
@@ -1670,7 +1987,7 @@ ${numero}. 🤝 ${tag(brother.jid)}
 }
 
 // ============================================================
-// 📋 TODOS LOS COMANDOS DEL PERFIL
+// 📋 COMANDOS
 // ============================================================
 
 handler.help = [
@@ -1745,7 +2062,8 @@ handler.before = async function (m) {
             return
         }
 
-        const conn = this
+        const conn =
+            this
 
         if (
             !isOwner(
@@ -1771,15 +2089,7 @@ handler.before = async function (m) {
             )
         ) {
 
-            if (
-                !Array.isArray(
-                    perfiles[jid].insignias
-                )
-            ) {
-                perfiles[jid].insignias = []
-            } else {
-                perfiles[jid].insignias = []
-            }
+            perfiles[jid].insignias = []
         }
 
         saveJSON(
@@ -1788,8 +2098,12 @@ handler.before = async function (m) {
         )
 
         return m.reply(
-            '🧹 *INSIGNIAS LIMPIADAS*\n\n' +
-            '✅ Todas las insignias fueron eliminadas.'
+            `╭━━〔 🧹 *INSIGNIAS LIMPIADAS* 〕━━╮
+
+┃ ✅ Todas las insignias
+┃ fueron eliminadas correctamente.
+
+╰━━━━━━━━━━━━━━━━━━━━━━╯`
         )
 
     } catch (e) {

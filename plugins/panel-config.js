@@ -1,8 +1,6 @@
 // 📂 plugins/grupo-configuracion.js
 // ⚙️ PANEL DE CONFIGURACIÓN DEL GRUPO
-// 🔗 Integrado con welcome.js PRO ULTRA
 // ============================================================
-
 
 // ============================================================
 // 🔄 ALIAS DE CONFIGURACIÓN
@@ -59,26 +57,9 @@ const aliasMap = {
   welcome: [
     'welcome',
     'bienvenida'
-  ],
-
-  welcomePhoto: [
-    'welcomePhoto'
-  ],
-
-  welcomeGroupPhoto: [
-    'welcomeGroupPhoto'
-  ],
-
-  welcomeMention: [
-    'welcomeMention'
-  ],
-
-  welcomeAntiSpam: [
-    'welcomeAntiSpam'
   ]
 
 }
-
 
 // ============================================================
 // 🔎 OBTENER ESTADO
@@ -86,21 +67,15 @@ const aliasMap = {
 
 function getChatValue(chat, key) {
 
-  const keys =
-    aliasMap[key]
+  const keys = aliasMap[key]
 
-  if (!keys) {
-    return false
-  }
+  if (!keys) return false
 
   for (const k of keys) {
 
-    if (
-      chat[k] !== undefined
-    ) {
+    if (chat[k] !== undefined) {
 
-      const value =
-        chat[k]
+      const value = chat[k]
 
       return (
         value === true ||
@@ -117,7 +92,6 @@ function getChatValue(chat, key) {
   return false
 }
 
-
 // ============================================================
 // 🟢 / 🔴 ESTADO
 // ============================================================
@@ -128,7 +102,6 @@ function status(value) {
     ? '🟢 ACTIVADO'
     : '🔴 DESACTIVADO'
 }
-
 
 // ============================================================
 // 🚀 HANDLER
@@ -153,109 +126,53 @@ let handler = async (
     )
   }
 
-
   // ==========================================================
   // 🛡️ ADMIN / OWNER
   // ==========================================================
 
-  if (
-    !isAdmin &&
-    !isOwner
-  ) {
+  if (!isAdmin && !isOwner) {
 
     return m.reply(
       '🚫 Solo administradores pueden usar este panel.'
     )
   }
 
-
   // ==========================================================
   // 📂 BASE DE DATOS
   // ==========================================================
 
-  if (
-    !global.db ||
-    !global.db.data
-  ) {
+  if (!global.db?.data) {
 
     return m.reply(
       '❌ La base de datos no está disponible.'
     )
   }
 
-
-  if (
-    !global.db.data.chats
-  ) {
-
+  if (!global.db.data.chats) {
     global.db.data.chats = {}
   }
 
-
-  if (
-    !global.db.data.chats[m.chat]
-  ) {
-
+  if (!global.db.data.chats[m.chat]) {
     global.db.data.chats[m.chat] = {}
   }
 
-
   const chat =
     global.db.data.chats[m.chat]
-
-
-  // ==========================================================
-  // 📊 ESTADOS
-  // ==========================================================
-
-  const welcome =
-    getChatValue(
-      chat,
-      'welcome'
-    )
-
-  const welcomePhoto =
-    getChatValue(
-      chat,
-      'welcomePhoto'
-    )
-
-  const welcomeGroupPhoto =
-    getChatValue(
-      chat,
-      'welcomeGroupPhoto'
-    )
-
-  const welcomeMention =
-    getChatValue(
-      chat,
-      'welcomeMention'
-    )
-
-  const welcomeAntiSpam =
-    getChatValue(
-      chat,
-      'welcomeAntiSpam'
-    )
-
 
   // ==========================================================
   // 📋 PANEL
   // ==========================================================
 
   const panel = `
-╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+╭━━━━━━━━━━━━━━━━━━━━━━╮
 ┃ ⚙️ *CONFIGURACIÓN DEL GRUPO*
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-📌 *Panel central de configuración*
+📌 *Usá los comandos para activar o desactivar cada función.*
 
-Usá los comandos para cambiar cada
-función. No necesitás escribir ON/OFF.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 🛡️ *SEGURIDAD*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 
 🔗 AntiLink
 └─ ${status(getChatValue(chat, 'antilink'))}
@@ -277,10 +194,9 @@ función. No necesitás escribir ON/OFF.
 └─ ${status(getChatValue(chat, 'antitagall'))}
    └─ *.antitagall*
 
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 🛠️ *ADMINISTRACIÓN*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 
 🎭 Evento del grupo
 └─ ${status(getChatValue(chat, 'evento'))}
@@ -290,69 +206,17 @@ función. No necesitás escribir ON/OFF.
 └─ ${status(getChatValue(chat, 'onlyadmin'))}
    └─ *.modoadmin*
 
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 👋 *WELCOME / LEAVE*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 
-🎉 Sistema Welcome
-└─ ${status(welcome)}
+🎉 Welcome
+└─ ${status(getChatValue(chat, 'welcome'))}
    └─ *.welcome*
 
-🖼️ Foto del usuario
-└─ ${status(welcomePhoto)}
-   └─ *.welcomefoto*
-
-🏠 Foto del grupo
-└─ ${status(welcomeGroupPhoto)}
-   └─ *.welcomegroup*
-
-📢 Menciones
-└─ ${status(welcomeMention)}
-   └─ Configuración interna
-
-🛡️ Anti-duplicados
-└─ ${status(welcomeAntiSpam)}
-   └─ Configuración interna
-
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 *MENSAJES WELCOME*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎉 Bienvenida personalizada
-└─ *.set1 <mensaje>*
-
-🎉 Alias de bienvenida
-└─ *.setwelcome <mensaje>*
-
-👋 Despedida personalizada
-└─ *.set2 <mensaje>*
-
-👋 Alias de despedida
-└─ *.setleave <mensaje>*
-
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧪 *PRUEBAS*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎉 Probar bienvenida
-└─ *.testwelcome*
-
-👋 Probar despedida
-└─ *.testleave*
-
-📊 Ver configuración
-└─ *.welcomestatus*
-
-🧹 Restaurar Welcome
-└─ *.clearwel*
-
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 🎮 *EXTRAS*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 
 🎮 Juegos
 └─ ${status(getChatValue(chat, 'juegos'))}
@@ -362,12 +226,9 @@ función. No necesitás escribir ON/OFF.
 └─ ${status(getChatValue(chat, 'nsfw'))}
    └─ *.nsfw*
 
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📚 *RESUMEN DE COMANDOS*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🛡️ SEGURIDAD
+━━━━━━━━━━━━━━━━━━━━━━
+📌 *COMANDOS DE CONFIGURACIÓN*
+━━━━━━━━━━━━━━━━━━━━━━
 
 🔗 .antilink
 🌍 .antilink2
@@ -375,40 +236,16 @@ función. No necesitás escribir ON/OFF.
 🛡️ .antispam
 ⚡ .antitagall
 
-🛠️ ADMINISTRACIÓN
-
 🎭 .evento
 👑 .modoadmin
 
-👋 WELCOME
-
-🎉 .welcome
-🖼️ .welcomefoto
-🏠 .welcomegroup
-
-📝 MENSAJES
-
-🎉 .set1
-🎉 .setwelcome
-👋 .set2
-👋 .setleave
-
-🧪 PRUEBAS
-
-🧪 .testwelcome
-🧪 .testleave
-📊 .welcomestatus
-🧹 .clearwel
-
-🎮 EXTRAS
+👋 .welcome
 
 🎮 .juegos
 🔞 .nsfw
 
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 *IMPORTANTE*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
+💡 *FUNCIONAMIENTO*
 
 Los comandos funcionan como interruptor.
 
@@ -416,53 +253,34 @@ Ejemplo:
 
 *.welcome*
 
-🟢 Activado
-⬇️
+🟢 ACTIVADO
+
+Volvés a usar:
+
 *.welcome*
-⬇️
-🔴 Desactivado
 
-Lo mismo:
+🔴 DESACTIVADO
 
-*.welcomefoto*
-
-*.welcomegroup*
-
-*.antilink*
-
-*.antispam*
-
-etc.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 ⚙️ *PANEL DE CONFIGURACIÓN*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 `.trim()
 
-
   // ==========================================================
-  // 📤 ENVIAR
+  // 📤 ENVIAR PANEL
   // ==========================================================
 
-  return m.reply(
-    panel
-  )
+  return m.reply(panel)
 }
-
 
 // ============================================================
 // 📚 AYUDA
 // ============================================================
 
 handler.help = [
-
   'panel',
-  'config',
-  'configuracion',
-  'configuración'
-
+  'config'
 ]
-
 
 // ============================================================
 // 🏷️ CATEGORÍA
@@ -472,20 +290,14 @@ handler.tags = [
   'grupo'
 ]
 
-
 // ============================================================
 // ⚙️ COMANDOS
 // ============================================================
 
 handler.command = [
-
   'panel',
-  'config',
-  'configuracion',
-  'configuración'
-
+  'config'
 ]
-
 
 // ============================================================
 // 👥 SOLO GRUPOS
@@ -493,13 +305,11 @@ handler.command = [
 
 handler.group = true
 
-
 // ============================================================
 // 👮 SOLO ADMIN
 // ============================================================
 
 handler.admin = true
-
 
 // ============================================================
 // 📤 EXPORT

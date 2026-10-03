@@ -1,21 +1,84 @@
-// 📂 plugins/grupo-configuracion.js — Panel de configuración del grupo
+// 📂 plugins/grupo-configuracion.js
+// ⚙️ PANEL DE CONFIGURACIÓN DEL GRUPO
+// 🔗 Integrado con welcome.js PRO ULTRA
+// ============================================================
+
 
 // ============================================================
 // 🔄 ALIAS DE CONFIGURACIÓN
 // ============================================================
 
 const aliasMap = {
-  antifake: ["antifake", "antiFake"],
-  antispam: ["antispam", "antiSpam"],
-  antilink: ["antilink", "antiLink"],
-  antilink2: ["antilink2", "antiLink2"],
-  antitagall: ["tagallEnabled", "antitagall"],
-  evento: ["evento", "detect"],
-  onlyadmin: ["onlyadmin", "onlyAdmin", "soloAdmins", "modoadmin"],
-  nsfw: ["nsfw"],
-  juegos: ["juegos", "games"],
-  welcome: ["welcome", "bienvenida"]
+
+  antifake: [
+    'antifake',
+    'antiFake'
+  ],
+
+  antispam: [
+    'antispam',
+    'antiSpam'
+  ],
+
+  antilink: [
+    'antilink',
+    'antiLink'
+  ],
+
+  antilink2: [
+    'antilink2',
+    'antiLink2'
+  ],
+
+  antitagall: [
+    'tagallEnabled',
+    'antitagall'
+  ],
+
+  evento: [
+    'evento',
+    'detect'
+  ],
+
+  onlyadmin: [
+    'onlyadmin',
+    'onlyAdmin',
+    'soloAdmins',
+    'modoadmin'
+  ],
+
+  nsfw: [
+    'nsfw'
+  ],
+
+  juegos: [
+    'juegos',
+    'games'
+  ],
+
+  welcome: [
+    'welcome',
+    'bienvenida'
+  ],
+
+  welcomePhoto: [
+    'welcomePhoto'
+  ],
+
+  welcomeGroupPhoto: [
+    'welcomeGroupPhoto'
+  ],
+
+  welcomeMention: [
+    'welcomeMention'
+  ],
+
+  welcomeAntiSpam: [
+    'welcomeAntiSpam'
+  ]
+
 }
+
 
 // ============================================================
 // 🔎 OBTENER ESTADO
@@ -23,18 +86,30 @@ const aliasMap = {
 
 function getChatValue(chat, key) {
 
-  const keys = aliasMap[key]
+  const keys =
+    aliasMap[key]
 
-  if (!keys) return false
+  if (!keys) {
+    return false
+  }
 
   for (const k of keys) {
 
-    if (chat[k] !== undefined) {
+    if (
+      chat[k] !== undefined
+    ) {
+
+      const value =
+        chat[k]
 
       return (
-        chat[k] === true ||
-        chat[k] === 1 ||
-        chat[k] === 'on'
+        value === true ||
+        value === 1 ||
+        value === '1' ||
+        value === 'on' ||
+        value === 'true' ||
+        value === 'activo' ||
+        value === 'activado'
       )
     }
   }
@@ -42,150 +117,392 @@ function getChatValue(chat, key) {
   return false
 }
 
+
+// ============================================================
+// 🟢 / 🔴 ESTADO
+// ============================================================
+
+function status(value) {
+
+  return value
+    ? '🟢 ACTIVADO'
+    : '🔴 DESACTIVADO'
+}
+
+
 // ============================================================
 // 🚀 HANDLER
 // ============================================================
 
-let handler = async (m, { isAdmin, isOwner }) => {
+let handler = async (
+  m,
+  {
+    isAdmin,
+    isOwner
+  }
+) => {
 
   // ==========================================================
   // 👥 SOLO GRUPOS
   // ==========================================================
 
   if (!m.isGroup) {
+
     return m.reply(
       '⚠️ Este comando solo funciona en grupos.'
     )
   }
 
+
   // ==========================================================
-  // 🛡️ SOLO ADMIN / OWNER
+  // 🛡️ ADMIN / OWNER
   // ==========================================================
 
-  if (!isAdmin && !isOwner) {
+  if (
+    !isAdmin &&
+    !isOwner
+  ) {
+
     return m.reply(
       '🚫 Solo administradores pueden usar este panel.'
     )
   }
 
+
   // ==========================================================
-  // 📂 DATOS DEL GRUPO
+  // 📂 BASE DE DATOS
   // ==========================================================
+
+  if (
+    !global.db ||
+    !global.db.data
+  ) {
+
+    return m.reply(
+      '❌ La base de datos no está disponible.'
+    )
+  }
+
+
+  if (
+    !global.db.data.chats
+  ) {
+
+    global.db.data.chats = {}
+  }
+
+
+  if (
+    !global.db.data.chats[m.chat]
+  ) {
+
+    global.db.data.chats[m.chat] = {}
+  }
+
 
   const chat =
-    global.db?.data?.chats?.[m.chat] || {}
+    global.db.data.chats[m.chat]
+
 
   // ==========================================================
-  // 🟢 / 🔴 ESTADOS
+  // 📊 ESTADOS
   // ==========================================================
 
-  const on = '🟢 ACTIVADO'
-  const off = '🔴 DESACTIVADO'
+  const welcome =
+    getChatValue(
+      chat,
+      'welcome'
+    )
+
+  const welcomePhoto =
+    getChatValue(
+      chat,
+      'welcomePhoto'
+    )
+
+  const welcomeGroupPhoto =
+    getChatValue(
+      chat,
+      'welcomeGroupPhoto'
+    )
+
+  const welcomeMention =
+    getChatValue(
+      chat,
+      'welcomeMention'
+    )
+
+  const welcomeAntiSpam =
+    getChatValue(
+      chat,
+      'welcomeAntiSpam'
+    )
+
 
   // ==========================================================
   // 📋 PANEL
   // ==========================================================
 
   const panel = `
-╭━━━━━━━━━━━━━━━━━━━━━━╮
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
 ┃ ⚙️ *CONFIGURACIÓN DEL GRUPO*
-╰━━━━━━━━━━━━━━━━━━━━━━╯
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-📌 *Usá los comandos para activar o desactivar cada función.*
+📌 *Panel central de configuración*
 
-━━━━━━━━━━━━━━━━━━━━━━
+Usá los comandos para cambiar cada
+función. No necesitás escribir ON/OFF.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🛡️ *SEGURIDAD*
-━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🔗 AntiLink       » ${getChatValue(chat, 'antilink') ? on : off}
+🔗 AntiLink
+└─ ${status(getChatValue(chat, 'antilink'))}
+   └─ *.antilink*
 
-🌍 AntiLink Social » ${getChatValue(chat, 'antilink2') ? on : off}
+🌍 AntiLink Social
+└─ ${status(getChatValue(chat, 'antilink2'))}
+   └─ *.antilink2*
 
-🚫 AntiFake       » ${getChatValue(chat, 'antifake') ? on : off}
+🚫 AntiFake
+└─ ${status(getChatValue(chat, 'antifake'))}
+   └─ *.antifake*
 
-🛡️ AntiSpam       » ${getChatValue(chat, 'antispam') ? on : off}
+🛡️ AntiSpam
+└─ ${status(getChatValue(chat, 'antispam'))}
+   └─ *.antispam*
 
-⚡ AntiTagAll      » ${getChatValue(chat, 'antitagall') ? on : off}
+⚡ AntiTagAll
+└─ ${status(getChatValue(chat, 'antitagall'))}
+   └─ *.antitagall*
 
 
-━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🛠️ *ADMINISTRACIÓN*
-━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🎭 Evento del grupo » ${getChatValue(chat, 'evento') ? on : off}
+🎭 Evento del grupo
+└─ ${status(getChatValue(chat, 'evento'))}
+   └─ *.evento*
 
-👑 Solo Admins      » ${getChatValue(chat, 'onlyadmin') ? on : off}
-
-
-━━━━━━━━━━━━━━━━━━━━━━
-👋 *BIENVENIDA*
-━━━━━━━━━━━━━━━━━━━━━━
-
-👋 Mensaje Welcome  » ${getChatValue(chat, 'welcome') ? on : off}
+👑 Solo Administradores
+└─ ${status(getChatValue(chat, 'onlyadmin'))}
+   └─ *.modoadmin*
 
 
-━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👋 *WELCOME / LEAVE*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 Sistema Welcome
+└─ ${status(welcome)}
+   └─ *.welcome*
+
+🖼️ Foto del usuario
+└─ ${status(welcomePhoto)}
+   └─ *.welcomefoto*
+
+🏠 Foto del grupo
+└─ ${status(welcomeGroupPhoto)}
+   └─ *.welcomegroup*
+
+📢 Menciones
+└─ ${status(welcomeMention)}
+   └─ Configuración interna
+
+🛡️ Anti-duplicados
+└─ ${status(welcomeAntiSpam)}
+   └─ Configuración interna
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 *MENSAJES WELCOME*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 Bienvenida personalizada
+└─ *.set1 <mensaje>*
+
+🎉 Alias de bienvenida
+└─ *.setwelcome <mensaje>*
+
+👋 Despedida personalizada
+└─ *.set2 <mensaje>*
+
+👋 Alias de despedida
+└─ *.setleave <mensaje>*
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧪 *PRUEBAS*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 Probar bienvenida
+└─ *.testwelcome*
+
+👋 Probar despedida
+└─ *.testleave*
+
+📊 Ver configuración
+└─ *.welcomestatus*
+
+🧹 Restaurar Welcome
+└─ *.clearwel*
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎮 *EXTRAS*
-━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🎮 Juegos           » ${getChatValue(chat, 'juegos') ? on : off}
+🎮 Juegos
+└─ ${status(getChatValue(chat, 'juegos'))}
+   └─ *.juegos*
 
-🔞 NSFW             » ${getChatValue(chat, 'nsfw') ? on : off}
+🔞 NSFW
+└─ ${status(getChatValue(chat, 'nsfw'))}
+   └─ *.nsfw*
 
 
-━━━━━━━━━━━━━━━━━━━━━━
-📌 *COMANDOS DE CONFIGURACIÓN*
-━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 *RESUMEN DE COMANDOS*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🛡️ SEGURIDAD
 
 🔗 .antilink
 🌍 .antilink2
+🚫 .antifake
 🛡️ .antispam
 ⚡ .antitagall
+
+🛠️ ADMINISTRACIÓN
+
+🎭 .evento
 👑 .modoadmin
-👋 .welcome
+
+👋 WELCOME
+
+🎉 .welcome
+🖼️ .welcomefoto
+🏠 .welcomegroup
+
+📝 MENSAJES
+
+🎉 .set1
+🎉 .setwelcome
+👋 .set2
+👋 .setleave
+
+🧪 PRUEBAS
+
+🧪 .testwelcome
+🧪 .testleave
+📊 .welcomestatus
+🧹 .clearwel
+
+🎮 EXTRAS
+
 🎮 .juegos
 🔞 .nsfw
 
-━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 *IMPORTANTE*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Los comandos funcionan como interruptor.
+
+Ejemplo:
+
+*.welcome*
+
+🟢 Activado
+⬇️
+*.welcome*
+⬇️
+🔴 Desactivado
+
+Lo mismo:
+
+*.welcomefoto*
+
+*.welcomegroup*
+
+*.antilink*
+
+*.antispam*
+
+etc.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚙️ *PANEL DE CONFIGURACIÓN*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `.trim()
 
+
   // ==========================================================
-  // 📤 ENVIAR PANEL
+  // 📤 ENVIAR
   // ==========================================================
 
-  return m.reply(panel)
+  return m.reply(
+    panel
+  )
 }
+
 
 // ============================================================
 // 📚 AYUDA
 // ============================================================
 
 handler.help = [
+
   'panel',
-  'config'
+  'config',
+  'configuracion',
+  'configuración'
+
 ]
+
 
 // ============================================================
 // 🏷️ CATEGORÍA
 // ============================================================
 
 handler.tags = [
-  'group'
+  'grupo'
 ]
+
 
 // ============================================================
 // ⚙️ COMANDOS
 // ============================================================
 
 handler.command = [
+
   'panel',
-  'config'
+  'config',
+  'configuracion',
+  'configuración'
+
 ]
+
 
 // ============================================================
 // 👥 SOLO GRUPOS
 // ============================================================
 
 handler.group = true
+
+
+// ============================================================
+// 👮 SOLO ADMIN
+// ============================================================
+
+handler.admin = true
+
+
+// ============================================================
+// 📤 EXPORT
+// ============================================================
 
 export default handler

@@ -1,111 +1,131 @@
-// 📂 plugins/perfil.js — PERFIL + INSIGNIAS 🐾🏅
-// FELIXCAT_BOT — FELI 2026 PRO
+// ============================================================
+// 📂 plugins/perfil.js
+// 👤 PERFIL COMPLETO — WHATSAPP-BOT
+// 🧬 Soporte para hasta 3 hermanos
+// ❤️ Pareja + hermanos + insignias + bio + género + cumpleaños
+// ============================================================
 
 import fs from 'fs'
 import path from 'path'
 
 // ============================================================
-// 📁 RUTAS
+// 📁 ARCHIVOS
 // ============================================================
 
-const dbPath = './database'
+const DATABASE_DIR = './database'
 
-const perfilesFile = path.join(dbPath, 'perfiles.json')
-const parejasFile = path.join(dbPath, 'parejas.json')
-const hermanosFile = path.join(dbPath, 'hermanos.json')
+const PERFIL_FILE = path.join(
+  DATABASE_DIR,
+  'perfiles.json'
+)
 
-// ============================================================
-// 📂 CREAR DATABASE
-// ============================================================
+const PAREJAS_FILE = path.join(
+  DATABASE_DIR,
+  'parejas.json'
+)
 
-if (!fs.existsSync(dbPath)) {
-  fs.mkdirSync(dbPath, { recursive: true })
+const HERMANOS_FILE = path.join(
+  DATABASE_DIR,
+  'hermanos.json'
+)
+
+if (!fs.existsSync(DATABASE_DIR)) {
+  fs.mkdirSync(DATABASE_DIR, {
+    recursive: true
+  })
 }
 
-if (!fs.existsSync(perfilesFile)) {
+if (!fs.existsSync(PERFIL_FILE)) {
   fs.writeFileSync(
-    perfilesFile,
+    PERFIL_FILE,
     JSON.stringify({}, null, 2)
   )
 }
 
-if (!fs.existsSync(parejasFile)) {
+if (!fs.existsSync(PAREJAS_FILE)) {
   fs.writeFileSync(
-    parejasFile,
+    PAREJAS_FILE,
     JSON.stringify({}, null, 2)
   )
 }
 
-if (!fs.existsSync(hermanosFile)) {
+if (!fs.existsSync(HERMANOS_FILE)) {
   fs.writeFileSync(
-    hermanosFile,
+    HERMANOS_FILE,
     JSON.stringify({}, null, 2)
   )
 }
 
 // ============================================================
-// 💾 LOAD / SAVE
+// 💾 CARGAR JSON
 // ============================================================
 
-const loadJSON = file => {
+function loadJSON(file) {
   try {
     const data = fs.readFileSync(
       file,
       'utf8'
     )
 
-    return JSON.parse(data || '{}')
-
+    return JSON.parse(
+      data || '{}'
+    )
   } catch {
     return {}
   }
 }
 
-const saveJSON = (file, data) => {
-  fs.writeFileSync(
-    file,
-    JSON.stringify(data, null, 2)
-  )
+// ============================================================
+// 💾 GUARDAR JSON
+// ============================================================
+
+function saveJSON(file, data) {
+  try {
+    fs.writeFileSync(
+      file,
+      JSON.stringify(data, null, 2)
+    )
+  } catch (e) {
+    console.error(
+      `❌ Error guardando ${file}:`,
+      e
+    )
+  }
 }
-
-const loadPerfiles = () =>
-  loadJSON(perfilesFile)
-
-const savePerfiles = data =>
-  saveJSON(perfilesFile, data)
-
-const loadParejas = () =>
-  loadJSON(parejasFile)
-
-const loadHermanos = () =>
-  loadJSON(hermanosFile)
 
 // ============================================================
 // 🔧 NORMALIZAR JID
 // ============================================================
 
-const normalizeJid = (jid, conn) => {
+function normalizeJid(jid, conn) {
 
   if (!jid) return null
 
   try {
-
     if (conn?.decodeJid) {
       jid = conn.decodeJid(jid)
     }
-
   } catch {}
 
-  return jid
+  jid = String(jid)
+
+  if (jid.includes('@')) {
+    return jid
+  }
+
+  const number =
+    jid.replace(/[^0-9]/g, '')
+
+  if (!number) return null
+
+  return `${number}@s.whatsapp.net`
 }
 
 // ============================================================
-// 🔍 COMPARAR JID
+// 🔍 COMPARAR USUARIOS
 // ============================================================
 
-const sameUser = (a, b, conn) => {
-
-  if (!a || !b) return false
+function sameUser(a, b, conn) {
 
   a = normalizeJid(a, conn)
   b = normalizeJid(b, conn)
@@ -115,38 +135,35 @@ const sameUser = (a, b, conn) => {
   if (a === b) return true
 
   const clean = jid =>
-    jid
+    String(jid)
       .split(':')[0]
       .split('@')[0]
       .replace(/[^0-9]/g, '')
 
-  const A = clean(a)
-  const B = clean(b)
-
-  return Boolean(
-    A &&
-    B &&
-    A === B
-  )
+  return clean(a) === clean(b)
 }
 
 // ============================================================
-// 🔎 BUSCAR JID EXISTENTE
+// 🔎 BUSCAR JID DENTRO DE JSON
 // ============================================================
 
-const findJid = (db, jid, conn) => {
+function findJid(data, jid, conn) {
 
   if (!jid) return null
 
-  jid = normalizeJid(jid, conn)
+  jid =
+    normalizeJid(
+      jid,
+      conn
+    )
 
   if (!jid) return null
 
-  if (db[jid]) {
+  if (data[jid]) {
     return jid
   }
 
-  for (const id of Object.keys(db)) {
+  for (const id of Object.keys(data)) {
 
     if (
       sameUser(
@@ -163,208 +180,31 @@ const findJid = (db, jid, conn) => {
 }
 
 // ============================================================
-// 🎂 CALCULAR EDAD
+// 🏷️ MENCION
 // ============================================================
 
-const calcularEdad = fecha => {
+function tag(jid) {
 
-  if (!fecha) return null
-
-  const partes =
-    fecha.split('/').map(Number)
-
-  if (partes.length !== 3) {
-    return null
+  if (!jid) {
+    return '@usuario'
   }
 
-  const [d, m, a] = partes
+  return '@' +
+    String(jid)
+      .split('@')[0]
+      .split(':')[0]
+}
 
-  if (!d || !m || !a) {
-    return null
-  }
+// ============================================================
+// 🎯 OBTENER OBJETIVO
+// ============================================================
 
-  const nacimiento =
-    new Date(a, m - 1, d)
-
-  if (isNaN(nacimiento.getTime())) {
-    return null
-  }
-
-  const hoy = new Date()
-
-  let edad =
-    hoy.getFullYear() -
-    nacimiento.getFullYear()
-
-  const mes =
-    hoy.getMonth() -
-    nacimiento.getMonth()
+function getTarget(m, conn) {
 
   if (
-    mes < 0 ||
-    (
-      mes === 0 &&
-      hoy.getDate() <
-      nacimiento.getDate()
-    )
+    m.mentionedJid &&
+    m.mentionedJid.length
   ) {
-    edad--
-  }
-
-  return edad
-}
-
-// ============================================================
-// ♑ SIGNO ZODIACAL
-// ============================================================
-
-const signoZodiacal = fecha => {
-
-  if (!fecha) return null
-
-  const partes =
-    fecha.split('/').map(Number)
-
-  if (partes.length < 2) {
-    return null
-  }
-
-  const [d, m] = partes
-
-  if (!d || !m || m < 1 || m > 12) {
-    return null
-  }
-
-  const signos = [
-    ['Capricornio ♑', 19],
-    ['Acuario ♒', 18],
-    ['Piscis ♓', 20],
-    ['Aries ♈', 19],
-    ['Tauro ♉', 20],
-    ['Géminis ♊', 20],
-    ['Cáncer ♋', 22],
-    ['Leo ♌', 22],
-    ['Virgo ♍', 22],
-    ['Libra ♎', 22],
-    ['Escorpio ♏', 21],
-    ['Sagitario ♐', 21],
-    ['Capricornio ♑', 31]
-  ]
-
-  return d <= signos[m - 1][1]
-    ? signos[m - 1][0]
-    : signos[m][0]
-}
-
-// ============================================================
-// ⏳ TIEMPO DE RELACIÓN
-// ============================================================
-
-const tiempoRelacion = fecha => {
-
-  if (!fecha) return null
-
-  const diff =
-    Date.now() -
-    Number(fecha)
-
-  const dias =
-    Math.max(
-      0,
-      Math.floor(
-        diff / 86400000
-      )
-    )
-
-  return `${dias} día(s)`
-}
-
-// ============================================================
-// 🎂 DÍAS PARA CUMPLEAÑOS
-// ============================================================
-
-const diasParaCumple = fecha => {
-
-  if (!fecha) return null
-
-  const partes =
-    fecha.split('/').map(Number)
-
-  if (partes.length < 2) {
-    return null
-  }
-
-  const [d, m] = partes
-
-  if (!d || !m) {
-    return null
-  }
-
-  const hoy = new Date()
-
-  const año =
-    hoy.getFullYear()
-
-  let cumple =
-    new Date(
-      año,
-      m - 1,
-      d
-    )
-
-  if (cumple < hoy) {
-
-    cumple =
-      new Date(
-        año + 1,
-        m - 1,
-        d
-      )
-  }
-
-  return Math.ceil(
-    (cumple - hoy) /
-    86400000
-  )
-}
-
-// ============================================================
-// 👑 DUEÑO
-// ============================================================
-
-const getOwnerNumbers = () => {
-
-  return (global.owner || [])
-    .map(v => {
-
-      if (Array.isArray(v)) {
-        v = v[0]
-      }
-
-      return String(v)
-        .replace(/[^0-9]/g, '')
-    })
-    .filter(Boolean)
-}
-
-const isOwner = jid => {
-
-  const number =
-    String(jid)
-      .replace(/[^0-9]/g, '')
-
-  return getOwnerNumbers()
-    .includes(number)
-}
-
-// ============================================================
-// 🎯 TARGET
-// Mención > CITADO
-// ============================================================
-
-const getTarget = (m, conn) => {
-
-  if (m.mentionedJid?.length) {
 
     return normalizeJid(
       m.mentionedJid[0],
@@ -384,26 +224,635 @@ const getTarget = (m, conn) => {
 }
 
 // ============================================================
-// 🏷️ TAG
+// 📅 FECHA
 // ============================================================
 
-const tag = jid => {
+function formatDate(value) {
 
-  if (!jid) {
-    return '@usuario'
+  if (!value) {
+    return 'No registrada'
   }
 
-  return '@' +
-    jid
-      .split('@')[0]
-      .split(':')[0]
+  const date =
+    new Date(value)
+
+  if (
+    isNaN(
+      date.getTime()
+    )
+  ) {
+    return 'No registrada'
+  }
+
+  return date.toLocaleDateString(
+    'es-UY',
+    {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }
+  )
 }
 
 // ============================================================
-// 🧬 RANGO HERMANOS
+// ⏳ DÍAS ENTRE FECHAS
 // ============================================================
 
-const rangoHermano = nivel => {
+function daysBetween(value) {
+
+  if (!value) {
+    return 0
+  }
+
+  const date =
+    new Date(value)
+
+  if (
+    isNaN(
+      date.getTime()
+    )
+  ) {
+    return 0
+  }
+
+  return Math.max(
+    0,
+    Math.floor(
+      (
+        Date.now() -
+        date.getTime()
+      ) / 86400000
+    )
+  )
+}
+
+// ============================================================
+// 🎂 EDAD
+// ============================================================
+
+function calculateAge(birth) {
+
+  if (!birth) {
+    return null
+  }
+
+  const date =
+    new Date(birth)
+
+  if (
+    isNaN(
+      date.getTime()
+    )
+  ) {
+    return null
+  }
+
+  const now =
+    new Date()
+
+  let age =
+    now.getFullYear() -
+    date.getFullYear()
+
+  const month =
+    now.getMonth() -
+    date.getMonth()
+
+  if (
+    month < 0 ||
+    (
+      month === 0 &&
+      now.getDate() <
+      date.getDate()
+    )
+  ) {
+    age--
+  }
+
+  return age
+}
+
+// ============================================================
+// ♑ SIGNO ZODIACAL
+// ============================================================
+
+function zodiac(day, month) {
+
+  if (!day || !month) {
+    return '❔ Desconocido'
+  }
+
+  const signs = [
+    ['♑ Capricornio', 20],
+    ['♒ Acuario', 19],
+    ['♓ Piscis', 20],
+    ['♈ Aries', 20],
+    ['♉ Tauro', 21],
+    ['♊ Géminis', 21],
+    ['♋ Cáncer', 22],
+    ['♌ Leo', 23],
+    ['♍ Virgo', 23],
+    ['♎ Libra', 23],
+    ['♏ Escorpio', 22],
+    ['♐ Sagitario', 21]
+  ]
+
+  const index =
+    month - 1
+
+  if (
+    day <=
+    signs[index][1]
+  ) {
+
+    return signs[index][0]
+  }
+
+  return signs[
+    (index + 1) % 12
+  ][0]
+}
+
+// ============================================================
+// 🎂 DÍAS PARA CUMPLEAÑOS
+// ============================================================
+
+function daysToBirthday(birth) {
+
+  if (!birth) {
+    return null
+  }
+
+  const date =
+    new Date(birth)
+
+  if (
+    isNaN(
+      date.getTime()
+    )
+  ) {
+    return null
+  }
+
+  const now =
+    new Date()
+
+  let next =
+    new Date(
+      now.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    )
+
+  if (
+    next <
+    new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    )
+  ) {
+
+    next =
+      new Date(
+        now.getFullYear() + 1,
+        date.getMonth(),
+        date.getDate()
+      )
+  }
+
+  return Math.ceil(
+    (
+      next.getTime() -
+      now.getTime()
+    ) / 86400000
+  )
+}
+
+// ============================================================
+// 👑 OBTENER OWNERS
+// ============================================================
+
+function getOwners(conn) {
+
+  return (
+    global.owner || []
+  )
+    .map(v => {
+
+      if (
+        Array.isArray(v)
+      ) {
+        v = v[0]
+      }
+
+      return normalizeJid(
+        v,
+        conn
+      )
+    })
+    .filter(Boolean)
+}
+
+// ============================================================
+// 🛡️ VERIFICAR OWNER
+// ============================================================
+
+function isOwner(m, conn) {
+
+  const owners =
+    getOwners(conn)
+
+  return owners.some(
+    owner =>
+      sameUser(
+        owner,
+        m.sender,
+        conn
+      )
+  )
+}
+
+// ============================================================
+// 👮 ROL
+// ============================================================
+
+async function getRole(
+  m,
+  conn,
+  target
+) {
+
+  try {
+
+    const owners =
+      getOwners(conn)
+
+    if (
+      owners.some(
+        owner =>
+          sameUser(
+            owner,
+            target,
+            conn
+          )
+      )
+    ) {
+      return '👑 Dueño'
+    }
+
+    if (!m.isGroup) {
+      return '👤 Usuario'
+    }
+
+    const metadata =
+      await conn.groupMetadata(
+        m.chat
+      )
+
+    const participant =
+      metadata.participants.find(
+        p =>
+          sameUser(
+            p.id,
+            target,
+            conn
+          )
+      )
+
+    if (
+      participant?.admin ===
+      'superadmin'
+    ) {
+      return '👑 Creador'
+    }
+
+    if (
+      participant?.admin
+    ) {
+      return '🛡️ Administrador'
+    }
+
+  } catch {}
+
+  return '👤 Usuario'
+}
+
+// ============================================================
+// 🧬 OBTENER TODOS LOS HERMANOS
+// ============================================================
+//
+// Soporta:
+//
+// hermano
+//
+// y también:
+//
+// hermanos: []
+//
+// Máximo 3
+// ============================================================
+
+function getAllBrothers(
+  hermanosDB,
+  target,
+  conn
+) {
+
+  const result = []
+
+  const id =
+    findJid(
+      hermanosDB,
+      target,
+      conn
+    )
+
+  const data =
+    hermanosDB[id]
+
+  if (!data) {
+    return result
+  }
+
+  // ========================================================
+  // 🆕 FORMATO NUEVO
+  // hermanos: []
+  // ========================================================
+
+  if (
+    Array.isArray(
+      data.hermanos
+    )
+  ) {
+
+    for (
+      const brother
+      of data.hermanos
+    ) {
+
+      const jid =
+        typeof brother ===
+        'string'
+          ? brother
+          : brother?.jid ||
+            brother?.id
+
+      if (!jid) {
+        continue
+      }
+
+      const normalized =
+        normalizeJid(
+          jid,
+          conn
+        )
+
+      if (!normalized) {
+        continue
+      }
+
+      if (
+        sameUser(
+          normalized,
+          target,
+          conn
+        )
+      ) {
+        continue
+      }
+
+      if (
+        !result.some(
+          x =>
+            sameUser(
+              x.jid,
+              normalized,
+              conn
+            )
+        )
+      ) {
+
+        result.push({
+          jid: normalized,
+          data:
+            typeof brother ===
+            'object'
+              ? brother
+              : {}
+        })
+      }
+    }
+  }
+
+  // ========================================================
+  // 🔄 COMPATIBILIDAD CON FORMATO ANTIGUO
+  // ========================================================
+
+  if (
+    data.hermano
+  ) {
+
+    const normalized =
+      normalizeJid(
+        data.hermano,
+        conn
+      )
+
+    if (
+      normalized &&
+      !result.some(
+        x =>
+          sameUser(
+            x.jid,
+            normalized,
+            conn
+          )
+      )
+    ) {
+
+      result.push({
+        jid: normalized,
+        data
+      })
+    }
+  }
+
+  // ========================================================
+  // 🔍 BUSCAR TAMBIÉN QUIÉNES TIENEN A ESTE USUARIO
+  // COMO HERMANO
+  // ========================================================
+
+  for (
+    const [
+      userId,
+      userData
+    ] of Object.entries(
+      hermanosDB
+    )
+  ) {
+
+    if (
+      result.length >= 3
+    ) {
+      break
+    }
+
+    if (!userData) {
+      continue
+    }
+
+    const lista = []
+
+    if (
+      Array.isArray(
+        userData.hermanos
+      )
+    ) {
+
+      lista.push(
+        ...userData.hermanos
+          .map(x =>
+            typeof x === 'string'
+              ? x
+              : x?.jid ||
+                x?.id
+          )
+          .filter(Boolean)
+      )
+    }
+
+    if (
+      userData.hermano
+    ) {
+      lista.push(
+        userData.hermano
+      )
+    }
+
+    const pertenece =
+      lista.some(
+        brother =>
+          sameUser(
+            brother,
+            target,
+            conn
+          )
+      )
+
+    if (!pertenece) {
+      continue
+    }
+
+    const normalized =
+      normalizeJid(
+        userId,
+        conn
+      )
+
+    if (!normalized) {
+      continue
+    }
+
+    if (
+      sameUser(
+        normalized,
+        target,
+        conn
+      )
+    ) {
+      continue
+    }
+
+    if (
+      !result.some(
+        x =>
+          sameUser(
+            x.jid,
+            normalized,
+            conn
+          )
+      )
+    ) {
+
+      result.push({
+        jid: normalized,
+        data: userData
+      })
+    }
+  }
+
+  // ========================================================
+  // 🔢 MÁXIMO 3
+  // ========================================================
+
+  return result.slice(
+    0,
+    3
+  )
+}
+
+// ============================================================
+// 🧬 INFORMACIÓN DE UN HERMANO
+// ============================================================
+
+function brotherInfo(
+  brother,
+  hermanosDB,
+  conn
+) {
+
+  const jid =
+    brother.jid
+
+  const ownData =
+    hermanosDB[
+      findJid(
+        hermanosDB,
+        jid,
+        conn
+      )
+    ] || {}
+
+  const data =
+    brother.data || {}
+
+  const nivel =
+    Number(
+      data.nivel ??
+      ownData.nivel ??
+      0
+    )
+
+  const interacciones =
+    Number(
+      data.interacciones ??
+      ownData.interacciones ??
+      0
+    )
+
+  const fecha =
+    data.hermandadFecha ||
+    data.fecha ||
+    data.relacionFecha ||
+    ownData.hermandadFecha ||
+    ownData.fecha ||
+    ownData.relacionFecha ||
+    null
+
+  return {
+    jid,
+    nivel,
+    interacciones,
+    fecha
+  }
+}
+
+// ============================================================
+// 🏅 RANGO HERMANOS
+// ============================================================
+
+function rangoHermano(nivel) {
 
   nivel =
     Number(nivel || 0)
@@ -432,61 +881,34 @@ const rangoHermano = nivel => {
 }
 
 // ============================================================
-// 👤 CREAR PERFIL
+// 🏆 INSIGNIAS
 // ============================================================
 
-const createProfile = (
-  perfiles,
-  jid
-) => {
+const insigniasDisponibles = {
 
-  if (!perfiles[jid]) {
+  fundador:
+    '👑 Fundador',
 
-    perfiles[jid] = {
+  vip:
+    '💎 VIP',
 
-      registered: Date.now(),
+  legendario:
+    '🔥 Legendario',
 
-      joinGroup: null,
+  activo:
+    '⚡ Activo',
 
-      insignias: [],
+  veterano:
+    '🎖️ Veterano',
 
-      genero: null,
+  creador:
+    '🛠️ Creador',
 
-      birth: null,
+  gamer:
+    '🎮 Gamer',
 
-      bio: null
-
-    }
-  }
-
-  const user =
-    perfiles[jid]
-
-  if (!Array.isArray(user.insignias)) {
-    user.insignias = []
-  }
-
-  if (!('registered' in user)) {
-    user.registered = Date.now()
-  }
-
-  if (!('joinGroup' in user)) {
-    user.joinGroup = null
-  }
-
-  if (!('genero' in user)) {
-    user.genero = null
-  }
-
-  if (!('birth' in user)) {
-    user.birth = null
-  }
-
-  if (!('bio' in user)) {
-    user.bio = null
-  }
-
-  return user
+  especial:
+    '🌟 Especial'
 }
 
 // ============================================================
@@ -497,192 +919,200 @@ let handler = async (
   m,
   {
     conn,
-    text,
-    command
+    command,
+    text
   }
 ) => {
 
   try {
 
-    // ========================================================
-    // 💾 CARGAR DATABASES
-    // ========================================================
-
     const perfiles =
-      loadPerfiles()
+      loadJSON(
+        PERFIL_FILE
+      )
 
     const parejas =
-      loadParejas()
+      loadJSON(
+        PAREJAS_FILE
+      )
 
-    const hermanos =
-      loadHermanos()
+    const hermanosDB =
+      loadJSON(
+        HERMANOS_FILE
+      )
 
-    // ========================================================
-    // 👤 JID ACTUAL
-    // ========================================================
-
-    const jid =
+    const sender =
       normalizeJid(
         m.sender,
         conn
       )
 
-    if (!jid) {
-      return m.reply(
-        '❌ No se pudo identificar al usuario.'
-      )
-    }
+    // ========================================================
+    // 🎯 TARGET
+    // ========================================================
 
-    const username =
-      jid
-        .split('@')[0]
-        .split(':')[0]
+    const target =
+      getTarget(
+        m,
+        conn
+      ) ||
+      sender
+
+    const targetId =
+      findJid(
+        perfiles,
+        target,
+        conn
+      )
 
     // ========================================================
     // 👤 CREAR PERFIL
     // ========================================================
 
-    const user =
-      createProfile(
-        perfiles,
-        jid
-      )
-
     if (
-      m.isGroup &&
-      !user.joinGroup
+      !perfiles[targetId]
     ) {
 
-      user.joinGroup =
-        Date.now()
-
-      savePerfiles(
-        perfiles
-      )
-    }
-
-    // ========================================================
-    // 🛡️ PERMISOS
-    // ========================================================
-
-    const realOwner =
-      isOwner(jid)
-
-    const admin =
-      m.isAdmin || false
-
-    // ========================================================
-    // ✍️ BIO
-    // ========================================================
-
-    if (command === 'bio') {
-
-      if (!text?.trim()) {
-
-        return m.reply(
-          '✍️ Escribe tu nueva bio.\n\n' +
-          'Ejemplo:\n' +
-          '.bio Amante de la tecnología 🐾'
-        )
+      perfiles[targetId] = {
+        bio: '',
+        genero: '',
+        birth: null,
+        registered:
+          Date.now(),
+        insignias: []
       }
 
-      user.bio =
-        text.trim()
-
-      savePerfiles(
+      saveJSON(
+        PERFIL_FILE,
         perfiles
-      )
-
-      return m.reply(
-        '✅ *Bio actualizada correctamente.*'
       )
     }
 
+    const perfil =
+      perfiles[targetId]
+
     // ========================================================
-    // ⚧️ GENERO
+    // ✏️ SETBR
     // ========================================================
 
-    if (command === 'genero') {
+    if (
+      command === 'setbr'
+    ) {
 
-      if (!text?.trim()) {
+      const nuevo =
+        text?.trim()
+
+      if (!nuevo) {
 
         return m.reply(
-          '⚧️ Escribe tu género.\n\n' +
-          'Ejemplo:\n' +
-          '.genero Masculino'
-        )
-      }
-
-      user.genero =
-        text.trim()
-
-      savePerfiles(
-        perfiles
-      )
-
-      return m.reply(
-        '✅ *Género actualizado correctamente.*'
-      )
-    }
-
-    // ========================================================
-    // 🎂 FECHA NACIMIENTO
-    // ========================================================
-
-    if (command === 'setbr') {
-
-      if (!text?.trim()) {
-
-        return m.reply(
-          '🎂 Usa el formato:\n\n' +
-          '*.setbr 31/12/1998*'
+          '✏️ Usa:\n\n' +
+          '*.setbr <fecha de nacimiento>*'
         )
       }
 
       const fecha =
-        text.trim()
-
-      const partes =
-        fecha.split('/').map(Number)
+        new Date(nuevo)
 
       if (
-        partes.length !== 3 ||
-        !partes.every(Boolean)
+        isNaN(
+          fecha.getTime()
+        )
       ) {
 
         return m.reply(
-          '❌ Formato incorrecto.\n\n' +
-          'Usa:\n' +
-          '*.setbr DD/MM/AAAA*'
+          '❌ Fecha no válida.\n\n' +
+          'Ejemplo:\n' +
+          '*.setbr 31/12/1998*'
         )
       }
 
-      const edad =
-        calcularEdad(fecha)
+      perfil.birth =
+        fecha.toISOString()
 
-      if (
-        edad === null ||
-        edad < 0 ||
-        edad > 120
-      ) {
-
-        return m.reply(
-          '❌ Esa fecha de nacimiento no parece válida.'
-        )
-      }
-
-      user.birth =
-        fecha
-
-      savePerfiles(
+      saveJSON(
+        PERFIL_FILE,
         perfiles
       )
 
       return m.reply(
-        `🎂 *Fecha de nacimiento guardada.*
+        `🎂 *FECHA DE NACIMIENTO ACTUALIZADA*\n\n` +
+        `📅 ${formatDate(perfil.birth)}`
+      )
+    }
 
-📅 ${fecha}
-🎉 Edad actual: ${edad} años`
+    // ========================================================
+    // 📝 BIO
+    // ========================================================
+
+    if (
+      command === 'bio'
+    ) {
+
+      const nuevaBio =
+        text?.trim()
+
+      if (!nuevaBio) {
+
+        if (
+          perfil.bio
+        ) {
+
+          return m.reply(
+            `📝 *TU BIOGRAFÍA*\n\n${perfil.bio}`
+          )
+        }
+
+        return m.reply(
+          '📝 No tienes una biografía.\n\n' +
+          'Usa *.bio <texto>*'
+        )
+      }
+
+      perfil.bio =
+        nuevaBio
+
+      saveJSON(
+        PERFIL_FILE,
+        perfiles
+      )
+
+      return m.reply(
+        '✅ *Biografía actualizada correctamente.*'
+      )
+    }
+
+    // ========================================================
+    // ⚧️ GÉNERO
+    // ========================================================
+
+    if (
+      command === 'genero'
+    ) {
+
+      const genero =
+        text?.trim()
+
+      if (!genero) {
+
+        return m.reply(
+          `⚧️ Tu género actual: ${
+            perfil.genero ||
+            'No especificado'
+          }\n\n` +
+          `Usa *.genero <género>*`
+        )
+      }
+
+      perfil.genero =
+        genero
+
+      saveJSON(
+        PERFIL_FILE,
+        perfiles
+      )
+
+      return m.reply(
+        `✅ Género actualizado: *${genero}*`
       )
     }
 
@@ -690,75 +1120,117 @@ let handler = async (
     // 🏅 OTORGAR INSIGNIA
     // ========================================================
 
-    if (command === 'otorgar') {
+    if (
+      command === 'otorgar'
+    ) {
 
-      if (!realOwner && !admin) {
+      if (
+        !isOwner(
+          m,
+          conn
+        )
+      ) {
 
         return m.reply(
-          '❌ Solo admins o dueño pueden otorgar insignias.'
+          '🚫 Solo el dueño puede otorgar insignias.'
         )
       }
 
-      const targetRaw =
+      const objetivo =
         getTarget(
           m,
           conn
         )
 
-      if (!targetRaw) {
+      if (!objetivo) {
 
         return m.reply(
-          '⚠️ Menciona o responde al usuario.'
+          '❌ Menciona o responde al usuario.'
         )
       }
 
-      const target =
-        findJid(
-          perfiles,
-          targetRaw,
-          conn
-        )
+      const partes =
+        String(text || '')
+          .trim()
+          .split(/\s+/)
 
       const insignia =
-        (text || '')
-          .replace(/@\d+/g, '')
-          .trim()
+        partes
+          .find(
+            x =>
+              insigniasDisponibles[
+                x.toLowerCase()
+              ]
+          )
+          ?.toLowerCase()
 
       if (!insignia) {
 
         return m.reply(
-          '⚠️ Escribe la insignia que quieres otorgar.'
+          `🏅 *INSIGNIAS DISPONIBLES*\n\n` +
+          Object.entries(
+            insigniasDisponibles
+          )
+            .map(
+              ([id, nombre]) =>
+                `• ${id} — ${nombre}`
+            )
+            .join('\n')
         )
       }
 
-      const targetUser =
-        createProfile(
+      const jid =
+        findJid(
           perfiles,
-          target
+          objetivo,
+          conn
         )
 
-      targetUser.insignias.push(
-        insignia
-      )
+      if (
+        !Array.isArray(
+          perfiles[jid].insignias
+        )
+      ) {
 
-      savePerfiles(
+        perfiles[jid].insignias = []
+      }
+
+      if (
+        perfiles[jid]
+          .insignias
+          .includes(insignia)
+      ) {
+
+        return m.reply(
+          '⚠️ Ese usuario ya tiene esa insignia.'
+        )
+      }
+
+      perfiles[jid]
+        .insignias
+        .push(
+          insignia
+        )
+
+      saveJSON(
+        PERFIL_FILE,
         perfiles
       )
 
-      return conn.reply(
+      return conn.sendMessage(
         m.chat,
-
-        `🏅 *INSIGNIA OTORGADA*
-
-👤 Usuario: ${tag(target)}
-
-🏆 ${insignia}`,
-
-        m,
         {
+          text:
+`🏅 *INSIGNIA OTORGADA*
+
+👤 ${tag(jid)}
+🎖️ ${insigniasDisponibles[insignia]}`,
           mentions: [
-            target
+            jid
           ]
+        },
+        {
+          quoted: m
         }
       )
     }
@@ -767,40 +1239,76 @@ let handler = async (
     // ❌ QUITAR INSIGNIA
     // ========================================================
 
-    if (command === 'quitar') {
+    if (
+      command === 'quitar'
+    ) {
 
-      if (!realOwner && !admin) {
+      if (
+        !isOwner(
+          m,
+          conn
+        )
+      ) {
 
         return m.reply(
-          '❌ Solo admins o dueño pueden quitar insignias.'
+          '🚫 Solo el dueño puede quitar insignias.'
         )
       }
 
-      const targetRaw =
+      const objetivo =
         getTarget(
           m,
           conn
         )
 
-      if (!targetRaw) {
+      if (!objetivo) {
 
         return m.reply(
-          '⚠️ Menciona o responde al usuario.'
+          '❌ Menciona o responde al usuario.'
         )
       }
 
-      const target =
+      const partes =
+        String(text || '')
+          .trim()
+          .split(/\s+/)
+
+      const insignia =
+        partes
+          .find(
+            x =>
+              insigniasDisponibles[
+                x.toLowerCase()
+              ]
+          )
+          ?.toLowerCase()
+
+      if (!insignia) {
+
+        return m.reply(
+          `❌ Debes indicar una insignia.\n\n` +
+          Object.entries(
+            insigniasDisponibles
+          )
+            .map(
+              ([id, nombre]) =>
+                `• ${id} — ${nombre}`
+            )
+            .join('\n')
+        )
+      }
+
+      const jid =
         findJid(
           perfiles,
-          targetRaw,
+          objetivo,
           conn
         )
 
-      const targetUser =
-        perfiles[target]
-
       if (
-        !targetUser?.insignias?.length
+        !Array.isArray(
+          perfiles[jid].insignias
+        )
       ) {
 
         return m.reply(
@@ -808,53 +1316,48 @@ let handler = async (
         )
       }
 
-      const insignia =
-        (text || '')
-          .replace(/@\d+/g, '')
-          .trim()
-
-      if (!insignia) {
-
-        return m.reply(
-          '⚠️ Escribe exactamente la insignia que quieres quitar.'
-        )
-      }
-
-      const antes =
-        targetUser.insignias.length
-
-      targetUser.insignias =
-        targetUser.insignias.filter(
-          i => i !== insignia
-        )
+      const index =
+        perfiles[jid]
+          .insignias
+          .indexOf(
+            insignia
+          )
 
       if (
-        targetUser.insignias.length === antes
+        index === -1
       ) {
 
         return m.reply(
-          `❌ ${tag(target)} no tiene esa insignia.`
+          '❌ Ese usuario no tiene esa insignia.'
         )
       }
 
-      savePerfiles(
+      perfiles[jid]
+        .insignias
+        .splice(
+          index,
+          1
+        )
+
+      saveJSON(
+        PERFIL_FILE,
         perfiles
       )
 
-      return conn.reply(
+      return conn.sendMessage(
         m.chat,
-
-        `❌ *INSIGNIA QUITADA*
-
-👤 Usuario: ${tag(target)}
-
-🏆 ${insignia}`,
-
-        m,
         {
+          text:
+`🗑️ *INSIGNIA ELIMINADA*
+
+👤 ${tag(jid)}
+🎖️ ${insigniasDisponibles[insignia]}`,
           mentions: [
-            target
+            jid
           ]
+        },
+        {
+          quoted: m
         }
       )
     }
@@ -863,535 +1366,30 @@ let handler = async (
     // 🏅 VER INSIGNIAS
     // ========================================================
 
-    if (command === 'insignias') {
-
-      const targetRaw =
-        getTarget(
-          m,
-          conn
-        )
-
-      // ------------------------------------------------------
-      // VER LAS DE UN USUARIO
-      // ------------------------------------------------------
-
-      if (targetRaw) {
-
-        const target =
-          findJid(
-            perfiles,
-            targetRaw,
-            conn
-          )
-
-        const data =
-          perfiles[target]
-
-        if (
-          !data?.insignias?.length
-        ) {
-
-          return conn.reply(
-            m.chat,
-            `🏅 ${tag(target)} no tiene insignias.`,
-            m,
-            {
-              mentions: [
-                target
-              ]
-            }
-          )
-        }
-
-        const lista =
-          data.insignias
-            .map(
-              (i, index) =>
-                `${index + 1}. ${i}`
-            )
-            .join('\n')
-
-        return conn.reply(
-          m.chat,
-
-          `🏅 *INSIGNIAS DE ${tag(target)}*
-
-${lista}`,
-
-          m,
-          {
-            mentions: [
-              target
-            ]
-          }
-        )
-      }
-
-      // ------------------------------------------------------
-      // LISTAR TODOS
-      // ------------------------------------------------------
-
-      let texto =
-        '🏅 *USUARIOS CON INSIGNIAS*\n\n'
-
-      const mentions = []
-
-      for (
-        const id in perfiles
-      ) {
-
-        const data =
-          perfiles[id]
-
-        if (
-          data.insignias?.length
-        ) {
-
-          texto +=
-`👤 ${tag(id)}
-${data.insignias.join(' ')}
-
-`
-
-          mentions.push(id)
-        }
-      }
-
-      if (!mentions.length) {
-
-        return m.reply(
-          '❌ Nadie tiene insignias actualmente.'
-        )
-      }
-
-      return conn.reply(
-        m.chat,
-        texto.trim(),
-        m,
-        {
-          mentions
-        }
-      )
-    }
-
-    // ========================================================
-    // 🧹 CLEAR INSIGNIAS
-    // ========================================================
-
     if (
-      command === 'clearinsignias' ||
-      command === 'clearins'
+      command === 'insignias' ||
+      command === 'verinsignias'
     ) {
 
-      if (!admin && !realOwner) {
-
-        return m.reply(
-          '❌ Solo admins o dueño pueden usar este comando.'
+      const lista =
+        Array.isArray(
+          perfil.insignias
         )
-      }
+          ? perfil.insignias
+          : []
 
-      const targetRaw =
-        getTarget(
-          m,
-          conn
-        )
-
-      // ------------------------------------------------------
-      // 🧹 BORRAR INSIGNIAS DE UN USUARIO
-      // ------------------------------------------------------
-
-      if (targetRaw) {
-
-        const target =
-          findJid(
-            perfiles,
-            targetRaw,
-            conn
-          )
-
-        if (
-          !perfiles[target]?.insignias?.length
-        ) {
-
-          return conn.reply(
-            m.chat,
-            `❌ ${tag(target)} no tiene insignias.`,
-            m,
-            {
-              mentions: [
-                target
-              ]
-            }
-          )
-        }
-
-        perfiles[target].insignias = []
-
-        savePerfiles(
-          perfiles
-        )
-
-        return conn.reply(
-          m.chat,
-
-          `🧹 *INSIGNIAS ELIMINADAS*
-
-Se borraron todas las insignias de ${tag(target)}.`,
-
-          m,
-          {
-            mentions: [
-              target
-            ]
-          }
-        )
-      }
-
-      // ------------------------------------------------------
-      // 🧹 BORRAR TODAS
-      // ------------------------------------------------------
-
-      let eliminadas = 0
-
-      for (
-        const id in perfiles
-      ) {
-
-        if (
-          Array.isArray(
-            perfiles[id].insignias
-          ) &&
-          perfiles[id].insignias.length
-        ) {
-
-          eliminadas +=
-            perfiles[id].insignias.length
-
-          perfiles[id].insignias = []
-        }
-      }
-
-      savePerfiles(
-        perfiles
-      )
-
-      return m.reply(
-
-        `🧹 *INSIGNIAS LIMPIADAS*
-
-🏅 Insignias eliminadas: ${eliminadas}
-
-✅ Se limpiaron todas las insignias del sistema.`
-
-      )
-    }
-
-    // ========================================================
-    // 👤 PERFIL
-    // ========================================================
-
-    if (command === 'perfil') {
-
-      // ------------------------------------------------------
-      // ❤️ PAREJA
-      // ------------------------------------------------------
-
-      let estadoTexto =
-        '💔 Estado: Soltero/a'
-
-      let parejaTexto = ''
-
-      let amorTexto = ''
-
-      let tiempoTexto = ''
-
-      let parejaJid = null
-
-      const parejaData =
-        parejas[jid]
-
-      if (
-        parejaData?.pareja
-      ) {
-
-        parejaJid =
-          findJid(
-            parejas,
-            parejaData.pareja,
-            conn
-          )
-
-        // ====================================================
-        // 💍 ESTADO DE LA RELACIÓN
-        // ====================================================
-
-        const estado =
-          String(
-            parejaData.estado || ''
-          )
-            .toLowerCase()
-            .trim()
-
-        if (
-          [
-            'casados',
-            'casado',
-            'casada',
-            'matrimonio'
-          ].includes(estado)
-        ) {
-
-          estadoTexto =
-            '💍 Estado: Casado/a'
-
-        } else if (
-          [
-            'divorciados',
-            'divorciado',
-            'divorciada'
-          ].includes(estado)
-        ) {
-
-          estadoTexto =
-            '💔 Estado: Divorciado/a'
-
-        } else {
-
-          estadoTexto =
-            '💑 Estado: De novio/a'
-        }
-
-        parejaTexto =
-          `❤️ Pareja: ${tag(parejaJid)}`
-
-        amorTexto =
-          `💖 Amor: ${parejaData.amor || 0}`
-
-        tiempoTexto =
-          parejaData.relacionFecha
-            ? `⏳ Tiempo juntos: ${tiempoRelacion(
-                parejaData.relacionFecha
-              )}`
-            : ''
-      }
-
-      // ------------------------------------------------------
-      // 🧬 HERMANO
-      // ------------------------------------------------------
-
-      let hermanoTexto = ''
-
-      let tiempoHermano = ''
-
-      let hermanoJid = null
-
-      const hermanoData =
-        hermanos[jid]
-
-      if (
-        hermanoData?.hermano
-      ) {
-
-        hermanoJid =
-          findJid(
-            hermanos,
-            hermanoData.hermano,
-            conn
-          )
-
-        const nivel =
-          Number(
-            hermanoData.nivel || 0
-          )
-
-        const interacciones =
-          Number(
-            hermanoData.interacciones || 0
-          )
-
-        hermanoTexto =
-`🧬 Hermano: ${tag(hermanoJid)}
-💪 Nivel: ${nivel}
-🏅 Rango: ${rangoHermano(nivel)}
-🎮 Interacciones: ${interacciones}`
-
-        tiempoHermano =
-          hermanoData.hermandadFecha
-            ? `⏳ Tiempo de hermandad: ${tiempoRelacion(
-                hermanoData.hermandadFecha
-              )}`
-            : ''
-      }
-
-      // ------------------------------------------------------
-      // 🎂 DATOS
-      // ------------------------------------------------------
-
-      const edad =
-        user.birth
-          ? calcularEdad(
-              user.birth
-            )
-          : null
-
-      const signo =
-        user.birth
-          ? signoZodiacal(
-              user.birth
-            )
-          : null
-
-      const diasCumple =
-        user.birth
-          ? diasParaCumple(
-              user.birth
-            )
-          : null
-
-      // ------------------------------------------------------
-      // 👑 ROL
-      // ------------------------------------------------------
-
-      const rol =
-        realOwner
-          ? 'Dueño 👑'
-          : admin
-            ? 'Admin 🛡️'
-            : 'Usuario 👤'
-
-      // ------------------------------------------------------
-      // 🏅 INSIGNIAS
-      // ------------------------------------------------------
-
-      const insigniasTexto =
-        user.insignias?.length
-          ? user.insignias
-              .map(
-                i => `• ${i}`
-              )
-              .join('\n')
-          : 'Ninguna'
-
-      // ------------------------------------------------------
-      // 📋 PERFIL
-      // ------------------------------------------------------
-
-      const textoPerfil =
-
-`👤 *PERFIL DE USUARIO*
-
-━━━━━━━━━━━━━━━━━━
-
-${tag(jid)}
-
-⭐ Rol: ${rol}
-
-━━━━━━━━━━━━━━━━━━
-
-❤️ *RELACIÓN*
-
-${estadoTexto}
-${parejaTexto}
-${amorTexto}
-${tiempoTexto}
-
-━━━━━━━━━━━━━━━━━━
-
-🧬 *HERMANDAD*
-
-${hermanoTexto || 'Sin hermano'}
-${tiempoHermano}
-
-━━━━━━━━━━━━━━━━━━
-
-🏅 *INSIGNIAS*
-
-${insigniasTexto}
-
-━━━━━━━━━━━━━━━━━━
-
-👤 *DATOS PERSONALES*
-
-🚻 Género: ${user.genero || 'No definido'}
-
-🎂 Nacimiento: ${user.birth || 'No registrado'}
-${edad !== null ? `🎉 Edad: ${edad}` : ''}
-${signo ? `🔮 Signo: ${signo}` : ''}
-${
-  diasCumple !== null
-    ? `🎁 Faltan ${diasCumple} día(s) para tu cumpleaños`
-    : ''
-}
-
-━━━━━━━━━━━━━━━━━━
-
-📝 *BIO*
-
-${user.bio || 'Sin bio'}
-
-━━━━━━━━━━━━━━━━━━`
-
-      // ------------------------------------------------------
-      // 💾 GUARDAR
-      // ------------------------------------------------------
-
-      savePerfiles(
-        perfiles
-      )
-
-      // ------------------------------------------------------
-      // 🏷️ MENCIONES
-      // ------------------------------------------------------
-
-      const mentions = [
-        jid
-      ]
-
-      if (parejaJid) {
-        mentions.push(
-          parejaJid
-        )
-      }
-
-      if (hermanoJid) {
-        mentions.push(
-          hermanoJid
-        )
-      }
-
-      // ------------------------------------------------------
-      // 🖼️ FOTO PERFIL
-      // ------------------------------------------------------
-
-      let pp = null
-
-      try {
-
-        pp =
-          await conn.profilePictureUrl(
-            jid,
-            'image'
-          )
-
-      } catch {}
-
-      // ------------------------------------------------------
-      // 📸 ENVIAR CON FOTO
-      // ------------------------------------------------------
-
-      if (pp) {
+      if (!lista.length) {
 
         return conn.sendMessage(
           m.chat,
           {
-            image: {
-              url: pp
-            },
+            text:
+`🏅 *INSIGNIAS DE ${tag(targetId)}*
 
-            caption:
-              textoPerfil,
-
-            mentions
+No tiene insignias actualmente.`,
+            mentions: [
+              targetId
+            ]
           },
           {
             quoted: m
@@ -1399,16 +1397,403 @@ ${user.bio || 'Sin bio'}
         )
       }
 
-      // ------------------------------------------------------
-      // 📝 SIN FOTO
-      // ------------------------------------------------------
+      const texto =
+        lista
+          .map(
+            x =>
+              `• ${
+                insigniasDisponibles[x] ||
+                x
+              }`
+          )
+          .join('\n')
 
-      return conn.reply(
+      return conn.sendMessage(
         m.chat,
-        textoPerfil,
-        m,
         {
+          text:
+`🏅 *INSIGNIAS DE ${tag(targetId)}*
+
+${texto}`,
+          mentions: [
+            targetId
+          ]
+        },
+        {
+          quoted: m
+        }
+      )
+    }
+
+    // ========================================================
+    // 👤 PERFIL
+    // ========================================================
+
+    if (
+      command === 'perfil'
+    ) {
+
+      // ======================================================
+      // ❤️ PAREJA
+      // ======================================================
+
+      let parejaJid = null
+
+      const parejaData =
+        parejas[targetId]
+
+      if (
+        parejaData?.jid
+      ) {
+
+        parejaJid =
+          normalizeJid(
+            parejaData.jid,
+            conn
+          )
+
+      } else {
+
+        // Compatibilidad con estructuras
+        // donde el usuario aparece como pareja
+
+        for (
+          const [
+            id,
+            data
+          ] of Object.entries(
+            parejas
+          ) {
+
+          if (
+            data?.jid &&
+            sameUser(
+              data.jid,
+              targetId,
+              conn
+            )
+          ) {
+
+            parejaJid =
+              normalizeJid(
+                id,
+                conn
+              )
+
+            break
+          }
+        }
+      }
+
+      // ======================================================
+      // 🧬 HERMANOS — TODOS
+      // ======================================================
+
+      const hermanos =
+        getAllBrothers(
+          hermanosDB,
+          targetId,
+          conn
+        )
+
+      const brotherData =
+        hermanos.map(
+          brother =>
+            brotherInfo(
+              brother,
+              hermanosDB,
+              conn
+            )
+        )
+
+      // ======================================================
+      // 🎂 DATOS PERSONALES
+      // ======================================================
+
+      const edad =
+        calculateAge(
+          perfil.birth
+        )
+
+      let signo =
+        '❔ Desconocido'
+
+      if (
+        perfil.birth
+      ) {
+
+        const birth =
+          new Date(
+            perfil.birth
+          )
+
+        signo =
+          zodiac(
+            birth.getDate(),
+            birth.getMonth() + 1
+          )
+      }
+
+      const cumple =
+        daysToBirthday(
+          perfil.birth
+        )
+
+      // ======================================================
+      // 👮 ROL
+      // ======================================================
+
+      const role =
+        await getRole(
+          m,
+          conn,
+          targetId
+        )
+
+      // ======================================================
+      // 🏅 INSIGNIAS
+      // ======================================================
+
+      const insignias =
+        Array.isArray(
+          perfil.insignias
+        )
+          ? perfil.insignias
+          : []
+
+      // ======================================================
+      // 📸 FOTO
+      // ======================================================
+
+      let ppUrl = null
+
+      try {
+
+        ppUrl =
+          await conn.profilePictureUrl(
+            targetId,
+            'image'
+          )
+
+      } catch {}
+
+      // ======================================================
+      // 📅 REGISTRO
+      // ======================================================
+
+      const registered =
+        perfil.registered ||
+        perfil.joinGroup ||
+        null
+
+      // ======================================================
+      // 📝 TEXTO DEL PERFIL
+      // ======================================================
+
+      let texto =
+`╭━━━〔 👤 *PERFIL* 〕━━━╮
+
+👤 *Usuario:* ${tag(targetId)}
+${role}
+
+📝 *Bio:*
+${perfil.bio || 'Sin biografía'}
+
+⚧️ *Género:* ${
+  perfil.genero ||
+  'No especificado'
+}
+
+🎂 *Edad:* ${
+  edad !== null
+    ? `${edad} años`
+    : 'No registrada'
+}
+
+♈ *Signo:* ${signo}
+
+🎂 *Cumpleaños:* ${
+  cumple !== null
+    ? `faltan ${cumple} días`
+    : 'No registrado'
+}
+
+📅 *Registrado:* ${
+  formatDate(
+    registered
+  )
+}
+`
+
+      // ======================================================
+      // ❤️ PAREJA
+      // ======================================================
+
+      texto +=
+`\n❤️ *RELACIÓN*\n`
+
+      if (
+        parejaJid
+      ) {
+
+        texto +=
+`💞 Pareja: ${tag(parejaJid)}\n`
+
+      } else {
+
+        texto +=
+`💔 Soltero/a\n`
+      }
+
+      // ======================================================
+      // 🧬 HERMANOS
+      // ======================================================
+
+      texto +=
+`\n🧬 *HERMANOS*`
+
+      const mentions = [
+        targetId
+      ]
+
+      if (
+        parejaJid
+      ) {
+        mentions.push(
+          parejaJid
+        )
+      }
+
+      if (
+        !brotherData.length
+      ) {
+
+        texto +=
+`\n😹 No tiene hermanos registrados.`
+
+      } else {
+
+        texto +=
+`\n`
+
+        brotherData.forEach(
+          (
+            brother,
+            index
+          ) => {
+
+            const numero =
+              index + 1
+
+            const dias =
+              daysBetween(
+                brother.fecha
+              )
+
+            texto +=
+`
+${numero}. 🤝 ${tag(brother.jid)}
+   💪 Nivel: ${brother.nivel}
+   🏅 ${rangoHermano(brother.nivel)}
+   🎮 Interacciones: ${brother.interacciones}
+   📅 Desde: ${formatDate(brother.fecha)}
+   🕒 ${dias} días
+`
+
+            mentions.push(
+              brother.jid
+            )
+          }
+        )
+      }
+
+      // ======================================================
+      // 🏅 INSIGNIAS
+      // ======================================================
+
+      texto +=
+`\n🏅 *INSIGNIAS*\n`
+
+      if (
+        insignias.length
+      ) {
+
+        texto +=
+          insignias
+            .map(
+              x =>
+                `• ${
+                  insigniasDisponibles[x] ||
+                  x
+                }`
+            )
+            .join('\n')
+
+      } else {
+
+        texto +=
+          'Sin insignias'
+      }
+
+      // ======================================================
+      // 📊 RESUMEN
+      // ======================================================
+
+      texto +=
+`
+
+━━━━━━━━━━━━━━━━━━━━
+🧬 *Resumen familiar*
+
+❤️ Pareja: ${
+  parejaJid
+    ? 'Sí'
+    : 'No'
+}
+
+🤝 Hermanos: ${
+  brotherData.length
+}/3
+
+🏅 Insignias: ${
+  insignias.length
+}
+━━━━━━━━━━━━━━━━━━━━`
+
+      // ======================================================
+      // 📤 ENVIAR PERFIL
+      // ======================================================
+
+      if (
+        ppUrl
+      ) {
+
+        return conn.sendMessage(
+          m.chat,
+          {
+            image: {
+              url: ppUrl
+            },
+            caption:
+              texto.trim(),
+            mentions
+          },
+          {
+            quoted: m
+          }
+        )
+
+      }
+
+      return conn.sendMessage(
+        m.chat,
+        {
+          text:
+            texto.trim(),
           mentions
+        },
+        {
+          quoted: m
         }
       )
     }
@@ -1421,7 +1806,7 @@ ${user.bio || 'Sin bio'}
     )
 
     return m.reply(
-      '❌ Ocurrió un error interno en el sistema de perfil.'
+      '❌ Ocurrió un error al cargar el perfil.'
     )
   }
 }
@@ -1430,29 +1815,130 @@ ${user.bio || 'Sin bio'}
 // 📋 COMANDOS
 // ============================================================
 
-handler.command = [
+handler.help = [
 
-  // 👤 PERFIL
   'perfil',
-
-  // 🎂 DATOS
   'setbr',
   'bio',
   'genero',
 
-  // 🏅 INSIGNIAS
   'otorgar',
   'quitar',
-  'insignias',
 
-  // 🧹 LIMPIAR
+  'insignias',
+  'verinsignias',
+
+  'clearinsignias',
+  'clearins'
+
+]
+
+handler.tags = [
+  'perfil',
+  'owner'
+]
+
+handler.command = [
+
+  'perfil',
+  'setbr',
+  'bio',
+  'genero',
+
+  'otorgar',
+  'quitar',
+
+  'insignias',
+  'verinsignias',
+
   'clearinsignias',
   'clearins'
 
 ]
 
 // ============================================================
-// 📤 EXPORT
+// 🧹 LIMPIAR INSIGNIAS
+// ============================================================
+
+handler.before = async function (m) {
+
+  try {
+
+    const command =
+      String(
+        m.text || ''
+      )
+        .trim()
+        .split(/\s+/)[0]
+        .replace(
+          /^[.!#/]/,
+          ''
+        )
+        .toLowerCase()
+
+    if (
+      ![
+        'clearinsignias',
+        'clearins'
+      ].includes(
+        command
+      )
+    ) {
+      return
+    }
+
+    const conn =
+      this
+
+    if (
+      !isOwner(
+        m,
+        conn
+      )
+    ) {
+
+      return m.reply(
+        '🚫 Solo el dueño puede limpiar insignias.'
+      )
+    }
+
+    const perfiles =
+      loadJSON(
+        PERFIL_FILE
+      )
+
+    for (
+      const jid
+      of Object.keys(
+        perfiles
+      )
+    ) {
+
+      perfiles[jid]
+        .insignias = []
+    }
+
+    saveJSON(
+      PERFIL_FILE,
+      perfiles
+    )
+
+    return m.reply(
+      '🧹 *INSIGNIAS LIMPIADAS*\n\n' +
+      '✅ Todas las insignias fueron eliminadas.'
+    )
+
+  } catch (e) {
+
+    console.error(
+      '❌ Error limpiando insignias:',
+      e
+    )
+  }
+}
+
+// ============================================================
+// 📤 EXPORTAR
 // ============================================================
 
 export default handler

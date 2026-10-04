@@ -8,21 +8,28 @@
 // .sugrechazar <ID>         → rechazar
 // .sugdesarrollo <ID>       → poner en desarrollo
 //
-// 🆔 El ID SOLO se muestra en el grupo de revisión.
-// 👤 El usuario NO ve el ID al enviar.
+// 🆔 ID SIMPLE: SUG-001
+// 👤 El usuario NO ve el ID.
+// 👥 El grupo de revisión SÍ ve el ID.
 // 💾 Datos guardados en global.db
+// ============================================================
+
+
+// ============================================================
+// ⚙️ CONFIGURACIÓN
 // ============================================================
 
 const SUG_GROUP = '120363429424906972@g.us'
 
-const COOLDOWN_TIME = 24 * 60 * 60 * 1000
+const COOLDOWN_TIME =
+  24 * 60 * 60 * 1000
 
 const MAX_LENGTH = 1000
 const MIN_LENGTH = 5
 
 
 // ============================================================
-// 💾 BASE DE DATOS
+// 💾 PREPARAR BASE DE DATOS
 // ============================================================
 
 function prepararDB() {
@@ -30,7 +37,7 @@ function prepararDB() {
   if (!global.db.data)
     global.db.data = {}
 
-  if (!global.db.data.sugerencias)
+  if (!Array.isArray(global.db.data.sugerencias))
     global.db.data.sugerencias = []
 
   if (!global.db.data.sugerenciasCooldown)
@@ -97,23 +104,41 @@ function isOwner(jid) {
 
 
 // ============================================================
-// 🆔 GENERAR ID
+// 🆔 GENERAR ID SIMPLE
 // ============================================================
 
 function generarId() {
 
-  const tiempo =
-    Date.now()
-      .toString(36)
-      .toUpperCase()
+  prepararDB()
 
-  const random =
-    Math.random()
-      .toString(36)
-      .substring(2, 7)
-      .toUpperCase()
+  let numero = 1
 
-  return `SUG-${tiempo}-${random}`
+  const sugerencias =
+    global.db.data.sugerencias
+
+  if (sugerencias.length > 0) {
+
+    const numeros = sugerencias
+      .map(s => {
+
+        const match =
+          String(s.id || '')
+            .match(/^SUG-(\d+)$/i)
+
+        return match
+          ? parseInt(match[1])
+          : 0
+      })
+      .filter(n => n > 0)
+
+    if (numeros.length) {
+
+      numero =
+        Math.max(...numeros) + 1
+    }
+  }
+
+  return `SUG-${String(numero).padStart(3, '0')}`
 }
 
 
@@ -159,7 +184,7 @@ function obtenerTiempoRestante(ms) {
 
 
 // ============================================================
-// 💾 GUARDAR DB
+// 💾 GUARDAR BASE DE DATOS
 // ============================================================
 
 async function guardarDB() {
@@ -192,10 +217,15 @@ function buscarSugerencia(id) {
 
   prepararDB()
 
+  const buscado =
+    String(id || '')
+      .trim()
+      .toUpperCase()
+
   return global.db.data.sugerencias.find(
     s =>
-      String(s.id).toUpperCase() ===
-      String(id).toUpperCase()
+      String(s.id || '')
+        .toUpperCase() === buscado
   )
 }
 
@@ -208,10 +238,12 @@ function contarEstado(estado) {
 
   prepararDB()
 
-  return global.db.data.sugerencias.filter(
-    s =>
-      s.estado === estado
-  ).length
+  return global.db.data.sugerencias
+    .filter(
+      s =>
+        s.estado === estado
+    )
+    .length
 }
 
 
@@ -278,7 +310,7 @@ let handler = async (
 
 
     // ========================================================
-    // 📏 LONGITUD
+    // 📏 COMPROBAR LONGITUD
     // ========================================================
 
     if (
@@ -289,7 +321,7 @@ let handler = async (
       return m.reply(
 `⚠️ *Sugerencia demasiado corta.*
 
-📝 Mínimo:
+📝 Mínimo permitido:
 *${MIN_LENGTH} caracteres.*`
       )
     }
@@ -303,10 +335,10 @@ let handler = async (
       return m.reply(
 `⚠️ *Sugerencia demasiado larga.*
 
-📏 Máximo:
+📏 Máximo permitido:
 *${MAX_LENGTH} caracteres.*
 
-📝 Actual:
+📝 Tu sugerencia tiene:
 *${sugerencia.length} caracteres.*`
       )
     }
@@ -365,7 +397,7 @@ let handler = async (
 
 
     // ========================================================
-    // 📦 REGISTRO
+    // 📦 CREAR REGISTRO
     // ========================================================
 
     const registro = {
@@ -389,7 +421,7 @@ let handler = async (
 
 
     // ========================================================
-    // 📤 MENSAJE AL GRUPO
+    // 📤 MENSAJE PARA EL GRUPO DE REVISIÓN
     // ========================================================
 
     const mensajeGrupo =
@@ -422,13 +454,17 @@ let handler = async (
 
 
       // ======================================================
-      // 💾 GUARDAR
+      // 💾 GUARDAR SUGERENCIA
       // ======================================================
 
       global.db.data
         .sugerencias
         .push(registro)
 
+
+      // ======================================================
+      // 💾 GUARDAR COOLDOWN
+      // ======================================================
 
       if (!owner) {
 
@@ -452,7 +488,7 @@ let handler = async (
 
       // ======================================================
       // 👤 RESPUESTA AL USUARIO
-      // 🚫 NO SE MUESTRA EL ID
+      // 🚫 NO SE MUESTRA ID
       // ======================================================
 
       return m.reply(
@@ -512,7 +548,7 @@ no estar disponible.
 
     if (!args)
       return m.reply(
-        '📌 Uso: *.suginfo SUG-XXXXXX*'
+        '📌 Uso: *.suginfo SUG-001*'
       )
 
 
@@ -676,7 +712,7 @@ ${lista}
 
     if (!args)
       return m.reply(
-        '📌 Debés indicar el ID de la sugerencia.'
+        '📌 Debés indicar el ID.'
       )
 
 
@@ -754,7 +790,7 @@ ${lista}
 
 
     // ========================================================
-    // 📤 ACTUALIZAR GRUPO
+    // 📤 ACTUALIZAR GRUPO DE REVISIÓN
     // ========================================================
 
     try {
@@ -868,5 +904,10 @@ handler.command = [
 
 handler.group = false
 handler.limit = false
+
+
+// ============================================================
+// 📤 EXPORTAR
+// ============================================================
 
 export default handler

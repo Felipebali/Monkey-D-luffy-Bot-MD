@@ -1,7 +1,7 @@
 // 📂 plugins/_ver.js
 // 📥 "m" SIN PREFIJO
 // 👑 Solo owners
-// 📩 Recupera multimedia y lo envía al privado
+// 📩 Recupera multimedia y lo envía al grupo central
 // 🚫 Sin reacciones
 // 🚫 Sin avisos si falla
 
@@ -10,43 +10,70 @@ import path from 'path'
 import { webp2png } from '../lib/webp2mp4.js'
 
 // ============================================================
+// 📌 GRUPO CENTRAL DE MEDIOS
+// ============================================================
+
+const MEDIA_GROUP_ID =
+  '120363429424906972@g.us'
+
+
+// ============================================================
 // 👑 OBTENER OWNERS
 // ============================================================
 
 function getOwners() {
+
   return (global.owner || [])
-    .map(o => Array.isArray(o) ? o[0] : o)
+    .map(o =>
+      Array.isArray(o)
+        ? o[0]
+        : o
+    )
     .filter(Boolean)
-    .map(o => String(o).replace(/[^0-9]/g, ''))
+    .map(o =>
+      String(o)
+        .replace(/[^0-9]/g, '')
+    )
     .filter(Boolean)
 }
+
 
 // ============================================================
 // 🚀 HANDLER
 // ============================================================
 
-let handler = async (m, { conn }) => {
+let handler = async (
+  m,
+  { conn }
+) => {
 
   // ==========================================================
   // 🔤 SOLO "m"
   // ==========================================================
 
-  const text = String(m.text || '')
-    .trim()
-    .toLowerCase()
+  const text =
+    String(m.text || '')
+      .trim()
+      .toLowerCase()
 
-  if (text !== 'm') return
+  if (text !== 'm')
+    return
+
 
   // ==========================================================
   // 👑 VERIFICAR OWNER
   // ==========================================================
 
-  const senderNumber = String(m.sender || '')
-    .replace(/[^0-9]/g, '')
+  const senderNumber =
+    String(m.sender || '')
+      .replace(/[^0-9]/g, '')
 
-  const owners = getOwners()
+  const owners =
+    getOwners()
 
-  if (!owners.includes(senderNumber)) return
+  if (!owners.includes(senderNumber))
+    return
+
 
   try {
 
@@ -54,9 +81,12 @@ let handler = async (m, { conn }) => {
     // 💬 DEBE SER RESPUESTA A UN MENSAJE
     // ========================================================
 
-    const q = m.quoted
+    const q =
+      m.quoted
 
-    if (!q) return
+    if (!q)
+      return
+
 
     // ========================================================
     // 📦 DETECTAR MULTIMEDIA
@@ -67,19 +97,27 @@ let handler = async (m, { conn }) => {
       q.mediaType ||
       ''
 
-    if (!/webp|image|video/i.test(mime)) return
+    if (
+      !/webp|image|video/i.test(mime)
+    )
+      return
+
 
     // ========================================================
     // 📥 DESCARGAR
     // ========================================================
 
-    let buffer = await q.download()
+    let buffer =
+      await q.download()
 
-    if (!buffer) return
+    if (!buffer)
+      return
+
 
     let type = null
     let filenameSent = null
     let sendMime = mime
+
 
     // ========================================================
     // 🖼️ STICKER WEBP → PNG
@@ -87,76 +125,103 @@ let handler = async (m, { conn }) => {
 
     if (/webp/i.test(mime)) {
 
-      const result = await webp2png(buffer)
+      const result =
+        await webp2png(buffer)
 
-      if (!result?.url) return
+      if (!result?.url)
+        return
 
-      const response = await fetch(result.url)
 
-      if (!response.ok) return
+      const response =
+        await fetch(result.url)
 
-      buffer = Buffer.from(
-        await response.arrayBuffer()
-      )
+      if (!response.ok)
+        return
+
+
+      buffer =
+        Buffer.from(
+          await response.arrayBuffer()
+        )
+
 
       type = 'image'
       sendMime = 'image/png'
       filenameSent = 'sticker.png'
     }
 
+
     // ========================================================
     // 🖼️ IMAGEN
     // ========================================================
 
-    else if (mime.startsWith('image/')) {
+    else if (
+      mime.startsWith('image/')
+    ) {
 
       type = 'image'
 
       const ext =
-        mime.split('/')[1] || 'jpg'
+        mime.split('/')[1] ||
+        'jpg'
 
       filenameSent =
         `recuperado.${ext}`
 
       sendMime = mime
     }
+
 
     // ========================================================
     // 🎥 VIDEO
     // ========================================================
 
-    else if (mime.startsWith('video/')) {
+    else if (
+      mime.startsWith('video/')
+    ) {
 
       type = 'video'
 
       const ext =
-        mime.split('/')[1] || 'mp4'
+        mime.split('/')[1] ||
+        'mp4'
 
       filenameSent =
         `recuperado.${ext}`
 
       sendMime = mime
     }
+
 
     // ========================================================
     // ❌ TIPO NO SOPORTADO
     // ========================================================
 
     else {
+
       return
     }
+
 
     // ========================================================
     // 📁 CREAR CARPETA MEDIA
     // ========================================================
 
-    const mediaFolder = './media'
+    const mediaFolder =
+      './media'
 
-    if (!fs.existsSync(mediaFolder)) {
-      fs.mkdirSync(mediaFolder, {
-        recursive: true
-      })
+    if (
+      !fs.existsSync(mediaFolder)
+    ) {
+
+      fs.mkdirSync(
+        mediaFolder,
+        {
+          recursive: true
+        }
+      )
     }
+
 
     // ========================================================
     // 🧹 PREPARAR BASE DE DATOS
@@ -166,30 +231,44 @@ let handler = async (m, { conn }) => {
       global.db.data = {}
     }
 
-    if (!Array.isArray(global.db.data.mediaList)) {
+    if (
+      !Array.isArray(
+        global.db.data.mediaList
+      )
+    ) {
+
       global.db.data.mediaList = []
     }
+
 
     // ========================================================
     // 📄 GENERAR NOMBRE ÚNICO
     // ========================================================
 
     const filename =
-      `${Date.now()}_${Math.floor(Math.random() * 999999)}`
+      `${Date.now()}_${Math.floor(
+        Math.random() * 999999
+      )}`
+
 
     const extFile =
       filenameSent.includes('.')
-        ? filenameSent.split('.').pop()
+        ? filenameSent
+            .split('.')
+            .pop()
         : 'bin'
+
 
     const finalName =
       `${filename}.${extFile}`
+
 
     const filepath =
       path.join(
         mediaFolder,
         finalName
       )
+
 
     // ========================================================
     // 💾 GUARDAR ARCHIVO
@@ -200,6 +279,7 @@ let handler = async (m, { conn }) => {
       buffer
     )
 
+
     // ========================================================
     // 👥 INFORMACIÓN DEL GRUPO
     // ========================================================
@@ -209,12 +289,18 @@ let handler = async (m, { conn }) => {
     if (m.isGroup) {
 
       try {
+
         chatInfo =
-          await conn.groupMetadata(m.chat)
+          await conn.groupMetadata(
+            m.chat
+          )
+
       } catch {
+
         chatInfo = null
       }
     }
+
 
     // ========================================================
     // 💾 GUARDAR REGISTRO
@@ -243,7 +329,10 @@ let handler = async (m, { conn }) => {
 
       groupName:
         m.isGroup
-          ? (chatInfo?.subject || '')
+          ? (
+              chatInfo?.subject ||
+              ''
+            )
           : null,
 
       date:
@@ -253,32 +342,56 @@ let handler = async (m, { conn }) => {
         true
     })
 
+
     // ========================================================
-    // 📩 ENVIAR AL PRIVADO
+    // 📤 DESTINO
+    // ========================================================
+    // Ya NO se envía al privado del owner.
+    // Se envía siempre al grupo central.
+
+    const destination =
+      MEDIA_GROUP_ID
+
+
+    // ========================================================
+    // 🖼️ ENVIAR IMAGEN
     // ========================================================
 
     if (type === 'image') {
 
       await conn.sendMessage(
-        m.sender,
+        destination,
         {
           image: buffer,
-          mimetype: sendMime || 'image/png',
-          fileName: filenameSent
-        }
-      )
-
-    } else if (type === 'video') {
-
-      await conn.sendMessage(
-        m.sender,
-        {
-          video: buffer,
-          mimetype: sendMime || 'video/mp4',
-          fileName: filenameSent
+          mimetype:
+            sendMime ||
+            'image/png',
+          fileName:
+            filenameSent
         }
       )
     }
+
+
+    // ========================================================
+    // 🎥 ENVIAR VIDEO
+    // ========================================================
+
+    else if (type === 'video') {
+
+      await conn.sendMessage(
+        destination,
+        {
+          video: buffer,
+          mimetype:
+            sendMime ||
+            'video/mp4',
+          fileName:
+            filenameSent
+        }
+      )
+    }
+
 
     // ========================================================
     // ✅ TERMINAR SILENCIOSAMENTE
@@ -286,10 +399,10 @@ let handler = async (m, { conn }) => {
 
     return
 
+
   } catch (e) {
 
-    // 🚫 Si ocurre cualquier error:
-    // no responde, no reacciona y no avisa al usuario.
+    // 🚫 Sin avisos al usuario
 
     console.error(
       '❌ ERROR EN M:',
@@ -300,24 +413,33 @@ let handler = async (m, { conn }) => {
   }
 }
 
+
 // ============================================================
 // 🔤 ACTIVAR "m" SIN PREFIJO
 // ============================================================
 
-handler.customPrefix = /^m$/i
+handler.customPrefix =
+  /^m$/i
+
 
 // ============================================================
 // 🚫 SIN COMANDO CON PREFIJO
 // ============================================================
 
-handler.command = new RegExp()
+handler.command =
+  new RegExp()
+
 
 // ============================================================
 // 🏷️ CONFIGURACIÓN
 // ============================================================
 
-handler.help = ['m']
-handler.tags = ['owner']
+handler.help =
+  ['m']
+
+handler.tags =
+  ['owner']
+
 
 // ============================================================
 // 📤 EXPORTAR

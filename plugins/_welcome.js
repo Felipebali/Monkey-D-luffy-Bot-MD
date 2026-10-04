@@ -2,6 +2,7 @@
 // 👋 Welcome + Leave
 // 🖼️ Usa la foto del grupo si existe
 // 🤖 Estilo WhatsApp-Bot
+// 🚫 Evita spam cuando entran varios usuarios
 // ============================================================
 
 let handler = async (m, { conn, isAdmin }) => {
@@ -79,7 +80,6 @@ handler.before = async function (m, { conn }) {
 
     let chat = global.db.data.chats[m.chat];
 
-    // Si está desactivado
     if (!chat.welcome) return;
 
     // ==========================================================
@@ -130,14 +130,22 @@ handler.before = async function (m, { conn }) {
     }
 
     // ==========================================================
-    // 🎉 ENTRADAS
+    // 🎉 BIENVENIDA
     // ==========================================================
 
-    for (let user of added) {
+    if (added.length > 0) {
 
-        let number = user.split("@")[0];
+        // ======================================================
+        // 👤 UNO O DOS USUARIOS
+        // ======================================================
 
-        let message = `
+        if (added.length <= 2) {
+
+            for (let user of added) {
+
+                let number = user.split("@")[0];
+
+                let message = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
 ┃ 🤖 *WHATSAPP-BOT*
 ┃ 🎉 *NUEVO MIEMBRO*
@@ -153,36 +161,101 @@ handler.before = async function (m, { conn }) {
 ━━━━━━━━━━━━━━━━━━━━━━
 🤖 *WhatsApp-Bot*
 ━━━━━━━━━━━━━━━━━━━━━━
-        `.trim();
+                `.trim();
 
-        try {
+                try {
 
-            if (groupPhoto) {
+                    if (groupPhoto) {
 
-                await conn.sendMessage(m.chat, {
-                    image: {
-                        url: groupPhoto
-                    },
-                    caption: message,
-                    mentions: [user]
-                });
+                        await conn.sendMessage(m.chat, {
+                            image: {
+                                url: groupPhoto
+                            },
+                            caption: message,
+                            mentions: [user]
+                        });
 
-            } else {
+                    } else {
+
+                        await conn.sendMessage(m.chat, {
+                            text: message,
+                            mentions: [user]
+                        });
+
+                    }
+
+                } catch {
+
+                    await conn.sendMessage(m.chat, {
+                        text: message,
+                        mentions: [user]
+                    });
+
+                }
+            }
+
+        }
+
+        // ======================================================
+        // 👥 TRES O MÁS → UNA SOLA BIENVENIDA
+        // ======================================================
+
+        else {
+
+            let mentionsText = added
+                .map(user => `👤 @${user.split("@")[0]}`)
+                .join("\n");
+
+            let message = `
+╭━━━━━━━━━━━━━━━━━━━━━━╮
+┃ 🤖 *WHATSAPP-BOT*
+┃ 🎉 *NUEVOS MIEMBROS*
+╰━━━━━━━━━━━━━━━━━━━━━━╯
+
+🏠 *Grupo:* ${groupName}
+
+🎊 *¡Bienvenidos al grupo!*
+
+Se han unido *${added.length} nuevos miembros*:
+
+${mentionsText}
+
+✨ ¡Esperamos que disfruten su estadía!
+
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 *WhatsApp-Bot*
+━━━━━━━━━━━━━━━━━━━━━━
+            `.trim();
+
+            try {
+
+                if (groupPhoto) {
+
+                    await conn.sendMessage(m.chat, {
+                        image: {
+                            url: groupPhoto
+                        },
+                        caption: message,
+                        mentions: added
+                    });
+
+                } else {
+
+                    await conn.sendMessage(m.chat, {
+                        text: message,
+                        mentions: added
+                    });
+
+                }
+
+            } catch {
 
                 await conn.sendMessage(m.chat, {
                     text: message,
-                    mentions: [user]
+                    mentions: added
                 });
 
             }
-
-        } catch {
-
-            await conn.sendMessage(m.chat, {
-                text: message,
-                mentions: [user]
-            });
-
         }
     }
 
@@ -190,11 +263,19 @@ handler.before = async function (m, { conn }) {
     // 👋 SALIDAS
     // ==========================================================
 
-    for (let user of removed) {
+    if (removed.length > 0) {
 
-        let number = user.split("@")[0];
+        // ======================================================
+        // 👤 UNO O DOS USUARIOS
+        // ======================================================
 
-        let message = `
+        if (removed.length <= 2) {
+
+            for (let user of removed) {
+
+                let number = user.split("@")[0];
+
+                let message = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
 ┃ 🤖 *WHATSAPP-BOT*
 ┃ 👋 *MIEMBRO SALIÓ*
@@ -209,36 +290,97 @@ handler.before = async function (m, { conn }) {
 ━━━━━━━━━━━━━━━━━━━━━━
 🤖 *WhatsApp-Bot*
 ━━━━━━━━━━━━━━━━━━━━━━
-        `.trim();
+                `.trim();
 
-        try {
+                try {
 
-            if (groupPhoto) {
+                    if (groupPhoto) {
 
-                await conn.sendMessage(m.chat, {
-                    image: {
-                        url: groupPhoto
-                    },
-                    caption: message,
-                    mentions: [user]
-                });
+                        await conn.sendMessage(m.chat, {
+                            image: {
+                                url: groupPhoto
+                            },
+                            caption: message,
+                            mentions: [user]
+                        });
 
-            } else {
+                    } else {
+
+                        await conn.sendMessage(m.chat, {
+                            text: message,
+                            mentions: [user]
+                        });
+
+                    }
+
+                } catch {
+
+                    await conn.sendMessage(m.chat, {
+                        text: message,
+                        mentions: [user]
+                    });
+
+                }
+            }
+
+        }
+
+        // ======================================================
+        // 👥 TRES O MÁS → UNA SOLA DESPEDIDA
+        // ======================================================
+
+        else {
+
+            let mentionsText = removed
+                .map(user => `👤 @${user.split("@")[0]}`)
+                .join("\n");
+
+            let message = `
+╭━━━━━━━━━━━━━━━━━━━━━━╮
+┃ 🤖 *WHATSAPP-BOT*
+┃ 👋 *MIEMBROS SALIERON*
+╰━━━━━━━━━━━━━━━━━━━━━━╯
+
+🏠 *Grupo:* ${groupName}
+
+👋 *${removed.length} miembros salieron del grupo:*
+
+${mentionsText}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 *WhatsApp-Bot*
+━━━━━━━━━━━━━━━━━━━━━━
+            `.trim();
+
+            try {
+
+                if (groupPhoto) {
+
+                    await conn.sendMessage(m.chat, {
+                        image: {
+                            url: groupPhoto
+                        },
+                        caption: message,
+                        mentions: removed
+                    });
+
+                } else {
+
+                    await conn.sendMessage(m.chat, {
+                        text: message,
+                        mentions: removed
+                    });
+
+                }
+
+            } catch {
 
                 await conn.sendMessage(m.chat, {
                     text: message,
-                    mentions: [user]
+                    mentions: removed
                 });
 
             }
-
-        } catch {
-
-            await conn.sendMessage(m.chat, {
-                text: message,
-                mentions: [user]
-            });
-
         }
     }
 

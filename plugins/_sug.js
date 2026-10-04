@@ -2,8 +2,9 @@
 // 💡 Sistema avanzado de sugerencias
 // ⏳ Cooldown de 24 horas
 // 📤 Envía las sugerencias al grupo de revisión
-// 💾 Cooldown persistente en global.db
+// 🆔 ID visible SOLO en el grupo de revisión
 // 👑 Owners sin cooldown
+// 💾 Cooldown persistente en global.db
 // ============================================================
 
 
@@ -38,7 +39,7 @@ if (!global.db.data.sugerenciasCooldown) {
 
 
 // ============================================================
-// 🧹 UTILIDADES
+// 🧹 LIMPIAR TEXTO
 // ============================================================
 
 function limpiarTexto(texto = '') {
@@ -104,7 +105,6 @@ function obtenerTiempoRestante(ms) {
   if (ms <= 0)
     return 'ya disponible'
 
-
   const dias =
     Math.floor(
       ms / 86400000
@@ -125,9 +125,7 @@ function obtenerTiempoRestante(ms) {
       (ms % 60000) / 1000
     )
 
-
   const partes = []
-
 
   if (dias > 0)
     partes.push(`${dias}d`)
@@ -145,14 +143,13 @@ function obtenerTiempoRestante(ms) {
     partes.push(`${segundos}s`)
   }
 
-
   return partes.join(' ') ||
     'menos de 1 minuto'
 }
 
 
 // ============================================================
-// 🕐 FORMATEAR FECHA
+// 🕐 FECHA URUGUAY
 // ============================================================
 
 function fechaUY() {
@@ -163,8 +160,10 @@ function fechaUY() {
       {
         timeZone:
           'America/Montevideo',
+
         dateStyle:
           'short',
+
         timeStyle:
           'medium'
       }
@@ -283,14 +282,14 @@ let handler = async (
 📏 Máximo permitido:
 *${MAX_LENGTH} caracteres.*
 
-📝 Tu sugerencia:
-*${sugerencia.length} caracteres.*`
+📝 Tu sugerencia tiene:
+*${sugerencia.length} caracteres*.`
     )
   }
 
 
   // ==========================================================
-  // 👑 OWNER
+  // 👑 COMPROBAR OWNER
   // ==========================================================
 
   const owner =
@@ -307,7 +306,6 @@ let handler = async (
         .sugerenciasCooldown[user] || 0
     )
 
-
   const transcurrido =
     now - ultimoEnvio
 
@@ -321,7 +319,6 @@ let handler = async (
     const restante =
       COOLDOWN_TIME -
       transcurrido
-
 
     return m.reply(
 `╭━━━〔 ⏳ *COOLDOWN* 〕━━━╮
@@ -341,15 +338,17 @@ let handler = async (
 
 
   // ==========================================================
-  // 🆔 ID DE SUGERENCIA
+  // 🆔 GENERAR ID
   // ==========================================================
+  // Este ID se muestra únicamente
+  // dentro del grupo de revisión.
 
   const sugerenciaId =
     generarId()
 
 
   // ==========================================================
-  // 👤 INFORMACIÓN DEL USUARIO
+  // 👤 NÚMERO DEL USUARIO
   // ==========================================================
 
   const numero =
@@ -357,10 +356,10 @@ let handler = async (
 
 
   // ==========================================================
-  // 📤 MENSAJE PARA EL GRUPO
+  // 📤 MENSAJE PARA EL GRUPO DE REVISIÓN
   // ==========================================================
 
-  const mensaje =
+  const mensajeGrupo =
 `╭━━━〔 💡 *NUEVA SUGERENCIA* 〕━━━╮
 ┃
 ┃ 🆔 *ID:* ${sugerenciaId}
@@ -387,7 +386,8 @@ let handler = async (
     await conn.sendMessage(
       SUG_GROUP,
       {
-        text: mensaje,
+        text:
+          mensajeGrupo,
 
         mentions: [
           user
@@ -409,7 +409,7 @@ let handler = async (
 
 
     // ========================================================
-    // 💾 GUARDAR DB
+    // 💾 GUARDAR BASE DE DATOS
     // ========================================================
 
     try {
@@ -443,8 +443,9 @@ let handler = async (
 
 
     // ========================================================
-    // ✅ CONFIRMACIÓN
+    // ✅ CONFIRMACIÓN AL USUARIO
     // ========================================================
+    // 🚫 NO SE MUESTRA EL ID AQUÍ.
 
     return m.reply(
 `╭━━━〔 ✅ *SUGERENCIA ENVIADA* 〕━━━╮
@@ -454,11 +455,9 @@ let handler = async (
 ┃ 📩 Tu sugerencia fue enviada
 ┃ correctamente al grupo de revisión.
 ┃
-┃ 🆔 *ID:* ${sugerenciaId}
-┃
-┃ ⏳ ${owner
-      ? 'Como owner, no tenés cooldown.'
-      : 'Podrás enviar otra en 24 horas.'}
+┃ ${owner
+      ? '👑 Como owner, no tenés cooldown.'
+      : '⏳ Podrás enviar otra en 24 horas.'}
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━╯`
     )
@@ -467,7 +466,7 @@ let handler = async (
   } catch (error) {
 
     // ========================================================
-    // ❌ ERROR
+    // ❌ ERROR DE ENVÍO
     // ========================================================
 
     console.error(

@@ -1,60 +1,233 @@
 // 📦 FelixCat_Bot — Comando .sug
-// 💡 Sistema de sugerencias con cooldown de 24 horas
+// 💡 Sistema avanzado de sugerencias
+// ⏳ Cooldown de 24 horas
+// 📤 Envía las sugerencias al grupo de revisión
+// 💾 Cooldown persistente en global.db
+// 👑 Owners sin cooldown
+// ============================================================
+
 
 // ============================================================
 // ⚙️ CONFIGURACIÓN
 // ============================================================
 
-const SUG_GROUP = '120363429424906972@g.us'
-const COOLDOWN_TIME = 24 * 60 * 60 * 1000
+const SUG_GROUP =
+  '120363429424906972@g.us'
+
+const COOLDOWN_TIME =
+  24 * 60 * 60 * 1000
+
+const MAX_LENGTH =
+  1000
+
+const MIN_LENGTH =
+  5
+
 
 // ============================================================
-// 💾 BASE DE DATOS DEL COOLDOWN
+// 💾 PREPARAR BASE DE DATOS
 // ============================================================
 
-global.sugerenciasCooldown = global.sugerenciasCooldown || {}
+if (!global.db.data) {
+  global.db.data = {}
+}
+
+if (!global.db.data.sugerenciasCooldown) {
+  global.db.data.sugerenciasCooldown = {}
+}
+
 
 // ============================================================
 // 🧹 UTILIDADES
 // ============================================================
 
-function limpiarTexto(texto) {
-  return String(texto || '')
+function limpiarTexto(texto = '') {
+
+  return String(texto)
+    .replace(/\r?\n+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
 
-function obtenerTiempoRestante(ms) {
-  const horas = Math.floor(ms / 3600000)
-  const minutos = Math.floor((ms % 3600000) / 60000)
 
-  if (horas > 0) {
-    return `${horas}h ${minutos}m`
-  }
+// ============================================================
+// 🔢 NORMALIZAR NÚMERO
+// ============================================================
 
-  if (minutos > 0) {
-    return `${minutos}m`
-  }
+function normalizarNumero(jid = '') {
 
-  return 'menos de 1 minuto'
+  return String(jid)
+    .replace(/[^0-9]/g, '')
 }
+
+
+// ============================================================
+// 👑 OBTENER OWNERS
+// ============================================================
+
+function getOwners() {
+
+  return (global.owner || [])
+    .map(o =>
+      Array.isArray(o)
+        ? o[0]
+        : o
+    )
+    .filter(Boolean)
+    .map(o =>
+      normalizarNumero(o)
+    )
+    .filter(Boolean)
+}
+
+
+// ============================================================
+// 👑 COMPROBAR OWNER
+// ============================================================
+
+function isOwner(jid) {
+
+  const numero =
+    normalizarNumero(jid)
+
+  return getOwners()
+    .includes(numero)
+}
+
+
+// ============================================================
+// ⏳ TIEMPO RESTANTE
+// ============================================================
+
+function obtenerTiempoRestante(ms) {
+
+  if (ms <= 0)
+    return 'ya disponible'
+
+
+  const dias =
+    Math.floor(
+      ms / 86400000
+    )
+
+  const horas =
+    Math.floor(
+      (ms % 86400000) / 3600000
+    )
+
+  const minutos =
+    Math.floor(
+      (ms % 3600000) / 60000
+    )
+
+  const segundos =
+    Math.floor(
+      (ms % 60000) / 1000
+    )
+
+
+  const partes = []
+
+
+  if (dias > 0)
+    partes.push(`${dias}d`)
+
+  if (horas > 0)
+    partes.push(`${horas}h`)
+
+  if (minutos > 0)
+    partes.push(`${minutos}m`)
+
+  if (
+    segundos > 0 &&
+    partes.length < 2
+  ) {
+    partes.push(`${segundos}s`)
+  }
+
+
+  return partes.join(' ') ||
+    'menos de 1 minuto'
+}
+
+
+// ============================================================
+// 🕐 FORMATEAR FECHA
+// ============================================================
+
+function fechaUY() {
+
+  return new Date()
+    .toLocaleString(
+      'es-UY',
+      {
+        timeZone:
+          'America/Montevideo',
+        dateStyle:
+          'short',
+        timeStyle:
+          'medium'
+      }
+    )
+}
+
+
+// ============================================================
+// 🆔 GENERAR ID DE SUGERENCIA
+// ============================================================
+
+function generarId() {
+
+  const tiempo =
+    Date.now()
+      .toString(36)
+      .toUpperCase()
+
+  const random =
+    Math.random()
+      .toString(36)
+      .substring(2, 6)
+      .toUpperCase()
+
+  return `SUG-${tiempo}-${random}`
+}
+
 
 // ============================================================
 // 💡 HANDLER
 // ============================================================
 
-let handler = async (m, { conn, text, usedPrefix, command }) => {
+let handler = async (
+  m,
+  {
+    conn,
+    text,
+    usedPrefix,
+    command
+  }
+) => {
 
-  const user = m.sender
-  const now = Date.now()
+  const user =
+    m.sender
+
+  const now =
+    Date.now()
+
 
   // ==========================================================
-  // 📝 COMPROBAR SUGERENCIA
+  // 📝 LIMPIAR SUGERENCIA
   // ==========================================================
 
-  const sugerencia = limpiarTexto(text)
+  const sugerencia =
+    limpiarTexto(text)
+
+
+  // ==========================================================
+  // ❓ SIN TEXTO
+  // ==========================================================
 
   if (!sugerencia) {
+
     return m.reply(
 `╭━━━〔 💡 *SUGERENCIAS* 〕━━━╮
 ┃
@@ -68,85 +241,210 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 ┃ ${usedPrefix + command} estaría bueno agregar un comando de memes
 ┃
 ┃ ⏳ *Cooldown:* 24 horas
+┃ 📏 *Máximo:* ${MAX_LENGTH} caracteres
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━╯`
     )
   }
 
+
   // ==========================================================
-  // 🕒 COOLDOWN
+  // 📏 LONGITUD MÍNIMA
   // ==========================================================
 
-  const ultimoEnvio = global.sugerenciasCooldown[user] || 0
-  const transcurrido = now - ultimoEnvio
-
-  if (ultimoEnvio && transcurrido < COOLDOWN_TIME) {
-
-    const restante = COOLDOWN_TIME - transcurrido
+  if (
+    sugerencia.length <
+    MIN_LENGTH
+  ) {
 
     return m.reply(
-`⏳ *Todavía no podés enviar otra sugerencia.*
+`⚠️ *La sugerencia es demasiado corta.*
 
-💡 Ya enviaste una sugerencia recientemente.
+📝 Mínimo:
+*${MIN_LENGTH} caracteres.*
 
-🕐 Podrás enviar otra en:
-*${obtenerTiempoRestante(restante)}*
-
-📌 El límite es de *1 sugerencia cada 24 horas*.`
+💡 Escribí una sugerencia un poco más detallada.`
     )
   }
 
+
   // ==========================================================
-  // 📏 LÍMITE DE TEXTO
+  // 📏 LONGITUD MÁXIMA
   // ==========================================================
 
-  if (sugerencia.length > 1000) {
+  if (
+    sugerencia.length >
+    MAX_LENGTH
+  ) {
+
     return m.reply(
 `⚠️ *La sugerencia es demasiado larga.*
 
-📏 Máximo permitido: *1000 caracteres.*
-📝 Tu sugerencia tiene: *${sugerencia.length} caracteres*.`
+📏 Máximo permitido:
+*${MAX_LENGTH} caracteres.*
+
+📝 Tu sugerencia:
+*${sugerencia.length} caracteres.*`
     )
   }
 
+
   // ==========================================================
-  // 📤 ENVIAR AL GRUPO DE REVISIÓN
+  // 👑 OWNER
   // ==========================================================
 
-  try {
+  const owner =
+    isOwner(user)
 
-    const numero = user.split('@')[0]
 
-    const mensaje =
+  // ==========================================================
+  // ⏳ COOLDOWN
+  // ==========================================================
+
+  const ultimoEnvio =
+    Number(
+      global.db.data
+        .sugerenciasCooldown[user] || 0
+    )
+
+
+  const transcurrido =
+    now - ultimoEnvio
+
+
+  if (
+    !owner &&
+    ultimoEnvio &&
+    transcurrido < COOLDOWN_TIME
+  ) {
+
+    const restante =
+      COOLDOWN_TIME -
+      transcurrido
+
+
+    return m.reply(
+`╭━━━〔 ⏳ *COOLDOWN* 〕━━━╮
+┃
+┃ ❌ Ya enviaste una sugerencia
+┃ recientemente.
+┃
+┃ 🕐 Podrás enviar otra en:
+┃ *${obtenerTiempoRestante(restante)}*
+┃
+┃ 📌 Límite:
+┃ *1 sugerencia cada 24 horas*
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━╯`
+    )
+  }
+
+
+  // ==========================================================
+  // 🆔 ID DE SUGERENCIA
+  // ==========================================================
+
+  const sugerenciaId =
+    generarId()
+
+
+  // ==========================================================
+  // 👤 INFORMACIÓN DEL USUARIO
+  // ==========================================================
+
+  const numero =
+    normalizarNumero(user)
+
+
+  // ==========================================================
+  // 📤 MENSAJE PARA EL GRUPO
+  // ==========================================================
+
+  const mensaje =
 `╭━━━〔 💡 *NUEVA SUGERENCIA* 〕━━━╮
+┃
+┃ 🆔 *ID:* ${sugerenciaId}
 ┃
 ┃ 👤 *Usuario:* @${numero}
 ┃
 ┃ 📝 *Sugerencia:*
+┃
 ┃ ${sugerencia}
 ┃
-┃ 🕐 *Fecha:* ${new Date().toLocaleString('es-UY')}
+┃ 👑 *Owner:* ${owner ? 'Sí' : 'No'}
+┃
+┃ 🕐 *Fecha:* ${fechaUY()}
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━╯`
 
-    await conn.sendMessage(SUG_GROUP, {
-      text: mensaje,
-      mentions: [user]
-    })
+
+  // ==========================================================
+  // 📤 ENVIAR AL GRUPO
+  // ==========================================================
+
+  try {
+
+    await conn.sendMessage(
+      SUG_GROUP,
+      {
+        text: mensaje,
+
+        mentions: [
+          user
+        ]
+      }
+    )
+
 
     // ========================================================
     // 💾 GUARDAR COOLDOWN
     // ========================================================
 
-    global.sugerenciasCooldown[user] = now
+    if (!owner) {
+
+      global.db.data
+        .sugerenciasCooldown[user] =
+        now
+    }
+
+
+    // ========================================================
+    // 💾 GUARDAR DB
+    // ========================================================
+
+    try {
+
+      if (
+        typeof global.db.write ===
+        'function'
+      ) {
+
+        await global.db.write()
+      }
+
+    } catch (dbError) {
+
+      console.error(
+        '⚠️ Error guardando cooldown:',
+        dbError
+      )
+    }
+
+
+    // ========================================================
+    // 💡 REACCIÓN
+    // ========================================================
+
+    try {
+
+      await m.react('💡')
+
+    } catch {}
+
 
     // ========================================================
     // ✅ CONFIRMACIÓN
     // ========================================================
-
-    try {
-      await m.react('💡')
-    } catch {}
 
     return m.reply(
 `╭━━━〔 ✅ *SUGERENCIA ENVIADA* 〕━━━╮
@@ -156,29 +454,51 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 ┃ 📩 Tu sugerencia fue enviada
 ┃ correctamente al grupo de revisión.
 ┃
-┃ ⏳ Podrás enviar otra en *24 horas*.
+┃ 🆔 *ID:* ${sugerenciaId}
+┃
+┃ ⏳ ${owner
+      ? 'Como owner, no tenés cooldown.'
+      : 'Podrás enviar otra en 24 horas.'}
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━╯`
     )
 
+
   } catch (error) {
 
-    console.error('❌ Error en .sug:', error)
+    // ========================================================
+    // ❌ ERROR
+    // ========================================================
+
+    console.error(
+      '❌ Error en .sug:',
+      error
+    )
+
 
     try {
+
       await m.react('⚠️')
+
     } catch {}
 
+
     return m.reply(
-`⚠️ *No se pudo enviar tu sugerencia.*
-
-Puede que el grupo de revisión no esté disponible
-o que el bot no tenga acceso a él.
-
-🔄 Intentá nuevamente más tarde.`
+`╭━━━〔 ⚠️ *ERROR* 〕━━━╮
+┃
+┃ No se pudo enviar tu sugerencia.
+┃
+┃ 📡 El grupo de revisión podría
+┃ no estar disponible o el bot
+┃ podría no tener acceso.
+┃
+┃ 🔄 Intentá nuevamente más tarde.
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━╯`
     )
   }
 }
+
 
 // ============================================================
 // ⚙️ CONFIGURACIÓN DEL COMANDO
@@ -192,9 +512,18 @@ handler.tags = [
   'info'
 ]
 
-handler.command = /^sug$/i
+handler.command =
+  /^sug$/i
 
-handler.group = false
-handler.limit = false
+handler.group =
+  false
+
+handler.limit =
+  false
+
+
+// ============================================================
+// 📤 EXPORTAR
+// ============================================================
 
 export default handler

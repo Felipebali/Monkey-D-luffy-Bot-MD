@@ -3,7 +3,7 @@
 // 👤 PERFIL COMPLETO — WHATSAPP-BOT
 // 🧬 Hasta 3 hermanos
 // ❤️ Pareja compatible con parejas.json
-// 🏅 Insignias
+// 🏅 INSIGNIAS PERSONALIZADAS Y NUMERADAS
 // 🎂 Cumpleaños
 // 📝 Bio
 // ⚧️ Género
@@ -66,6 +66,7 @@ function saveJSON(file, data) {
 // ============================================================
 
 function normalizeJid(jid, conn) {
+
     if (!jid) return null
 
     try {
@@ -80,7 +81,8 @@ function normalizeJid(jid, conn) {
         return jid
     }
 
-    const number = jid.replace(/[^0-9]/g, '')
+    const number =
+        jid.replace(/[^0-9]/g, '')
 
     if (!number) return null
 
@@ -92,6 +94,7 @@ function normalizeJid(jid, conn) {
 // ============================================================
 
 function sameUser(a, b, conn) {
+
     a = normalizeJid(a, conn)
     b = normalizeJid(b, conn)
 
@@ -108,7 +111,11 @@ function sameUser(a, b, conn) {
     const A = clean(a)
     const B = clean(b)
 
-    return Boolean(A && B && A === B)
+    return Boolean(
+        A &&
+        B &&
+        A === B
+    )
 }
 
 // ============================================================
@@ -116,9 +123,14 @@ function sameUser(a, b, conn) {
 // ============================================================
 
 function findJid(data, jid, conn) {
+
     if (!jid) return null
 
-    jid = normalizeJid(jid, conn)
+    jid =
+        normalizeJid(
+            jid,
+            conn
+        )
 
     if (!jid) return null
 
@@ -127,7 +139,14 @@ function findJid(data, jid, conn) {
     }
 
     for (const id of Object.keys(data)) {
-        if (sameUser(id, jid, conn)) {
+
+        if (
+            sameUser(
+                id,
+                jid,
+                conn
+            )
+        ) {
             return id
         }
     }
@@ -140,7 +159,10 @@ function findJid(data, jid, conn) {
 // ============================================================
 
 function tag(jid) {
-    if (!jid) return '@usuario'
+
+    if (!jid) {
+        return '@usuario'
+    }
 
     return '@' +
         String(jid)
@@ -154,14 +176,20 @@ function tag(jid) {
 
 function getTarget(m, conn) {
 
-    if (m.mentionedJid?.length) {
+    if (
+        m.mentionedJid?.length
+    ) {
+
         return normalizeJid(
             m.mentionedJid[0],
             conn
         )
     }
 
-    if (m.quoted?.sender) {
+    if (
+        m.quoted?.sender
+    ) {
+
         return normalizeJid(
             m.quoted.sender,
             conn
@@ -181,9 +209,14 @@ function formatDate(value) {
         return 'No registrada'
     }
 
-    const date = new Date(value)
+    const date =
+        new Date(value)
 
-    if (isNaN(date.getTime())) {
+    if (
+        isNaN(
+            date.getTime()
+        )
+    ) {
         return 'No registrada'
     }
 
@@ -205,16 +238,24 @@ function daysBetween(value) {
 
     if (!value) return 0
 
-    const date = new Date(value)
+    const date =
+        new Date(value)
 
-    if (isNaN(date.getTime())) {
+    if (
+        isNaN(
+            date.getTime()
+        )
+    ) {
         return 0
     }
 
     return Math.max(
         0,
         Math.floor(
-            (Date.now() - date.getTime()) /
+            (
+                Date.now() -
+                date.getTime()
+            ) /
             86400000
         )
     )
@@ -228,13 +269,19 @@ function calculateAge(birth) {
 
     if (!birth) return null
 
-    const date = new Date(birth)
+    const date =
+        new Date(birth)
 
-    if (isNaN(date.getTime())) {
+    if (
+        isNaN(
+            date.getTime()
+        )
+    ) {
         return null
     }
 
-    const now = new Date()
+    const now =
+        new Date()
 
     let age =
         now.getFullYear() -
@@ -248,7 +295,8 @@ function calculateAge(birth) {
         month < 0 ||
         (
             month === 0 &&
-            now.getDate() < date.getDate()
+            now.getDate() <
+            date.getDate()
         )
     ) {
         age--
@@ -263,11 +311,15 @@ function calculateAge(birth) {
 
 function zodiac(day, month) {
 
-    if (!day || !month) {
+    if (
+        !day ||
+        !month
+    ) {
         return '❔ Desconocido'
     }
 
     const signs = [
+
         ['♑ Capricornio', 20],
         ['♒ Acuario', 19],
         ['♓ Piscis', 20],
@@ -280,15 +332,22 @@ function zodiac(day, month) {
         ['♎ Libra', 23],
         ['♏ Escorpio', 22],
         ['♐ Sagitario', 21]
+
     ]
 
-    const index = month - 1
+    const index =
+        month - 1
 
-    if (day <= signs[index][1]) {
+    if (
+        day <=
+        signs[index][1]
+    ) {
         return signs[index][0]
     }
 
-    return signs[(index + 1) % 12][0]
+    return signs[
+        (index + 1) % 12
+    ][0]
 }
 
 // ============================================================
@@ -299,36 +358,49 @@ function daysToBirthday(birth) {
 
     if (!birth) return null
 
-    const date = new Date(birth)
+    const date =
+        new Date(birth)
 
-    if (isNaN(date.getTime())) {
+    if (
+        isNaN(
+            date.getTime()
+        )
+    ) {
         return null
     }
 
-    const now = new Date()
+    const now =
+        new Date()
 
-    let next = new Date(
-        now.getFullYear(),
-        date.getMonth(),
-        date.getDate()
-    )
-
-    const today = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate()
-    )
-
-    if (next < today) {
-        next = new Date(
-            now.getFullYear() + 1,
+    let next =
+        new Date(
+            now.getFullYear(),
             date.getMonth(),
             date.getDate()
         )
+
+    const today =
+        new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate()
+        )
+
+    if (next < today) {
+
+        next =
+            new Date(
+                now.getFullYear() + 1,
+                date.getMonth(),
+                date.getDate()
+            )
     }
 
     return Math.ceil(
-        (next.getTime() - now.getTime()) /
+        (
+            next.getTime() -
+            now.getTime()
+        ) /
         86400000
     )
 }
@@ -339,14 +411,21 @@ function daysToBirthday(birth) {
 
 function getOwners(conn) {
 
-    return (global.owner || [])
+    return (
+        global.owner || []
+    )
         .map(v => {
 
-            if (Array.isArray(v)) {
+            if (
+                Array.isArray(v)
+            ) {
                 v = v[0]
             }
 
-            return normalizeJid(v, conn)
+            return normalizeJid(
+                v,
+                conn
+            )
         })
         .filter(Boolean)
 }
@@ -371,11 +450,16 @@ function isOwner(m, conn) {
 // 👮 ROL
 // ============================================================
 
-async function getRole(m, conn, target) {
+async function getRole(
+    m,
+    conn,
+    target
+) {
 
     try {
 
-        const owners = getOwners(conn)
+        const owners =
+            getOwners(conn)
 
         if (
             owners.some(
@@ -416,7 +500,9 @@ async function getRole(m, conn, target) {
             return '👑 Creador'
         }
 
-        if (participant?.admin) {
+        if (
+            participant?.admin
+        ) {
             return '🛡️ Administrador'
         }
 
@@ -426,7 +512,7 @@ async function getRole(m, conn, target) {
 }
 
 // ============================================================
-// 🧬 OBTENER TODOS LOS HERMANOS
+// 🧬 OBTENER HERMANOS
 // ============================================================
 
 function getAllBrothers(
@@ -447,13 +533,11 @@ function getAllBrothers(
     const data =
         hermanosDB[targetId]
 
-    // ========================================================
-    // 🆕 FORMATO NUEVO
-    // ========================================================
-
     if (
         data &&
-        Array.isArray(data.hermanos)
+        Array.isArray(
+            data.hermanos
+        )
     ) {
 
         for (
@@ -469,234 +553,44 @@ function getAllBrothers(
 
             if (!jid) continue
 
-            const normalized =
-                normalizeJid(
-                    jid,
-                    conn
-                )
-
-            if (!normalized) continue
-
-            if (
-                sameUser(
-                    normalized,
-                    target,
-                    conn
-                )
-            ) {
-                continue
-            }
-
-            if (
-                !result.some(
-                    x =>
-                        sameUser(
-                            x.jid,
-                            normalized,
-                            conn
-                        )
-                )
-            ) {
-
-                result.push({
-                    jid: normalized,
-                    data:
-                        typeof brother === 'object'
-                            ? brother
-                            : {}
-                })
-            }
-        }
-    }
-
-    // ========================================================
-    // 🔄 FORMATO ANTIGUO
-    // ========================================================
-
-    if (data?.hermano) {
-
-        const normalized =
-            normalizeJid(
-                data.hermano,
-                conn
-            )
-
-        if (
-            normalized &&
-            !result.some(
-                x =>
-                    sameUser(
-                        x.jid,
-                        normalized,
-                        conn
-                    )
-            )
-        ) {
-
             result.push({
-                jid: normalized,
-                data
+                jid:
+                    normalizeJid(
+                        jid,
+                        conn
+                    ),
+                nivel:
+                    Number(
+                        brother?.nivel ||
+                        0
+                    ),
+                interacciones:
+                    Number(
+                        brother?.interacciones ||
+                        0
+                    ),
+                fecha:
+                    brother?.fecha ||
+                    null
             })
         }
+
+        return result
     }
 
-    // ========================================================
-    // 🔍 BÚSQUEDA INVERSA
-    // ========================================================
-
-    for (
-        const [userId, userData]
-        of Object.entries(hermanosDB)
-    ) {
-
-        if (result.length >= 3) {
-            break
-        }
-
-        if (!userData) continue
-
-        const lista = []
-
-        if (
-            Array.isArray(
-                userData.hermanos
-            )
-        ) {
-
-            lista.push(
-                ...userData.hermanos
-                    .map(x =>
-                        typeof x === 'string'
-                            ? x
-                            : x?.jid ||
-                              x?.id
-                    )
-                    .filter(Boolean)
-            )
-        }
-
-        if (userData.hermano) {
-            lista.push(
-                userData.hermano
-            )
-        }
-
-        const pertenece =
-            lista.some(
-                brother =>
-                    sameUser(
-                        brother,
-                        target,
-                        conn
-                    )
-            )
-
-        if (!pertenece) continue
-
-        const normalized =
-            normalizeJid(
-                userId,
-                conn
-            )
-
-        if (!normalized) continue
-
-        if (
-            sameUser(
-                normalized,
-                target,
-                conn
-            )
-        ) {
-            continue
-        }
-
-        if (
-            !result.some(
-                x =>
-                    sameUser(
-                        x.jid,
-                        normalized,
-                        conn
-                    )
-            )
-        ) {
-
-            result.push({
-                jid: normalized,
-                data: userData
-            })
-        }
-    }
-
-    return result.slice(0, 3)
+    return result
 }
 
 // ============================================================
-// 🧬 INFORMACIÓN HERMANO
-// ============================================================
-
-function brotherInfo(
-    brother,
-    hermanosDB,
-    conn
-) {
-
-    const jid = brother.jid
-
-    const realId =
-        findJid(
-            hermanosDB,
-            jid,
-            conn
-        )
-
-    const ownData =
-        hermanosDB[realId] || {}
-
-    const data =
-        brother.data || {}
-
-    const nivel =
-        Number(
-            data.nivel ??
-            ownData.nivel ??
-            0
-        )
-
-    const interacciones =
-        Number(
-            data.interacciones ??
-            ownData.interacciones ??
-            0
-        )
-
-    const fecha =
-        data.hermandadFecha ||
-        data.fecha ||
-        data.relacionFecha ||
-        ownData.hermandadFecha ||
-        ownData.fecha ||
-        ownData.relacionFecha ||
-        null
-
-    return {
-        jid,
-        nivel,
-        interacciones,
-        fecha
-    }
-}
-
-// ============================================================
-// 🏅 RANGO
+// 🏅 RANGO HERMANO
 // ============================================================
 
 function rangoHermano(nivel) {
 
-    nivel = Number(nivel || 0)
+    nivel =
+        Number(nivel || 0)
 
-    if (nivel >= 300)
+    if (nivel >= 500)
         return '👑 Hermanos Supremos'
 
     if (nivel >= 200)
@@ -715,31 +609,100 @@ function rangoHermano(nivel) {
 }
 
 // ============================================================
-// 🏅 INSIGNIAS
+// 🏅 UTILIDADES DE INSIGNIAS
 // ============================================================
 
-const insigniasDisponibles = {
+// Convierte:
+// "Mejor Admin"
+// "🏆 Mejor Admin"
+// "mejor admin"
+// en un texto limpio.
+function normalizeBadgeName(text) {
 
-    fundador: '👑 Fundador',
-    vip: '💎 VIP',
-    legendario: '🔥 Legendario',
-    activo: '⚡ Activo',
-    veterano: '🎖️ Veterano',
-    creador: '🛠️ Creador',
-    gamer: '🎮 Gamer',
-    especial: '🌟 Especial'
+    return String(text || '')
+        .replace(
+            /\s+/g,
+            ' '
+        )
+        .trim()
+}
+
+// ============================================================
+// 🏅 OBTENER INSIGNIAS
+// ============================================================
+
+function getBadges(perfil) {
+
+    if (
+        !perfil ||
+        !Array.isArray(
+            perfil.insignias
+        )
+    ) {
+        return []
+    }
+
+    return perfil.insignias
+        .map(
+            badge =>
+                normalizeBadgeName(
+                    badge
+                )
+        )
+        .filter(Boolean)
+}
+
+// ============================================================
+// 🏅 BUSCAR DUPLICADO
+// ============================================================
+
+function badgeExists(
+    badges,
+    badge
+) {
+
+    const target =
+        normalizeBadgeName(
+            badge
+        ).toLowerCase()
+
+    return badges.some(
+        x =>
+            normalizeBadgeName(
+                x
+            ).toLowerCase() ===
+            target
+    )
+}
+
+// ============================================================
+// 🏅 MOSTRAR INSIGNIAS
+// ============================================================
+
+function formatBadges(
+    badges
+) {
+
+    if (
+        !Array.isArray(badges) ||
+        !badges.length
+    ) {
+        return 'Sin insignias'
+    }
+
+    return badges
+        .map(
+            (
+                badge,
+                index
+            ) =>
+                `${index + 1}. ${badge}`
+        )
+        .join('\n')
 }
 
 // ============================================================
 // ❤️ OBTENER PAREJA
-// ============================================================
-// Compatible con:
-//
-// parejas[target].pareja
-//
-// y búsqueda inversa:
-//
-// parejas[otraPersona].pareja === target
 // ============================================================
 
 function getParejaInfo(
@@ -758,131 +721,76 @@ function getParejaInfo(
     let data =
         parejasDB[targetId]
 
-    // ========================================================
-    // 🥇 MÉTODO PRINCIPAL
-    // ========================================================
+    if (!data) {
 
-    if (data?.pareja) {
-
-        const pareja =
-            findJid(
-                parejasDB,
-                data.pareja,
-                conn
-            )
-
-        const parejaData =
-            parejasDB[pareja] || {}
-
-        return {
-            jid: pareja,
-            estado:
-                data.estado ||
-                parejaData.estado ||
-                'novios',
-            amor:
-                Number(
-                    data.amor ??
-                    parejaData.amor ??
-                    0
-                ),
-            relacionFecha:
-                data.relacionFecha ||
-                parejaData.relacionFecha ||
-                null,
-            matrimonioFecha:
-                data.matrimonioFecha ||
-                parejaData.matrimonioFecha ||
-                null
-        }
-    }
-
-    // ========================================================
-    // 🔍 BÚSQUEDA INVERSA
-    // ========================================================
-
-    for (
-        const [id, userData]
-        of Object.entries(parejasDB)
-    ) {
-
-        if (!userData?.pareja) {
-            continue
-        }
-
-        if (
-            sameUser(
-                userData.pareja,
-                targetId,
-                conn
+        for (
+            const jid
+            of Object.keys(
+                parejasDB
             )
         ) {
 
-            return {
-                jid:
-                    normalizeJid(
-                        id,
-                        conn
-                    ),
+            const pareja =
+                parejasDB[jid]
 
-                estado:
-                    userData.estado ||
-                    'novios',
+            if (
+                pareja?.pareja &&
+                sameUser(
+                    pareja.pareja,
+                    target,
+                    conn
+                )
+            ) {
 
-                amor:
-                    Number(
-                        userData.amor || 0
-                    ),
+                data =
+                    pareja
 
-                relacionFecha:
-                    userData.relacionFecha ||
-                    null,
-
-                matrimonioFecha:
-                    userData.matrimonioFecha ||
-                    null
+                return {
+                    ...pareja,
+                    parejaJid:
+                        jid
+                }
             }
         }
+
+        return null
     }
 
-    return null
+    return {
+        ...data,
+        parejaJid:
+            data.pareja
+    }
 }
 
 // ============================================================
-// ❤️ TEXTO DEL ESTADO DE PAREJA
+// ❤️ ESTADO PAREJA
 // ============================================================
 
-function estadoPareja(estado) {
+function estadoPareja(
+    estado
+) {
 
-    const value =
-        String(
-            estado || ''
-        )
-            .toLowerCase()
-            .trim()
+    const estados = {
 
-    if (
-        [
-            'casados',
-            'casado',
-            'casada',
-            'matrimonio'
-        ].includes(value)
-    ) {
-        return '💍 Casados'
+        novios:
+            '❤️ En pareja',
+
+        casados:
+            '💍 Casados',
+
+        prometidos:
+            '💎 Comprometidos',
+
+        enamorados:
+            '💖 Enamorados'
+
     }
 
-    if (
-        [
-            'divorciados',
-            'divorciado',
-            'divorciada'
-        ].includes(value)
-    ) {
-        return '💔 Divorciados'
-    }
-
-    return '❤️ Novios'
+    return (
+        estados[estado] ||
+        '❤️ En pareja'
+    )
 }
 
 // ============================================================
@@ -893,8 +801,8 @@ let handler = async (
     m,
     {
         conn,
-        command,
-        text
+        text,
+        command
     }
 ) => {
 
@@ -910,26 +818,20 @@ let handler = async (
                 PAREJAS_FILE
             )
 
-        const hermanosDB =
+        const hermanos =
             loadJSON(
                 HERMANOS_FILE
             )
-
-        const sender =
-            normalizeJid(
-                m.sender,
-                conn
-            )
-
-        // ========================================================
-        // 🎯 TARGET
-        // ========================================================
 
         const target =
             getTarget(
                 m,
                 conn
-            ) || sender
+            ) ||
+            normalizeJid(
+                m.sender,
+                conn
+            )
 
         const targetId =
             findJid(
@@ -938,180 +840,38 @@ let handler = async (
                 conn
             )
 
-        // ========================================================
-        // 👤 CREAR PERFIL
-        // ========================================================
-
-        if (!perfiles[targetId]) {
-
-            perfiles[targetId] = {
-                bio: '',
-                genero: '',
-                birth: null,
-                registered: Date.now(),
-                insignias: []
-            }
-
-            saveJSON(
-                PERFIL_FILE,
-                perfiles
-            )
+        if (
+            !perfiles[targetId]
+        ) {
+            perfiles[targetId] = {}
         }
 
         const perfil =
             perfiles[targetId]
 
+        if (
+            !Array.isArray(
+                perfil.insignias
+            )
+        ) {
+            perfil.insignias = []
+        }
+
         // ========================================================
-        // 🎂 SETBR
+        // 🏅 OTORGAR INSIGNIA PERSONALIZADA
         // ========================================================
 
-        if (command === 'setbr') {
-
-            const nuevo =
-                text?.trim()
-
-            if (!nuevo) {
-                return m.reply(
-                    '🎂 *FECHA DE NACIMIENTO*\n\n' +
-                    'Usa:\n' +
-                    '*.setbr 31/12/1998*'
-                )
-            }
-
-            let fecha
-
-            const match =
-                nuevo.match(
-                    /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/
-                )
-
-            if (match) {
-
-                const dia =
-                    Number(match[1])
-
-                const mes =
-                    Number(match[2])
-
-                const año =
-                    Number(match[3])
-
-                fecha =
-                    new Date(
-                        año,
-                        mes - 1,
-                        dia
-                    )
-
-            } else {
-
-                fecha =
-                    new Date(nuevo)
-            }
+        if (
+            command === 'otorgar'
+        ) {
 
             if (
-                isNaN(
-                    fecha.getTime()
+                !isOwner(
+                    m,
+                    conn
                 )
             ) {
 
-                return m.reply(
-                    '❌ Fecha no válida.\n\n' +
-                    'Ejemplo:\n' +
-                    '*.setbr 31/12/1998*'
-                )
-            }
-
-            perfil.birth =
-                fecha.toISOString()
-
-            saveJSON(
-                PERFIL_FILE,
-                perfiles
-            )
-
-            return m.reply(
-                `🎂 *FECHA ACTUALIZADA*\n\n` +
-                `📅 ${formatDate(perfil.birth)}`
-            )
-        }
-
-        // ========================================================
-        // 📝 BIO
-        // ========================================================
-
-        if (command === 'bio') {
-
-            const nuevaBio =
-                text?.trim()
-
-            if (!nuevaBio) {
-
-                if (perfil.bio) {
-                    return m.reply(
-                        `📝 *TU BIO*\n\n${perfil.bio}`
-                    )
-                }
-
-                return m.reply(
-                    '📝 No tienes biografía.\n\n' +
-                    'Usa *.bio <texto>*'
-                )
-            }
-
-            perfil.bio =
-                nuevaBio
-
-            saveJSON(
-                PERFIL_FILE,
-                perfiles
-            )
-
-            return m.reply(
-                '✅ *Biografía actualizada.*'
-            )
-        }
-
-        // ========================================================
-        // ⚧️ GÉNERO
-        // ========================================================
-
-        if (command === 'genero') {
-
-            const genero =
-                text?.trim()
-
-            if (!genero) {
-
-                return m.reply(
-                    `⚧️ Género actual: *${
-                        perfil.genero ||
-                        'No especificado'
-                    }*\n\n` +
-                    'Usa *.genero <género>*'
-                )
-            }
-
-            perfil.genero =
-                genero
-
-            saveJSON(
-                PERFIL_FILE,
-                perfiles
-            )
-
-            return m.reply(
-                `✅ Género actualizado: *${genero}*`
-            )
-        }
-
-        // ========================================================
-        // 🏅 OTORGAR INSIGNIA
-        // ========================================================
-
-        if (command === 'otorgar') {
-
-            if (!isOwner(m, conn)) {
                 return m.reply(
                     '🚫 Solo el dueño puede otorgar insignias.'
                 )
@@ -1124,38 +884,9 @@ let handler = async (
                 )
 
             if (!objetivo) {
-                return m.reply(
-                    '❌ Menciona o responde al usuario.'
-                )
-            }
-
-            const partes =
-                String(text || '')
-                    .trim()
-                    .split(/\s+/)
-
-            const insignia =
-                partes
-                    .find(
-                        x =>
-                            insigniasDisponibles[
-                                x.toLowerCase()
-                            ]
-                    )
-                    ?.toLowerCase()
-
-            if (!insignia) {
 
                 return m.reply(
-                    '🏅 *INSIGNIAS DISPONIBLES*\n\n' +
-                    Object.entries(
-                        insigniasDisponibles
-                    )
-                        .map(
-                            ([id, nombre]) =>
-                                `• ${id} — ${nombre}`
-                        )
-                        .join('\n')
+                    '❌ Menciona o responde al usuario al que quieres otorgarle la insignia.'
                 )
             }
 
@@ -1167,6 +898,12 @@ let handler = async (
                 )
 
             if (
+                !perfiles[jid]
+            ) {
+                perfiles[jid] = {}
+            }
+
+            if (
                 !Array.isArray(
                     perfiles[jid].insignias
                 )
@@ -1174,25 +911,94 @@ let handler = async (
                 perfiles[jid].insignias = []
             }
 
-            if (
-                perfiles[jid]
-                    .insignias
-                    .includes(insignia)
-            ) {
+            // ====================================================
+            // 📝 OBTENER NOMBRE DE INSIGNIA
+            // ====================================================
+
+            let badgeText =
+                String(
+                    text || ''
+                )
+                    .trim()
+
+            // Eliminar menciones del texto
+            badgeText =
+                badgeText
+                    .replace(
+                        /@\d{5,16}/g,
+                        ''
+                    )
+                    .replace(
+                        /\s+/g,
+                        ' '
+                    )
+                    .trim()
+
+            // Si el texto viene vacío pero hay mención
+            if (!badgeText) {
 
                 return m.reply(
-                    '⚠️ Ese usuario ya tiene esa insignia.'
+`🏅 *OTORGAR INSIGNIA*
+
+Usa:
+
+*.otorgar <insignia> @usuario*
+
+Ejemplos:
+
+*.otorgar 🏆 Mejor Admin @usuario*
+
+*.otorgar 👑 Fundador @usuario*
+
+*.otorgar 💎 VIP @usuario*
+
+También puedes responder al usuario:
+
+*.otorgar Mejor Admin*`
                 )
             }
 
+            // ====================================================
+            // 🏅 EVITAR DUPLICADOS
+            // ====================================================
+
+            if (
+                badgeExists(
+                    perfiles[jid].insignias,
+                    badgeText
+                )
+            ) {
+
+                return m.reply(
+`⚠️ ${tag(jid)} ya tiene esa insignia.
+
+🏅 *Insignias actuales:*
+
+${formatBadges(
+    perfiles[jid].insignias
+)}`
+                )
+            }
+
+            // ====================================================
+            // ➕ AGREGAR INSIGNIA
+            // ====================================================
+
             perfiles[jid]
                 .insignias
-                .push(insignia)
+                .push(
+                    badgeText
+                )
 
             saveJSON(
                 PERFIL_FILE,
                 perfiles
             )
+
+            const numero =
+                perfiles[jid]
+                    .insignias
+                    .length
 
             return conn.sendMessage(
                 m.chat,
@@ -1201,9 +1007,18 @@ let handler = async (
 `🏅 *INSIGNIA OTORGADA*
 
 👤 ${tag(jid)}
-🎖️ ${insigniasDisponibles[insignia]}`,
 
-                    mentions: [jid]
+${numero}. ${badgeText}
+
+━━━━━━━━━━━━━━━━━━━━
+
+🏅 *Insignias actuales:*
+${formatBadges(
+    perfiles[jid].insignias
+)}`,
+                    mentions: [
+                        jid
+                    ]
                 },
                 {
                     quoted: m
@@ -1212,12 +1027,20 @@ let handler = async (
         }
 
         // ========================================================
-        // ❌ QUITAR INSIGNIA
+        // ❌ QUITAR INSIGNIA POR NÚMERO
         // ========================================================
 
-        if (command === 'quitar') {
+        if (
+            command === 'quitar'
+        ) {
 
-            if (!isOwner(m, conn)) {
+            if (
+                !isOwner(
+                    m,
+                    conn
+                )
+            ) {
+
                 return m.reply(
                     '🚫 Solo el dueño puede quitar insignias.'
                 )
@@ -1230,38 +1053,9 @@ let handler = async (
                 )
 
             if (!objetivo) {
-                return m.reply(
-                    '❌ Menciona o responde al usuario.'
-                )
-            }
-
-            const partes =
-                String(text || '')
-                    .trim()
-                    .split(/\s+/)
-
-            const insignia =
-                partes
-                    .find(
-                        x =>
-                            insigniasDisponibles[
-                                x.toLowerCase()
-                            ]
-                    )
-                    ?.toLowerCase()
-
-            if (!insignia) {
 
                 return m.reply(
-                    '❌ Indica una insignia.\n\n' +
-                    Object.entries(
-                        insigniasDisponibles
-                    )
-                        .map(
-                            ([id, nombre]) =>
-                                `• ${id} — ${nombre}`
-                        )
-                        .join('\n')
+                    '❌ Menciona o responde al usuario al que quieres quitarle la insignia.'
                 )
             }
 
@@ -1273,32 +1067,95 @@ let handler = async (
                 )
 
             if (
+                !perfiles[jid] ||
                 !Array.isArray(
                     perfiles[jid].insignias
-                )
+                ) ||
+                !perfiles[jid].insignias.length
             ) {
+
                 return m.reply(
-                    '❌ Ese usuario no tiene insignias.'
+                    `❌ ${tag(jid)} no tiene insignias.`
+                )
+            }
+
+            // ====================================================
+            // 🔢 NÚMERO
+            // ====================================================
+
+            const partes =
+                String(
+                    text || ''
+                )
+                    .trim()
+                    .split(/\s+/)
+
+            const numero =
+                parseInt(
+                    partes.find(
+                        x =>
+                            /^\d+$/.test(x)
+                    )
+                )
+
+            if (
+                !numero ||
+                numero < 1
+            ) {
+
+                return m.reply(
+`❌ Debes indicar el número de la insignia.
+
+🏅 *Insignias de ${tag(jid)}:*
+
+${formatBadges(
+    perfiles[jid].insignias
+)}
+
+━━━━━━━━━━━━━━━━━━━━
+
+Ejemplo:
+
+*.quitar 1 @usuario*
+
+También puedes responder al usuario:
+
+*.quitar 1*`
                 )
             }
 
             const index =
+                numero - 1
+
+            if (
+                index >=
                 perfiles[jid]
                     .insignias
-                    .indexOf(insignia)
+                    .length
+            ) {
 
-            if (index === -1) {
                 return m.reply(
-                    '❌ Ese usuario no tiene esa insignia.'
+`❌ La insignia número *${numero}* no existe.
+
+🏅 *Insignias actuales:*
+
+${formatBadges(
+    perfiles[jid].insignias
+)}`
                 )
             }
 
-            perfiles[jid]
-                .insignias
-                .splice(
-                    index,
-                    1
-                )
+            // ====================================================
+            // 🗑️ ELIMINAR
+            // ====================================================
+
+            const insigniaEliminada =
+                perfiles[jid]
+                    .insignias
+                    .splice(
+                        index,
+                        1
+                    )[0]
 
             saveJSON(
                 PERFIL_FILE,
@@ -1312,9 +1169,20 @@ let handler = async (
 `🗑️ *INSIGNIA ELIMINADA*
 
 👤 ${tag(jid)}
-🎖️ ${insigniasDisponibles[insignia]}`,
 
-                    mentions: [jid]
+❌ ${numero}. ${insigniaEliminada}
+
+━━━━━━━━━━━━━━━━━━━━
+
+🏅 *Insignias restantes:*
+${
+    formatBadges(
+        perfiles[jid].insignias
+    )
+}`,
+                    mentions: [
+                        jid
+                    ]
                 },
                 {
                     quoted: m
@@ -1323,7 +1191,7 @@ let handler = async (
         }
 
         // ========================================================
-        // 🏅 INSIGNIAS
+        // 🏅 LISTAR INSIGNIAS DEL USUARIO
         // ========================================================
 
         if (
@@ -1331,51 +1199,56 @@ let handler = async (
             command === 'verinsignias'
         ) {
 
-            const lista =
-                Array.isArray(
-                    perfil.insignias
+            const objetivo =
+                getTarget(
+                    m,
+                    conn
+                ) ||
+                normalizeJid(
+                    m.sender,
+                    conn
                 )
-                    ? perfil.insignias
-                    : []
 
-            if (!lista.length) {
-
-                return conn.sendMessage(
-                    m.chat,
-                    {
-                        text:
-`🏅 *INSIGNIAS DE ${tag(targetId)}*
-
-No tiene insignias actualmente.`,
-
-                        mentions: [targetId]
-                    },
-                    {
-                        quoted: m
-                    }
+            const jid =
+                findJid(
+                    perfiles,
+                    objetivo,
+                    conn
                 )
-            }
 
-            const texto =
-                lista
-                    .map(
-                        x =>
-                            `• ${
-                                insigniasDisponibles[x] ||
-                                x
-                            }`
-                    )
-                    .join('\n')
+            const userPerfil =
+                perfiles[jid] || {}
+
+            const insignias =
+                getBadges(
+                    userPerfil
+                )
 
             return conn.sendMessage(
                 m.chat,
                 {
                     text:
-`🏅 *INSIGNIAS DE ${tag(targetId)}*
+`╭━━━〔 🏅 INSIGNIAS 〕━━━╮
 
-${texto}`,
+👤 Usuario: ${tag(jid)}
 
-                    mentions: [targetId]
+━━━━━━━━━━━━━━━━━━━━
+
+${
+    insignias.length
+        ? formatBadges(
+            insignias
+        )
+        : 'Sin insignias actualmente.'
+}
+
+━━━━━━━━━━━━━━━━━━━━
+
+🏅 Total: ${insignias.length}
+╰━━━━━━━━━━━━━━━━━━━━╯`,
+                    mentions: [
+                        jid
+                    ]
                 },
                 {
                     quoted: m
@@ -1387,42 +1260,9 @@ ${texto}`,
         // 👤 PERFIL
         // ========================================================
 
-        if (command === 'perfil') {
-
-            // ====================================================
-            // ❤️ PAREJA — parejas.json
-            // ====================================================
-
-            const parejaInfo =
-                getParejaInfo(
-                    parejas,
-                    targetId,
-                    conn
-                )
-
-            const parejaJid =
-                parejaInfo?.jid || null
-
-            // ====================================================
-            // 🧬 HERMANOS
-            // ====================================================
-
-            const hermanos =
-                getAllBrothers(
-                    hermanosDB,
-                    targetId,
-                    conn
-                )
-
-            const brotherData =
-                hermanos.map(
-                    brother =>
-                        brotherInfo(
-                            brother,
-                            hermanosDB,
-                            conn
-                        )
-                )
+        if (
+            command === 'perfil'
+        ) {
 
             // ====================================================
             // 🎂 DATOS
@@ -1436,7 +1276,9 @@ ${texto}`,
             let signo =
                 '❔ Desconocido'
 
-            if (perfil.birth) {
+            if (
+                perfil.birth
+            ) {
 
                 const birth =
                     new Date(
@@ -1471,11 +1313,36 @@ ${texto}`,
             // ====================================================
 
             const insignias =
-                Array.isArray(
-                    perfil.insignias
+                getBadges(
+                    perfil
                 )
-                    ? perfil.insignias
-                    : []
+
+            // ====================================================
+            // ❤️ PAREJA
+            // ====================================================
+
+            const parejaInfo =
+                getParejaInfo(
+                    parejas,
+                    targetId,
+                    conn
+                )
+
+            const parejaJid =
+                parejaInfo?.parejaJid ||
+                parejaInfo?.pareja ||
+                null
+
+            // ====================================================
+            // 🧬 HERMANOS
+            // ====================================================
+
+            const brotherData =
+                getAllBrothers(
+                    hermanos,
+                    targetId,
+                    conn
+                )
 
             // ====================================================
             // 📸 FOTO
@@ -1538,9 +1405,10 @@ ${perfil.bio || 'Sin biografía'}
 }
 
 📅 *Registrado:* ${
-    formatDate(registered)
-}
-`
+    formatDate(
+        registered
+    )
+}`
 
             // ====================================================
             // ❤️ RELACIÓN
@@ -1552,7 +1420,9 @@ ${perfil.bio || 'Sin biografía'}
 ❤️ *RELACIÓN*
 `
 
-            if (parejaInfo) {
+            if (
+                parejaInfo
+            ) {
 
                 const estado =
                     estadoPareja(
@@ -1581,7 +1451,8 @@ ${estado}
 } días
 
 💖 *Amor:* ${
-    parejaInfo.amor
+    parejaInfo.amor ||
+    0
 } puntos
 `
 
@@ -1623,13 +1494,17 @@ No tiene una pareja registrada.
                 targetId
             ]
 
-            if (parejaJid) {
+            if (
+                parejaJid
+            ) {
                 mentions.push(
                     parejaJid
                 )
             }
 
-            if (!brotherData.length) {
+            if (
+                !brotherData.length
+            ) {
 
                 texto +=
 `
@@ -1681,18 +1556,14 @@ ${index + 1}. 🤝 ${tag(brother.jid)}
 🏅 *INSIGNIAS*
 `
 
-            if (insignias.length) {
+            if (
+                insignias.length
+            ) {
 
                 texto +=
-                    insignias
-                        .map(
-                            x =>
-                                `• ${
-                                    insigniasDisponibles[x] ||
-                                    x
-                                }`
-                        )
-                        .join('\n')
+                    formatBadges(
+                        insignias
+                    )
 
             } else {
 
@@ -1723,19 +1594,23 @@ ${index + 1}. 🤝 ${tag(brother.jid)}
 🏅 Insignias: ${
     insignias.length
 }
+
 ━━━━━━━━━━━━━━━━━━━━`
 
             // ====================================================
             // 📤 ENVIAR
             // ====================================================
 
-            if (ppUrl) {
+            if (
+                ppUrl
+            ) {
 
                 return conn.sendMessage(
                     m.chat,
                     {
                         image: {
-                            url: ppUrl
+                            url:
+                                ppUrl
                         },
                         caption:
                             texto.trim(),
@@ -1822,7 +1697,8 @@ handler.command = [
 // 🧹 LIMPIAR INSIGNIAS
 // ============================================================
 
-handler.before = async function (m) {
+handler.before =
+async function (m) {
 
     try {
 
@@ -1842,14 +1718,22 @@ handler.before = async function (m) {
             ![
                 'clearinsignias',
                 'clearins'
-            ].includes(command)
+            ].includes(
+                command
+            )
         ) {
             return
         }
 
-        const conn = this
+        const conn =
+            this
 
-        if (!isOwner(m, conn)) {
+        if (
+            !isOwner(
+                m,
+                conn
+            )
+        ) {
 
             return m.reply(
                 '🚫 Solo el dueño puede limpiar insignias.'
@@ -1863,7 +1747,9 @@ handler.before = async function (m) {
 
         for (
             const jid
-            of Object.keys(perfiles)
+            of Object.keys(
+                perfiles
+            )
         ) {
 
             if (
@@ -1872,7 +1758,8 @@ handler.before = async function (m) {
                 perfiles[jid] = {}
             }
 
-            perfiles[jid].insignias = []
+            perfiles[jid]
+                .insignias = []
         }
 
         saveJSON(
@@ -1881,8 +1768,9 @@ handler.before = async function (m) {
         )
 
         return m.reply(
-            '🧹 *INSIGNIAS LIMPIADAS*\n\n' +
-            '✅ Todas las insignias fueron eliminadas.'
+`🧹 *INSIGNIAS LIMPIADAS*
+
+✅ Todas las insignias fueron eliminadas.`
         )
 
     } catch (e) {

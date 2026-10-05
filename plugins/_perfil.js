@@ -69,22 +69,58 @@ function normalizeJid(jid, conn) {
 
     if (!jid) return null
 
+    // Si viene como objeto
+    if (typeof jid === 'object') {
+
+        jid =
+            jid.jid ||
+            jid.id ||
+            jid.user ||
+            jid.numero ||
+            jid.number ||
+            jid.phone ||
+            jid.pareja ||
+            null
+    }
+
+    if (!jid) return null
+
     try {
+
         if (conn?.decodeJid) {
             jid = conn.decodeJid(jid)
         }
+
     } catch {}
 
-    jid = String(jid).trim()
+    jid =
+        String(jid)
+            .trim()
+
+    if (!jid) {
+        return null
+    }
+
+    if (
+        jid.includes('@s.whatsapp.net') ||
+        jid.includes('@lid')
+    ) {
+        return jid
+    }
 
     if (jid.includes('@')) {
         return jid
     }
 
     const number =
-        jid.replace(/[^0-9]/g, '')
+        jid.replace(
+            /[^0-9]/g,
+            ''
+        )
 
-    if (!number) return null
+    if (!number) {
+        return null
+    }
 
     return `${number}@s.whatsapp.net`
 }
@@ -95,18 +131,34 @@ function normalizeJid(jid, conn) {
 
 function sameUser(a, b, conn) {
 
-    a = normalizeJid(a, conn)
-    b = normalizeJid(b, conn)
+    a =
+        normalizeJid(
+            a,
+            conn
+        )
 
-    if (!a || !b) return false
+    b =
+        normalizeJid(
+            b,
+            conn
+        )
 
-    if (a === b) return true
+    if (!a || !b) {
+        return false
+    }
+
+    if (a === b) {
+        return true
+    }
 
     const clean = jid =>
         String(jid)
             .split(':')[0]
             .split('@')[0]
-            .replace(/[^0-9]/g, '')
+            .replace(
+                /[^0-9]/g,
+                ''
+            )
 
     const A = clean(a)
     const B = clean(b)
@@ -124,7 +176,9 @@ function sameUser(a, b, conn) {
 
 function findJid(data, jid, conn) {
 
-    if (!jid) return null
+    if (!jid) {
+        return null
+    }
 
     jid =
         normalizeJid(
@@ -132,13 +186,17 @@ function findJid(data, jid, conn) {
             conn
         )
 
-    if (!jid) return null
+    if (!jid) {
+        return null
+    }
 
     if (data[jid]) {
         return jid
     }
 
-    for (const id of Object.keys(data)) {
+    for (
+        const id of Object.keys(data)
+    ) {
 
         if (
             sameUser(
@@ -164,8 +222,17 @@ function tag(jid) {
         return '@usuario'
     }
 
+    const normalized =
+        normalizeJid(
+            jid
+        )
+
+    if (!normalized) {
+        return '@usuario'
+    }
+
     return '@' +
-        String(jid)
+        String(normalized)
             .split('@')[0]
             .split(':')[0]
 }
@@ -236,7 +303,9 @@ function formatDate(value) {
 
 function daysBetween(value) {
 
-    if (!value) return 0
+    if (!value) {
+        return 0
+    }
 
     const date =
         new Date(value)
@@ -267,7 +336,9 @@ function daysBetween(value) {
 
 function calculateAge(birth) {
 
-    if (!birth) return null
+    if (!birth) {
+        return null
+    }
 
     const date =
         new Date(birth)
@@ -356,7 +427,9 @@ function zodiac(day, month) {
 
 function daysToBirthday(birth) {
 
-    if (!birth) return null
+    if (!birth) {
+        return null
+    }
 
     const date =
         new Date(birth)
@@ -612,11 +685,6 @@ function rangoHermano(nivel) {
 // 🏅 UTILIDADES DE INSIGNIAS
 // ============================================================
 
-// Convierte:
-// "Mejor Admin"
-// "🏆 Mejor Admin"
-// "mejor admin"
-// en un texto limpio.
 function normalizeBadgeName(text) {
 
     return String(text || '')
@@ -702,6 +770,60 @@ function formatBadges(
 }
 
 // ============================================================
+// ❤️ EXTRAER JID DE PAREJA
+// ============================================================
+
+function extractPartnerJid(
+    value,
+    conn
+) {
+
+    if (!value) {
+        return null
+    }
+
+    // Si directamente es un JID
+    if (
+        typeof value === 'string'
+    ) {
+
+        return normalizeJid(
+            value,
+            conn
+        )
+    }
+
+    // Si es un objeto
+    if (
+        typeof value === 'object'
+    ) {
+
+        const candidate =
+            value.jid ||
+            value.id ||
+            value.user ||
+            value.numero ||
+            value.number ||
+            value.phone ||
+            value.pareja ||
+            value.partner ||
+            value.partnerJid ||
+            null
+
+        if (!candidate) {
+            return null
+        }
+
+        return normalizeJid(
+            candidate,
+            conn
+        )
+    }
+
+    return null
+}
+
+// ============================================================
 // ❤️ OBTENER PAREJA
 // ============================================================
 
@@ -711,56 +833,139 @@ function getParejaInfo(
     conn
 ) {
 
+    if (
+        !parejasDB ||
+        typeof parejasDB !== 'object'
+    ) {
+        return null
+    }
+
     const targetId =
-        findJid(
-            parejasDB,
+        normalizeJid(
             target,
             conn
         )
 
-    let data =
-        parejasDB[targetId]
+    if (!targetId) {
+        return null
+    }
 
-    if (!data) {
+    // ========================================================
+    // 1️⃣ BUSCAR REGISTRO DIRECTO DEL USUARIO
+    // ========================================================
 
-        for (
-            const jid
-            of Object.keys(
-                parejasDB
+    const realTargetId =
+        findJid(
+            parejasDB,
+            targetId,
+            conn
+        )
+
+    const direct =
+        parejasDB[realTargetId]
+
+    if (
+        direct &&
+        typeof direct === 'object'
+    ) {
+
+        const partner =
+            extractPartnerJid(
+                direct.pareja ??
+                direct.partner ??
+                direct.partnerJid ??
+                direct.parejaJid,
+                conn
+            )
+
+        // Solamente es relación si existe una pareja válida
+        if (
+            partner &&
+            !sameUser(
+                partner,
+                targetId,
+                conn
             )
         ) {
 
-            const pareja =
-                parejasDB[jid]
+            return {
+                ...direct,
+                parejaJid:
+                    partner
+            }
+        }
+    }
+
+    // ========================================================
+    // 2️⃣ BUSCAR RELACIÓN INVERSA
+    // ========================================================
+
+    for (
+        const jid of Object.keys(
+            parejasDB
+        )
+    ) {
+
+        const data =
+            parejasDB[jid]
+
+        if (
+            !data ||
+            typeof data !== 'object'
+        ) {
+            continue
+        }
+
+        const partner =
+            extractPartnerJid(
+                data.pareja ??
+                data.partner ??
+                data.partnerJid ??
+                data.parejaJid,
+                conn
+            )
+
+        if (!partner) {
+            continue
+        }
+
+        if (
+            sameUser(
+                partner,
+                targetId,
+                conn
+            )
+        ) {
+
+            const ownerJid =
+                normalizeJid(
+                    jid,
+                    conn
+                )
 
             if (
-                pareja?.pareja &&
-                sameUser(
-                    pareja.pareja,
-                    target,
+                ownerJid &&
+                !sameUser(
+                    ownerJid,
+                    targetId,
                     conn
                 )
             ) {
 
-                data =
-                    pareja
-
                 return {
-                    ...pareja,
+                    ...data,
                     parejaJid:
-                        jid
+                        ownerJid
                 }
             }
         }
-
-        return null
     }
 
-    return {
-        ...data,
-        parejaJid:
-            data.pareja
-    }
+    // ========================================================
+    // ❌ NO HAY PAREJA
+    // ========================================================
+
+    return null
 }
 
 // ============================================================
@@ -782,13 +987,26 @@ function estadoPareja(
         prometidos:
             '💎 Comprometidos',
 
+        comprometidos:
+            '💎 Comprometidos',
+
         enamorados:
-            '💖 Enamorados'
+            '💖 Enamorados',
+
+        pareja:
+            '❤️ En pareja'
 
     }
 
+    const key =
+        String(
+            estado || ''
+        )
+            .toLowerCase()
+            .trim()
+
     return (
-        estados[estado] ||
+        estados[key] ||
         '❤️ En pareja'
     )
 }
@@ -807,6 +1025,12 @@ let handler = async (
 ) => {
 
     try {
+
+        const cmd =
+            String(
+                command || ''
+            )
+                .toLowerCase()
 
         const perfiles =
             loadJSON(
@@ -858,11 +1082,11 @@ let handler = async (
         }
 
         // ========================================================
-        // 🏅 OTORGAR INSIGNIA PERSONALIZADA
+        // 🏅 OTORGAR INSIGNIA
         // ========================================================
 
         if (
-            command === 'otorgar'
+            cmd === 'otorgar'
         ) {
 
             if (
@@ -911,17 +1135,12 @@ let handler = async (
                 perfiles[jid].insignias = []
             }
 
-            // ====================================================
-            // 📝 OBTENER NOMBRE DE INSIGNIA
-            // ====================================================
-
             let badgeText =
                 String(
                     text || ''
                 )
                     .trim()
 
-            // Eliminar menciones del texto
             badgeText =
                 badgeText
                     .replace(
@@ -934,7 +1153,6 @@ let handler = async (
                     )
                     .trim()
 
-            // Si el texto viene vacío pero hay mención
             if (!badgeText) {
 
                 return m.reply(
@@ -958,10 +1176,6 @@ También puedes responder al usuario:
                 )
             }
 
-            // ====================================================
-            // 🏅 EVITAR DUPLICADOS
-            // ====================================================
-
             if (
                 badgeExists(
                     perfiles[jid].insignias,
@@ -979,10 +1193,6 @@ ${formatBadges(
 )}`
                 )
             }
-
-            // ====================================================
-            // ➕ AGREGAR INSIGNIA
-            // ====================================================
 
             perfiles[jid]
                 .insignias
@@ -1027,11 +1237,11 @@ ${formatBadges(
         }
 
         // ========================================================
-        // ❌ QUITAR INSIGNIA POR NÚMERO
+        // ❌ QUITAR INSIGNIA
         // ========================================================
 
         if (
-            command === 'quitar'
+            cmd === 'quitar'
         ) {
 
             if (
@@ -1078,10 +1288,6 @@ ${formatBadges(
                     `❌ ${tag(jid)} no tiene insignias.`
                 )
             }
-
-            // ====================================================
-            // 🔢 NÚMERO
-            // ====================================================
 
             const partes =
                 String(
@@ -1145,10 +1351,6 @@ ${formatBadges(
                 )
             }
 
-            // ====================================================
-            // 🗑️ ELIMINAR
-            // ====================================================
-
             const insigniaEliminada =
                 perfiles[jid]
                     .insignias
@@ -1191,12 +1393,12 @@ ${
         }
 
         // ========================================================
-        // 🏅 LISTAR INSIGNIAS DEL USUARIO
+        // 🏅 LISTAR INSIGNIAS
         // ========================================================
 
         if (
-            command === 'insignias' ||
-            command === 'verinsignias'
+            cmd === 'insignias' ||
+            cmd === 'verinsignias'
         ) {
 
             const objetivo =
@@ -1261,12 +1463,8 @@ ${
         // ========================================================
 
         if (
-            command === 'perfil'
+            cmd === 'perfil'
         ) {
-
-            // ====================================================
-            // 🎂 DATOS
-            // ====================================================
 
             const edad =
                 calculateAge(
@@ -1318,7 +1516,7 @@ ${
                 )
 
             // ====================================================
-            // ❤️ PAREJA
+            // ❤️ PAREJA CORREGIDA
             // ====================================================
 
             const parejaInfo =
@@ -1330,7 +1528,6 @@ ${
 
             const parejaJid =
                 parejaInfo?.parejaJid ||
-                parejaInfo?.pareja ||
                 null
 
             // ====================================================
@@ -1421,7 +1618,8 @@ ${perfil.bio || 'Sin biografía'}
 `
 
             if (
-                parejaInfo
+                parejaInfo &&
+                parejaJid
             ) {
 
                 const estado =
@@ -1451,8 +1649,9 @@ ${estado}
 } días
 
 💖 *Amor:* ${
-    parejaInfo.amor ||
-    0
+    Number(
+        parejaInfo.amor || 0
+    )
 } puntos
 `
 
@@ -1497,6 +1696,7 @@ No tiene una pareja registrada.
             if (
                 parejaJid
             ) {
+
                 mentions.push(
                     parejaJid
                 )

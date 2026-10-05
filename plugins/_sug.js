@@ -1,7 +1,7 @@
-// 📦 FelixCat_Bot — Sistema PRO de Sugerencias
+// 📦 WhatsApp-Bot — Sistema PRO de Sugerencias
 // ============================================================
 // .sug <texto>              → enviar sugerencia
-// .suginfo <ID>             → consultar sugerencia
+// .suginfo <ID>            → consultar sugerencia
 // .suglist                  → ver pendientes
 // .sugs                     → estadísticas
 // .sugaceptar <ID>          → aceptar
@@ -293,7 +293,7 @@ let handler = async (
 ┃
 ┃ ✏️ Escribí una sugerencia
 ┃ para ayudar a mejorar
-┃ FelixCat-Bot 🐾
+┃ WhatsApp-Bot 🐾
 ┃
 ┃ 📌 *Uso:*
 ┃ ${usedPrefix}sug <sugerencia>
@@ -849,7 +849,7 @@ ${lista}
 ┃ 📝 ${sug.texto}
 ┃
 ┃ 🐾 Gracias por ayudar
-┃ a mejorar FelixCat-Bot.
+┃ a mejorar WhatsApp-Bot.
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━╯`
         }
@@ -910,4 +910,4 @@ handler.limit = false
 // 📤 EXPORTAR
 // ============================================================
 
-export default handler
+export default handler 

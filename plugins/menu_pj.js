@@ -1,62 +1,107 @@
-// 📂 plugins/menu-personajes.js — MENÚ PERSONAJES 🎌✨
+// 📂 plugins/menu-personajes.js
+// 🎌 MENÚ DEL SISTEMA DE PERSONAJES
+// ============================================================
 
 let handler = async (m, { conn }) => {
 
-  let menu = `
+  const menu = `
 ╭━━━〔 🎴 *GREMIO ANIME* 〕━━━⬣
-┃ 🐉 Bienvenido al sistema de invocación
-┃ ⚔️ Recluta, colecciona y domina personajes
 ┃
-┃━━━━━━━━━━━━━━
+┃ 🌌 *SISTEMA DE PERSONAJES*
+┃ Recluta • Colecciona • Cambia
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 🎌 *COMANDOS PRINCIPALES*
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━
 ┃
 ┃ 📜 *.personajes*
-┃ ➤ Ver personajes disponibles
+┃ ➤ Activar / desactivar el sistema
+┃ 👑 Solo owners
 ┃
 ┃ 🎲 *.claim*
-┃ ➤ Invocar un personaje aleatorio
+┃ ➤ Invocar un personaje
 ┃
 ┃ 👤 *.mipersonaje*
-┃ ➤ Ver tu personaje actual
+┃ ➤ Ver tu personaje y estadísticas
 ┃
 ┃ 💔 *.drop*
 ┃ ➤ Liberar tu personaje
 ┃
 ┃ 🔄 *.cambiar*
-┃ ➤ Cambiar personaje automáticamente
-┃
-┃━━━━━━━━━━━━━━
-┃ 👑 *PODER DE LOS OWNERS*
-┃
-┃ ⚡ *.addpj <nombre>*
-┃ ➤ Invocar nuevo personaje al mundo
-┃
-┃ ❌ *.delpj <nombre>*
-┃ ➤ Borrar personaje del sistema
-┃
-┃ 🔓 *.resetpj @user*
-┃ ➤ Quitar personaje a un usuario
+┃ ➤ Cambiar tu personaje
 ┃
 ┃ 📊 *.listpj*
-┃ ➤ Ver todos los personajes en uso
+┃ ➤ Ver personajes actualmente asignados
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━
+┃ 👑 *COMANDOS DE OWNER*
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━
+┃
+┃ ⚡ *.addpj <nombre>*
+┃ ➤ Agregar un personaje
+┃
+┃ ❌ *.delpj <nombre>*
+┃ ➤ Eliminar un personaje
+┃
+┃ 🔓 *.resetpj @usuario*
+┃ ➤ Quitar personaje a un usuario
 ┃
 ┃ 🧹 *.resetchars*
-┃ ➤ Liberar TODOS los personajes
+┃ ➤ Liberar todos los personajes
 ┃
-┃━━━━━━━━━━━━━━
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 🌟 *RAREZA*
-┃ ✨ Normales → Comunes
-┃ 🌟 Raros → 10% probabilidad
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━
 ┃
-┃ 🎴 ¡Colecciona los más poderosos!
-╰━━━━━━━━━━━━━━━━━━⬣
+┃ ✨ Personajes normales
+┃ ➤ 90% de probabilidad
+┃
+┃ 🌟 Personajes raros
+┃ ➤ 10% de probabilidad
+┃
+┃ 👑 Owner
+┃ ➤ 35% de probabilidad de raro
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━
+┃ 🎴 *FLUJO*
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━
+┃
+┃ 1️⃣ El owner activa el sistema
+┃ 2️⃣ Los usuarios usan *.claim*
+┃ 3️⃣ Cada personaje es único
+┃ 4️⃣ *.mipersonaje* muestra tus stats
+┃ 5️⃣ *.drop* libera tu personaje
+┃ 6️⃣ *.cambiar* busca otro personaje
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━⬣
 
-🐾 *FelixCat-Bot* — Sistema Anime RPG ⚔️
+🤖 *WhatsApp-Bot* — Anime RPG
 `.trim()
 
-  conn.sendMessage(m.chat, { text: menu }, { quoted: m })
+  return conn.sendMessage(
+    m.chat,
+    {
+      text: menu
+    },
+    {
+      quoted: m
+    }
+  )
 }
 
-handler.command = ['menupj', 'menupersonajes']
+handler.help = [
+  'menupj',
+  'menupersonajes'
+]
+
+handler.tags = [
+  'anime',
+  'juego'
+]
+
+handler.command = [
+  'menupj',
+  'menupersonajes'
+]
 
 export default handler

@@ -1,278 +1,949 @@
-// 📂 plugins/personajes.js — Sistema PRO Anime GOD MODE 🐉👑✨
+// 📂 plugins/personajes.js — FelixCat_Bot
+// 🎌 SISTEMA DE PERSONAJES — GOD MODE
+// 🔐 Activación exclusiva para OWNERS
+// 🔘 Un solo comando de activación: .juegopj
+// ============================================================
 
 import fs from 'fs'
 import path from 'path'
 
+// ============================================================
+// 📂 BASE DE DATOS
+// ============================================================
+
 const dir = './database'
 const file = path.join(dir, 'personajes.json')
 
-if (!fs.existsSync(dir)) fs.mkdirSync(dir)
-if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify({}, null, 2))
-
-const loadDB = () => JSON.parse(fs.readFileSync(file))
-const saveDB = (data) => fs.writeFileSync(file, JSON.stringify(data, null, 2))
-
-// 🎌 PERSONAJES NORMALES
-let normales = [
-  "Naruto","Sasuke","Goku","Vegeta","Luffy","Zoro",
-  "Levi","Eren","Gojo","Itachi","Tanjiro","Zenitsu","Inosuke","Mikasa"
-]
-
-// 🌟 PERSONAJES RAROS
-let raros = [
-  "Madara (Raro)",
-  "Sukuna (Raro)",
-  "Goku Ultra Instinto (Raro)",
-  "Gojo Ilimitado (Raro)",
-  "Levi Ackerman Elite (Raro)"
-]
-
-// 💥 STATS
-const statsBase = {
-  "Naruto": { atk: 80, def: 70, hp: 100 },
-  "Sasuke": { atk: 85, def: 65, hp: 95 },
-  "Goku": { atk: 95, def: 80, hp: 120 },
-  "Vegeta": { atk: 90, def: 75, hp: 110 },
-  "Luffy": { atk: 85, def: 80, hp: 110 },
-  "Zoro": { atk: 88, def: 78, hp: 105 },
-  "Levi": { atk: 82, def: 60, hp: 90 },
-  "Eren": { atk: 87, def: 70, hp: 100 },
-  "Gojo": { atk: 100, def: 100, hp: 120 },
-  "Itachi": { atk: 92, def: 75, hp: 95 },
-  "Tanjiro": { atk: 85, def: 70, hp: 100 },
-  "Zenitsu": { atk: 90, def: 60, hp: 90 },
-  "Inosuke": { atk: 88, def: 65, hp: 95 },
-  "Mikasa": { atk: 87, def: 75, hp: 100 },
-
-  // 🌟 RAROS
-  "Madara (Raro)": { atk: 110, def: 100, hp: 130 },
-  "Sukuna (Raro)": { atk: 115, def: 95, hp: 130 },
-  "Goku Ultra Instinto (Raro)": { atk: 130, def: 110, hp: 140 },
-  "Gojo Ilimitado (Raro)": { atk: 125, def: 120, hp: 140 },
-  "Levi Ackerman Elite (Raro)": { atk: 105, def: 90, hp: 110 }
+if (!fs.existsSync(dir)) {
+  fs.mkdirSync(dir, { recursive: true })
 }
 
+if (!fs.existsSync(file)) {
+  fs.writeFileSync(
+    file,
+    JSON.stringify({}, null, 2)
+  )
+}
+
+function loadDB() {
+  try {
+    return JSON.parse(
+      fs.readFileSync(file, 'utf8')
+    )
+  } catch {
+    return {}
+  }
+}
+
+function saveDB(data) {
+  fs.writeFileSync(
+    file,
+    JSON.stringify(data, null, 2)
+  )
+}
+
+// ============================================================
+// 🎌 PERSONAJES NORMALES
+// ============================================================
+
+let normales = [
+  'Naruto',
+  'Sasuke',
+  'Goku',
+  'Vegeta',
+  'Luffy',
+  'Zoro',
+  'Levi',
+  'Eren',
+  'Gojo',
+  'Itachi',
+  'Tanjiro',
+  'Zenitsu',
+  'Inosuke',
+  'Mikasa'
+]
+
+// ============================================================
+// 🌟 PERSONAJES RAROS
+// ============================================================
+
+let raros = [
+  'Madara (Raro)',
+  'Sukuna (Raro)',
+  'Goku Ultra Instinto (Raro)',
+  'Gojo Ilimitado (Raro)',
+  'Levi Ackerman Elite (Raro)'
+]
+
+// ============================================================
+// 💥 ESTADÍSTICAS
+// ============================================================
+
+const statsBase = {
+
+  Naruto: {
+    atk: 80,
+    def: 70,
+    hp: 100
+  },
+
+  Sasuke: {
+    atk: 85,
+    def: 65,
+    hp: 95
+  },
+
+  Goku: {
+    atk: 95,
+    def: 80,
+    hp: 120
+  },
+
+  Vegeta: {
+    atk: 90,
+    def: 75,
+    hp: 110
+  },
+
+  Luffy: {
+    atk: 85,
+    def: 80,
+    hp: 110
+  },
+
+  Zoro: {
+    atk: 88,
+    def: 78,
+    hp: 105
+  },
+
+  Levi: {
+    atk: 82,
+    def: 60,
+    hp: 90
+  },
+
+  Eren: {
+    atk: 87,
+    def: 70,
+    hp: 100
+  },
+
+  Gojo: {
+    atk: 100,
+    def: 100,
+    hp: 120
+  },
+
+  Itachi: {
+    atk: 92,
+    def: 75,
+    hp: 95
+  },
+
+  Tanjiro: {
+    atk: 85,
+    def: 70,
+    hp: 100
+  },
+
+  Zenitsu: {
+    atk: 90,
+    def: 60,
+    hp: 90
+  },
+
+  Inosuke: {
+    atk: 88,
+    def: 65,
+    hp: 95
+  },
+
+  Mikasa: {
+    atk: 87,
+    def: 75,
+    hp: 100
+  },
+
+  // 🌟 RAROS
+
+  'Madara (Raro)': {
+    atk: 110,
+    def: 100,
+    hp: 130
+  },
+
+  'Sukuna (Raro)': {
+    atk: 115,
+    def: 95,
+    hp: 130
+  },
+
+  'Goku Ultra Instinto (Raro)': {
+    atk: 130,
+    def: 110,
+    hp: 140
+  },
+
+  'Gojo Ilimitado (Raro)': {
+    atk: 125,
+    def: 120,
+    hp: 140
+  },
+
+  'Levi Ackerman Elite (Raro)': {
+    atk: 105,
+    def: 90,
+    hp: 110
+  }
+}
+
+// ============================================================
 // 🎲 PROBABILIDADES
-const chanceRaro = () => Math.random() < 0.10
-const chanceRaroOwner = () => Math.random() < 0.35
+// ============================================================
 
-let handler = async (m, { conn, command, text }) => {
+const chanceRaro = () =>
+  Math.random() < 0.10
 
-  const db = loadDB()
-  const jid = m.sender
+const chanceRaroOwner = () =>
+  Math.random() < 0.35
 
-  const owners = (global.owner || []).map(v => {
-    if (Array.isArray(v)) v = v[0]
-    return String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net'
+// ============================================================
+// 👑 DETECTAR OWNER
+// ============================================================
+
+function isUserOwner(jid) {
+
+  const owners =
+    global.owner || []
+
+  const numeroUsuario =
+    String(jid || '')
+      .split('@')[0]
+      .replace(/[^0-9]/g, '')
+
+  return owners.some(owner => {
+
+    if (Array.isArray(owner)) {
+      owner = owner[0]
+    }
+
+    const numeroOwner =
+      String(owner || '')
+        .split('@')[0]
+        .replace(/[^0-9]/g, '')
+
+    return (
+      numeroOwner &&
+      numeroOwner === numeroUsuario
+    )
   })
+}
 
-  const isOwner = owners.includes(jid)
+// ============================================================
+// 🎮 ESTADO DEL JUEGO
+// ============================================================
 
-  // 📜 LISTA OTAKU
-  if (command === 'personajes') {
+function getGameState() {
 
-    let texto = `
-╭━━━〔 🌌 PORTAL DEL MULTIVERSO ANIME 〕━━━⬣
-┃ "Las almas de los guerreros aguardan..."
-┃ "¿Serás digno de invocarlos?"
+  if (
+    !global.db ||
+    !global.db.data
+  ) {
+    return false
+  }
+
+  if (
+    !global.db.data.personajes
+  ) {
+    global.db.data.personajes = {}
+  }
+
+  if (
+    typeof global.db.data.personajes.enabled !== 'boolean'
+  ) {
+    global.db.data.personajes.enabled = false
+  }
+
+  return global.db.data.personajes.enabled
+}
+
+function setGameState(value) {
+
+  if (!global.db.data.personajes) {
+    global.db.data.personajes = {}
+  }
+
+  global.db.data.personajes.enabled =
+    Boolean(value)
+}
+
+// ============================================================
+// 🚀 HANDLER
+// ============================================================
+
+let handler = async (
+  m,
+  {
+    conn,
+    command,
+    text
+  }
+) => {
+
+  const cmd =
+    String(command || '')
+      .toLowerCase()
+
+  const jid =
+    m.sender
+
+  const owner =
+    isUserOwner(jid)
+
+  // ==========================================================
+  // 🔐 ACTIVAR / DESACTIVAR JUEGO
+  // SOLO OWNER
+  // ==========================================================
+
+  if (cmd === 'juegopj') {
+
+    if (!owner) {
+
+      return m.reply(
+`🚫 *ACCESO DENEGADO*
+
+👑 Solo los propietarios del bot
+pueden controlar el juego de personajes.`
+      )
+    }
+
+    const actual =
+      getGameState()
+
+    const nuevoEstado =
+      !actual
+
+    setGameState(
+      nuevoEstado
+    )
+
+    return m.reply(
+`╭━━━〔 🎌 JUEGO DE PERSONAJES 〕━━━╮
+
+${nuevoEstado
+  ? '🟢 *JUEGO ACTIVADO*'
+  : '🔴 *JUEGO DESACTIVADO*'}
+
+${nuevoEstado
+  ? '🎲 Los usuarios ya pueden reclamar personajes.'
+  : '🔒 Los comandos del juego quedan bloqueados.'}
+
+━━━━━━━━━━━━━━━━━━━━
+
+👑 Control exclusivo del Owner
+
+💡 Usa *.juegopj* nuevamente
+para cambiar el estado.
+
+╰━━━━━━━━━━━━━━━━━━━━╯`
+    )
+  }
+
+  // ==========================================================
+  // 🔒 VERIFICAR SI EL JUEGO ESTÁ ACTIVO
+  // ==========================================================
+
+  if (!getGameState()) {
+
+    return m.reply(
+`🔒 *JUEGO DESACTIVADO*
+
+🎌 El sistema de personajes
+no está disponible actualmente.
+
+👑 Solo un Owner puede activarlo
+usando:
+
+*.juegopj*`
+    )
+  }
+
+  // ==========================================================
+  // 📜 LISTA DE PERSONAJES
+  // ==========================================================
+
+  if (cmd === 'personajes') {
+
+    const db =
+      loadDB()
+
+    let texto =
+`╭━━━〔 🌌 MULTIVERSO ANIME 〕━━━⬣
 ┃
-┃ 🟢 *CLASE NORMAL — SHINOBI / PIRATAS / TITANES*
+┃ 🎌 *PERSONAJES DISPONIBLES*
+┃
 `
 
-    normales.forEach(p => {
-      let dueño = Object.keys(db).find(u => db[u] === p)
-      let s = statsBase[p] || {}
+    normales.forEach(
+      personaje => {
 
-      texto += dueño
-        ? `┃ ❌ ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Sellado 💀\n`
-        : `┃ ✨ ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Esperando invocador\n`
-    })
+        const dueño =
+          Object.keys(db)
+            .find(
+              user =>
+                db[user] === personaje
+            )
 
-    texto += `
+        const s =
+          statsBase[personaje] || {}
+
+        texto += dueño
+
+          ? `┃ ❌ ${personaje} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}]
+┃    └─ 🔒 Sellado
 ┃
-┃ 🌟 *CLASE LEGENDARIA — DIOSES DEL ANIME*
-┃ "Su poder desafía la realidad..."
 `
 
-    raros.forEach(p => {
-      let dueño = Object.keys(db).find(u => db[u] === p)
-      let s = statsBase[p] || {}
+          : `┃ ✨ ${personaje} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}]
+┃    └─ 🟢 Disponible
+┃
+`
+      }
+    )
 
-      texto += dueño
-        ? `┃ 🔒 ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Encadenado por otro usuario\n`
-        : `┃ 🌟 ${p} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}] → Energía abrumadora detectada...\n`
-    })
+    texto +=
+`┃
+┃ 🌟 *PERSONAJES LEGENDARIOS*
+┃
+`
 
-    texto += `╰━━━━━━━━━━━━━━━━⬣`
+    raros.forEach(
+      personaje => {
+
+        const dueño =
+          Object.keys(db)
+            .find(
+              user =>
+                db[user] === personaje
+            )
+
+        const s =
+          statsBase[personaje] || {}
+
+        texto += dueño
+
+          ? `┃ 🔒 ${personaje} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}]
+┃    └─ Encadenado
+┃
+`
+
+          : `┃ 🌟 ${personaje} [⚔️${s.atk}|🛡️${s.def}|❤️${s.hp}]
+┃    └─ Disponible
+┃
+`
+      }
+    )
+
+    texto +=
+`╰━━━━━━━━━━━━━━━━⬣`
 
     return m.reply(texto)
   }
 
+  // ==========================================================
   // 🎲 CLAIM
-  if (command === 'claim') {
+  // ==========================================================
 
-    if (db[jid])
-      return m.reply(`⚠️ "Ya has sellado un contrato..." 🐉\n✨ *${db[jid]}* permanece a tu lado.`)
+  if (cmd === 'claim') {
 
-    let esRaro = isOwner ? chanceRaroOwner() : chanceRaro()
-    let pool = esRaro ? raros : normales
+    const db =
+      loadDB()
 
-    let disponibles = pool.filter(p => !Object.values(db).includes(p))
+    if (db[jid]) {
 
-    if (!disponibles.length)
-      return m.reply("💀 " + "El multiverso ha sido drenado... no quedan almas disponibles.")
+      return m.reply(
+`⚠️ *YA TIENES UN PERSONAJE*
 
-    let personaje = disponibles[Math.floor(Math.random() * disponibles.length)]
+🐉 Tu vínculo actual:
 
-    db[jid] = personaje
+✨ *${db[jid]}*
+
+Usa *.cambiar* si quieres buscar otro.`
+      )
+    }
+
+    const esRaro =
+      owner
+        ? chanceRaroOwner()
+        : chanceRaro()
+
+    const pool =
+      esRaro
+        ? raros
+        : normales
+
+    const disponibles =
+      pool.filter(
+        personaje =>
+          !Object.values(db)
+            .includes(personaje)
+      )
+
+    if (!disponibles.length) {
+
+      return m.reply(
+`💀 *MULTIVERSO AGOTADO*
+
+No quedan personajes disponibles
+en esta categoría.`
+      )
+    }
+
+    const personaje =
+      disponibles[
+        Math.floor(
+          Math.random() *
+          disponibles.length
+        )
+      ]
+
+    db[jid] =
+      personaje
+
     saveDB(db)
 
     return m.reply(
 `╭━━━〔 🎲 INVOCACIÓN DIMENSIONAL 〕━━━⬣
-┃ 🔮 Canalizando energía espiritual...
-┃ ⚡ Rompiendo barreras del universo...
 ┃
-┃ 🐉 *${personaje}* ha respondido a tu llamado
-${raros.includes(personaje) ? "┃ 🌟✨ UNA ENTIDAD LEGENDARIA HA DESPERTADO ✨🌟" : ""}
+┃ 🔮 Canalizando energía...
+┃ ⚡ Rompiendo barreras...
 ┃
-┃ "Desde este momento... luchará a tu lado"
-╰━━━━━━━━━━━━━━━━⬣`)
-  }
-
-  // 👤 MI PERSONAJE
-  if (command === 'mipersonaje') {
-
-    if (!db[jid])
-      return m.reply("❌ " + "Aún no has formado un contrato espiritual...")
-
-    let s = statsBase[db[jid]] || {}
-
-    return m.reply(
-`╭━━━〔 🐉 CONTRATO ESPIRITUAL 〕━━━⬣
-┃ ✨ ${db[jid]}
+┃ 🐉 *${personaje}*
 ┃
-┃ ⚔️ Poder ofensivo: ${s.atk}
-┃ 🛡️ Defensa: ${s.def}
-┃ ❤️ Vitalidad: ${s.hp}
+${raros.includes(personaje)
+  ? '┃ 🌟✨ ¡ENTIDAD LEGENDARIA DESPERTADA! ✨🌟'
+  : '┃ ✨ Un nuevo vínculo ha sido creado.'}
 ┃
-┃ "Su poder fluye a través de ti..."
-╰━━━━━━━━━━━━━━━━⬣`)
-  }
-
-  // 💔 DROP
-  if (command === 'drop') {
-
-    if (!db[jid])
-      return m.reply("❌ " + "No tienes ningún vínculo que romper.")
-
-    let viejo = db[jid]
-    delete db[jid]
-    saveDB(db)
-
-    return m.reply(
-`💔 Has roto el contrato con *${viejo}*
-🌌 Su esencia se desvanece en el vacío...
-
-"Algunas alianzas... no estaban destinadas a durar..."`)
-  }
-
-  // 🔄 CAMBIAR
-  if (command === 'cambiar') {
-
-    if (!db[jid])
-      return m.reply("❌ " + "No tienes personaje.")
-
-    let viejo = db[jid]
-
-    let esRaro = isOwner ? chanceRaroOwner() : chanceRaro()
-    let pool = esRaro ? raros : normales
-
-    let disponibles = pool.filter(p =>
-      !Object.values(db).includes(p) && p !== viejo
+┃ 🤝 Ahora luchará a tu lado.
+┃
+╰━━━━━━━━━━━━━━━━⬣`
     )
-
-    if (!disponibles.length)
-      return m.reply("💀 " + "El destino no ofrece nuevas opciones...")
-
-    let personaje = disponibles[Math.floor(Math.random() * disponibles.length)]
-
-    db[jid] = personaje
-    saveDB(db)
-
-    return m.reply(
-`╭━━━〔 🔄 REENCARNACIÓN DEL DESTINO 〕━━━⬣
-┃ ⚔️ ${viejo} ha sido liberado...
-┃ 🌌 Nuevo vínculo sellado:
-┃ ✨ ${personaje}
-${raros.includes(personaje) ? "┃ 🌟 EL DESTINO HA CAMBIADO DRÁSTICAMENTE 🌟" : ""}
-┃
-┃ "Tu camino acaba de cambiar..."
-╰━━━━━━━━━━━━━━━━⬣`)
   }
 
-  // 👑 OWNER
-  if (command === 'addpj') {
-    if (!isOwner) return m.reply('❌ Solo los dioses pueden alterar la existencia 👑')
-    if (!text) return m.reply('⚠️ Escribe nombre')
+  // ==========================================================
+  // 👤 MI PERSONAJE
+  // ==========================================================
 
-    normales.push(text.trim())
-    return m.reply(`👑 Has creado una nueva entidad:\n✨ *${text}*\n"Un nuevo poder ha nacido..."`)
-  }
+  if (cmd === 'mipersonaje') {
 
-  if (command === 'delpj') {
-    if (!isOwner) return m.reply('❌ Solo dioses 👑')
-    if (!text) return m.reply('⚠️ Escribe nombre')
+    const db =
+      loadDB()
 
-    normales = normales.filter(p => p.toLowerCase() !== text.toLowerCase())
-    raros = raros.filter(p => p.toLowerCase() !== text.toLowerCase())
+    if (!db[jid]) {
 
-    return m.reply(`💀 Has borrado a *${text}* del multiverso\n"Su existencia ha sido eliminada..."`)
-  }
+      return m.reply(
+`❌ *SIN PERSONAJE*
 
-  if (command === 'resetpj') {
-    if (!isOwner) return m.reply('❌ Solo dioses 👑')
-    if (!m.mentionedJid[0]) return m.reply('⚠️ Menciona usuario')
+Todavía no tienes un contrato espiritual.
 
-    let target = m.mentionedJid[0]
+🎲 Usa:
 
-    delete db[target]
-    saveDB(db)
-
-    return conn.sendMessage(m.chat, {
-      text: `🧹 Has roto el vínculo espiritual de @${target.split('@')[0]}\n"Su contrato ha sido destruido..."`,
-      mentions: [target]
-    })
-  }
-
-  if (command === 'listpj') {
-
-    if (!Object.keys(db).length)
-      return m.reply("❌ El multiverso está vacío...")
-
-    let texto = `╭━━━〔 📊 REGISTRO DEL MULTIVERSO 〕━━━⬣\n\n`
-
-    for (let user in db) {
-      texto += `👤 @${user.split('@')[0]} → ${db[user]}\n`
+*.claim*`
+      )
     }
 
-    texto += `\n"Todos los contratos están registrados aquí..."\n╰━━━━━━━━━━━━━━━━⬣`
+    const personaje =
+      db[jid]
 
-    return conn.sendMessage(m.chat, {
-      text: texto,
-      mentions: Object.keys(db)
-    })
+    const s =
+      statsBase[personaje] || {}
+
+    return m.reply(
+`╭━━━〔 🐉 TU PERSONAJE 〕━━━⬣
+
+✨ *${personaje}*
+
+⚔️ Poder ofensivo: *${s.atk}*
+🛡️ Defensa: *${s.def}*
+❤️ Vitalidad: *${s.hp}*
+
+╰━━━━━━━━━━━━━━━━⬣`
+    )
   }
 
-  if (command === 'resetchars') {
-    if (!isOwner) return m.reply('❌ Solo dioses 👑')
+  // ==========================================================
+  // 💔 DROP
+  // ==========================================================
+
+  if (cmd === 'drop') {
+
+    const db =
+      loadDB()
+
+    if (!db[jid]) {
+
+      return m.reply(
+        '❌ No tienes ningún personaje para liberar.'
+      )
+    }
+
+    const viejo =
+      db[jid]
+
+    delete db[jid]
+
+    saveDB(db)
+
+    return m.reply(
+`💔 *CONTRATO ROTO*
+
+Has liberado a:
+
+✨ *${viejo}*
+
+🌌 Su vínculo contigo ha terminado.`
+    )
+  }
+
+  // ==========================================================
+  // 🔄 CAMBIAR
+  // ==========================================================
+
+  if (cmd === 'cambiar') {
+
+    const db =
+      loadDB()
+
+    if (!db[jid]) {
+
+      return m.reply(
+`❌ No tienes personaje.
+
+🎲 Primero usa *.claim*.`
+      )
+    }
+
+    const viejo =
+      db[jid]
+
+    const esRaro =
+      owner
+        ? chanceRaroOwner()
+        : chanceRaro()
+
+    const pool =
+      esRaro
+        ? raros
+        : normales
+
+    const disponibles =
+      pool.filter(
+        personaje =>
+          !Object.values(db)
+            .includes(personaje) &&
+          personaje !== viejo
+      )
+
+    if (!disponibles.length) {
+
+      return m.reply(
+        '💀 El destino no ofrece nuevas opciones.'
+      )
+    }
+
+    const personaje =
+      disponibles[
+        Math.floor(
+          Math.random() *
+          disponibles.length
+        )
+      ]
+
+    db[jid] =
+      personaje
+
+    saveDB(db)
+
+    return m.reply(
+`╭━━━〔 🔄 CAMBIO DE DESTINO 〕━━━⬣
+
+⚔️ Anterior:
+*${viejo}*
+
+🌌 Nuevo vínculo:
+✨ *${personaje}*
+
+${raros.includes(personaje)
+  ? '🌟 ¡HAS OBTENIDO UNA ENTIDAD LEGENDARIA!'
+  : ''}
+
+╰━━━━━━━━━━━━━━━━⬣`
+    )
+  }
+
+  // ==========================================================
+  // 👑 OWNER — AGREGAR PERSONAJE
+  // ==========================================================
+
+  if (cmd === 'addpj') {
+
+    if (!owner) {
+
+      return m.reply(
+        '🚫 Solo los Owners pueden agregar personajes.'
+      )
+    }
+
+    if (!text?.trim()) {
+
+      return m.reply(
+        '⚠️ Escribe el nombre del personaje.'
+      )
+    }
+
+    const nombre =
+      text.trim()
+
+    if (
+      normales.includes(nombre) ||
+      raros.includes(nombre)
+    ) {
+
+      return m.reply(
+        '⚠️ Ese personaje ya existe.'
+      )
+    }
+
+    normales.push(
+      nombre
+    )
+
+    return m.reply(
+`👑 *PERSONAJE CREADO*
+
+✨ *${nombre}*
+
+El personaje fue agregado
+al multiverso.`
+    )
+  }
+
+  // ==========================================================
+  // 👑 OWNER — ELIMINAR PERSONAJE
+  // ==========================================================
+
+  if (cmd === 'delpj') {
+
+    if (!owner) {
+
+      return m.reply(
+        '🚫 Solo los Owners pueden eliminar personajes.'
+      )
+    }
+
+    if (!text?.trim()) {
+
+      return m.reply(
+        '⚠️ Escribe el nombre del personaje.'
+      )
+    }
+
+    const nombre =
+      text.trim()
+
+    normales =
+      normales.filter(
+        p =>
+          p.toLowerCase() !==
+          nombre.toLowerCase()
+      )
+
+    raros =
+      raros.filter(
+        p =>
+          p.toLowerCase() !==
+          nombre.toLowerCase()
+      )
+
+    return m.reply(
+`💀 *PERSONAJE ELIMINADO*
+
+✨ *${nombre}*
+
+Su existencia fue eliminada
+del multiverso.`
+    )
+  }
+
+  // ==========================================================
+  // 👑 OWNER — RESET DE USUARIO
+  // ==========================================================
+
+  if (cmd === 'resetpj') {
+
+    if (!owner) {
+
+      return m.reply(
+        '🚫 Solo los Owners pueden usar este comando.'
+      )
+    }
+
+    if (!m.mentionedJid?.[0]) {
+
+      return m.reply(
+        '⚠️ Menciona al usuario.'
+      )
+    }
+
+    const target =
+      m.mentionedJid[0]
+
+    const db =
+      loadDB()
+
+    if (!db[target]) {
+
+      return m.reply(
+        '❌ Ese usuario no tiene personaje.'
+      )
+    }
+
+    const personaje =
+      db[target]
+
+    delete db[target]
+
+    saveDB(db)
+
+    return conn.sendMessage(
+      m.chat,
+      {
+        text:
+`🧹 *VÍNCULO ELIMINADO*
+
+👤 Usuario:
+@${target.split('@')[0]}
+
+🎌 Personaje liberado:
+*${personaje}*`,
+        mentions: [
+          target
+        ]
+      },
+      {
+        quoted: m
+      }
+    )
+  }
+
+  // ==========================================================
+  // 📊 LISTA DE JUGADORES
+  // ==========================================================
+
+  if (cmd === 'listpj') {
+
+    const db =
+      loadDB()
+
+    if (
+      !Object.keys(db).length
+    ) {
+
+      return m.reply(
+        '❌ El multiverso todavía está vacío.'
+      )
+    }
+
+    let texto =
+`╭━━━〔 📊 REGISTRO DEL MULTIVERSO 〕━━━⬣
+
+`
+
+    for (
+      const user in db
+    ) {
+
+      texto +=
+`👤 @${user.split('@')[0]}
+🎌 ${db[user]}
+
+`
+    }
+
+    texto +=
+`╰━━━━━━━━━━━━━━━━⬣`
+
+    return conn.sendMessage(
+      m.chat,
+      {
+        text: texto,
+        mentions:
+          Object.keys(db)
+      },
+      {
+        quoted: m
+      }
+    )
+  }
+
+  // ==========================================================
+  // 👑 OWNER — RESET TOTAL
+  // ==========================================================
+
+  if (cmd === 'resetchars') {
+
+    if (!owner) {
+
+      return m.reply(
+        '🚫 Solo los Owners pueden reiniciar el multiverso.'
+      )
+    }
 
     saveDB({})
-    return m.reply("🌌 REINICIO TOTAL\n" + `"El multiverso ha sido destruido y reconstruido..."`)
-  }
 
+    return m.reply(
+`🌌 *REINICIO TOTAL*
+
+💥 Todos los contratos fueron eliminados.
+
+✨ El multiverso ha sido reconstruido desde cero.`
+    )
+  }
 }
 
+// ============================================================
+// 📋 COMANDOS
+// ============================================================
+
 handler.command = [
+
+  // 🎌 Juego
+  'personajes',
+  'claim',
+  'mipersonaje',
+  'drop',
+  'cambiar',
+
+  // 👑 Owner
+  'addpj',
+  'delpj',
+  'resetpj',
+  'listpj',
+  'resetchars',
+
+  // 🔐 Control exclusivo Owner
+  'juegopj'
+
+]
+
+// ============================================================
+// 🏷️ CATEGORÍA
+// ============================================================
+
+handler.help = [
+
+  'juegopj',
   'personajes',
   'claim',
   'mipersonaje',
@@ -283,6 +954,17 @@ handler.command = [
   'resetpj',
   'listpj',
   'resetchars'
+
 ]
+
+handler.tags = [
+  'juego',
+  'fun',
+  'owner'
+]
+
+// ============================================================
+// 📌 EXPORT
+// ============================================================
 
 export default handler

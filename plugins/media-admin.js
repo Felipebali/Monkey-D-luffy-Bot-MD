@@ -810,13 +810,20 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
                     m.chat,
 `❌ *Debes indicar al menos un ID.*
 
-Ejemplos:
+━━━━━━━━━━━━━━━━━━
 
-*.media del 5*
+📌 *Ejemplos:*
 
-*.media del 3 7 9*
+• *.media del 5*
+  └─ Elimina el medio con ID 5.
 
-*.media borrar 10*`,
+• *.media del 3 7 9*
+  └─ Elimina los medios 3, 7 y 9.
+
+• *.media borrar 10*
+  └─ Elimina el medio con ID 10.
+
+⚠️ *Los archivos eliminados no podrán recuperarse desde este sistema.*`,
                     m
                 )
             }
@@ -1154,53 +1161,256 @@ Ejemplos:
 
 
         // ========================================================
-        // ❓ AYUDA
+        // ❓ AYUDA / MENÚ COMPLETO
         // ========================================================
 
         return conn.reply(
             m.chat,
-`📂 *ADMINISTRADOR DE MEDIOS*
+`📂 *ADMINISTRADOR DE MEDIOS — FELIXCAT*
 
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-📋 *LISTAR*
+🛡️ *¿QUÉ HACE ESTE SISTEMA?*
+
+Este sistema guarda automáticamente los
+medios recibidos por el bot y permite al
+👑 *OWNER* administrarlos desde WhatsApp.
+
+📦 *TIPOS DE MEDIOS GUARDADOS:*
+
+🖼️ Imágenes
+🎥 Videos
+🎵 Audios
+📄 Documentos
+
+💾 Cada medio se guarda físicamente en:
+
+📁 *./media*
+
+Y su información se registra en:
+
+📂 *./database/media.json*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 *1. LISTAR MEDIOS*
+
+Muestra los medios almacenados junto con
+su información y su ID correspondiente.
+
+📝 *Comandos:*
 
 • *.media*
 • *.medias*
 • *.media list*
+• *.media lista*
 
-📤 *RECUPERAR*
+📊 El listado muestra hasta *500 medios*.
 
-• *.media <id>*
-• *.medias <id>*
+🔎 Cada registro incluye:
 
-📍 Los medios recuperados
-se envían al grupo central.
+🆔 ID del medio
+📄 Nombre del archivo
+📦 Tipo de archivo
+👤 Usuario que lo envió
+👥 Grupo donde fue recibido
+📅 Fecha de guardado
 
-🗑️ *BORRAR*
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-• *.media del <id>*
-• *.media del <id> <id> <id>*
+📤 *2. RECUPERAR UN MEDIO*
 
-🧹 *BORRAR TODO*
+Permite recuperar un archivo utilizando
+su número de ID.
+
+📝 *Comandos:*
+
+• *.media <ID>*
+• *.medias <ID>*
+
+📌 *Ejemplo:*
+
+*.media 25*
+
+➡️ El bot buscará el medio con ID *25*.
+
+📍 El archivo recuperado será enviado
+automáticamente al:
+
+👥 *GRUPO CENTRAL DE MEDIOS*
+
+⚠️ El archivo debe existir físicamente
+en la carpeta *./media*.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🗑️ *3. ELIMINAR MEDIOS*
+
+Permite eliminar uno o varios medios
+utilizando sus respectivos IDs.
+
+📝 *Comandos:*
+
+• *.media del <ID>*
+• *.media borrar <ID>*
+• *.media delete <ID>*
+• *.media del <ID> <ID> <ID>*
+
+📌 *Ejemplos:*
+
+*.media del 5*
+
+➡️ Elimina solamente el medio 5.
+
+*.media del 3 7 12*
+
+➡️ Elimina los medios 3, 7 y 12.
+
+⚠️ Al eliminar un medio también se elimina
+su archivo físico de *./media*.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧹 *4. LIMPIAR TODO*
+
+Elimina completamente los medios
+almacenados por el sistema.
+
+📝 *Comandos:*
 
 • *.media clear*
 • *.media clean*
 • *.media wipe*
+• *.media limpiar*
 
-🔄 *SINCRONIZAR*
+💥 Esta acción elimina:
+
+🗑️ Archivos de *./media*
+🗑️ Registros de *media.json*
+🗑️ Lista de medios en la memoria del bot
+
+⚠️ *ATENCIÓN:*
+
+Esta operación elimina *TODOS* los medios.
+No utilices este comando si solamente
+querés borrar un archivo específico.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 *5. SINCRONIZAR / REPARAR*
+
+Comprueba que los registros de
+*media.json* todavía tengan su archivo
+correspondiente en *./media*.
+
+📝 *Comandos:*
 
 • *.media sync*
+• *.media sincronizar*
+• *.media repair*
 • *.media fix*
 
-━━━━━━━━━━━━━━━━━━
+🔎 El sistema revisa los archivos y elimina
+de la base de datos aquellos registros cuyo
+archivo físico ya no existe.
 
-📌 *Grupo central:*
+📌 Esto ayuda a mantener sincronizados:
+
+📂 *./media*
+↕️
+📄 *media.json*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🤖 *6. GUARDADO AUTOMÁTICO*
+
+El bot detecta automáticamente cuando
+recibe:
+
+🖼️ Imagen
+🎥 Video
+🎵 Audio
+📄 Documento
+
+📥 El archivo se descarga automáticamente
+y se registra en la base de datos.
+
+No es necesario ejecutar ningún comando
+para guardar el medio.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 *7. IDENTIFICACIÓN DE MEDIOS*
+
+Cada archivo recibe un ID numérico.
+
+Ejemplo:
+
+🆔 ID 1
+🆔 ID 2
+🆔 ID 3
+🆔 ID 4
+🆔 ID 5
+
+Estos IDs permiten posteriormente
+recuperar o eliminar un archivo.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 *GRUPO CENTRAL*
+
+Los medios recuperados mediante:
+
+*.media <ID>*
+
+se envían automáticamente al grupo:
+
 ${MEDIA_GROUP_ID}
 
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-👑 *Solo disponible para el owner.*`,
+👑 *PERMISOS*
+
+🔐 Este administrador está disponible
+únicamente para el *OWNER* del bot.
+
+Los usuarios normales no pueden:
+
+❌ Ver la lista
+❌ Recuperar medios
+❌ Eliminar medios
+❌ Limpiar la biblioteca
+❌ Sincronizar la base de datos
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 *EJEMPLO RÁPIDO*
+
+1️⃣ Ver medios:
+
+*.media*
+
+2️⃣ Buscar un archivo por ID:
+
+*.media 25*
+
+3️⃣ Eliminar un archivo:
+
+*.media del 25*
+
+4️⃣ Reparar la base de datos:
+
+*.media sync*
+
+5️⃣ Eliminar absolutamente todo:
+
+*.media clear*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🐈 *FELIXCAT BOT*
+🛡️ *Administrador de medios*
+👑 *Solo para el OWNER*`,
             m
         )
 

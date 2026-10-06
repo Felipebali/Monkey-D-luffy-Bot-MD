@@ -1,68 +1,271 @@
 // 📂 plugins/menu-owner.js
+// 👑 PANEL DEL OWNER — WhatsApp-Bot
+// ============================================================
 
 let handler = async (m, { conn }) => {
+
   try {
-    await conn.sendMessage(m.chat, { react: { text: '👑', key: m.key } })
+
+    // ==========================================================
+    // 👑 REACCIÓN
+    // ==========================================================
+
+    await conn.sendMessage(
+      m.chat,
+      {
+        react: {
+          text: '👑',
+          key: m.key
+        }
+      }
+    )
+
+    // ==========================================================
+    // 📅 FECHA Y HORA
+    // ==========================================================
 
     const fecha = new Date().toLocaleString('es-UY', {
       timeZone: 'America/Montevideo',
       hour12: false
     })
 
+    // ==========================================================
+    // 📋 MENÚ
+    // ==========================================================
+
     const menuText = `
-╭━━━〔 *🐾 PANEL DEL DUEÑO 🐾* 〕━━━╮
-┃ 👑 *FelixCat_Bot – Control Total*  
+╭━━━〔 👑 *PANEL DEL OWNER* 〕━━━╮
+┃ 🤖 *WhatsApp-Bot*
+┃ 🛡️ Centro de control administrativo
 ┃ 📆 ${fecha}
-╰━━━━━━━━━━━━━━━━━━━━━━╯
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-🖼️ *Multimedia / Perfil*
-• .gpu — Descargar foto de perfil de usuario 🧑🖼️
-• .gpo — Descargar foto del grupo 🏞️
+╭━━〔 🖼️ MULTIMEDIA / PERFIL 〕━━╮
 
-🎖️ *Gestión de Insignias (Solo Owner)*
-• .otorgar @user <insignia> — Otorgar insignia 🏅
-• .quitar @user <insignia> — Quitar insignia ❌
-• .verinsignias @user — Ver insignias 📋
+┃ 🧑‍💻 *.gpu @user*
+┃ └─ Obtener foto de perfil del usuario
 
-🚨 *Advertencias para Administradores (Solo Owner)*
-• .admad @admin [motivo] — Dar advertencia ⚠️
-• .unadmad @admin — Quitar advertencia 🟢
-• .listadmad — Ver lista de advertencias 📋
-• .clearadmad — Limpiar todas las advertencias 🧹
+┃ 🏞️ *.gpo*
+┃ └─ Obtener foto de perfil del grupo
 
-🚫 *Lista Negra*
-• .ln @user — Agregar ⚠️
-• .unln @user — Quitar ✅
-• .vln — Ver lista 📋
-• .clrn — Limpiar lista 🗑️
-• .resetuser @user — Reiniciar datos 🔄
+┃ 🤖 *.setpp*
+┃ └─ Cambiar foto de perfil del bot
 
-⚙️ *Gestión del Bot*
-• .restart — Reinicia el bot 🔁
-• .update — Actualiza el bot 🆙
-• .exec / .exec2 — Ejecuta código 💻
-• .setcmd — Configura comando ⚙️
-• .setprefix — Cambia prefijo ✏️
-• .dsowner — Quita dueño ❌
-• .join <link> — Unirse a grupo 🔗
-• .resetlink — Resetear link del grupo ♻️
-• .setpp — Cambiar foto del bot 🤖🖼️
-• .setpg — Cambiar foto del grupo 👥🖼️
+┃ 👥 *.setpg*
+┃ └─ Cambiar foto del grupo
 
-━━━━━━━━━━━━━━━━━━━
-🐾 *FelixCat – Propietario Supremo*
-💠 "Control total con estilo felino." 💠
-━━━━━━━━━━━━━━━━━━━
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+
+╭━━〔 🎖️ SISTEMA DE INSIGNIAS 〕━━╮
+
+┃ 🏅 *.otorgar @user <insignia>*
+┃ └─ Otorgar una insignia
+
+┃ ❌ *.quitar @user <número>*
+┃ └─ Quitar una insignia por número
+
+┃ 📋 *.verinsignias @user*
+┃ └─ Ver las insignias del usuario
+
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+
+╭━━〔 🚨 ADVERTENCIAS DE ADMINS 〕━━╮
+
+┃ ⚠️ *.admad @admin <motivo>*
+┃ └─ Dar una advertencia
+
+┃ 🟢 *.unadmad @admin*
+┃ └─ Quitar la última advertencia
+
+┃ 📋 *.listadmad*
+┃ └─ Ver administradores advertidos
+
+┃ 🔎 *.veradmad @admin*
+┃ └─ Ver historial completo
+
+┃ 🧹 *.clearadmad*
+┃ └─ Limpiar todas las advertencias
+
+┃
+┃ 🚨 *Límite: 3 advertencias*
+┃ └─ 3/3 → Despromoción automática
+
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+
+╭━━〔 🚫 LISTA NEGRA 〕━━╮
+
+┃ 🚫 *.ln @user*
+┃ └─ Agregar usuario a la lista negra
+
+┃ ✅ *.unln @user*
+┃ └─ Quitar usuario de la lista negra
+
+┃ 📋 *.vln*
+┃ └─ Ver lista negra
+
+┃ 🗑️ *.clrn*
+┃ └─ Limpiar lista negra
+
+┃ 🔄 *.resetuser @user*
+┃ └─ Reiniciar datos del usuario
+
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+
+╭━━〔 ⚙️ CONTROL DEL BOT 〕━━╮
+
+┃ 🔁 *.restart*
+┃ └─ Reiniciar WhatsApp-Bot
+
+┃ 🆙 *.update*
+┃ └─ Actualizar el bot
+
+┃ 💻 *.exec*
+┃ └─ Ejecutar código
+
+┃ 💻 *.exec2*
+┃ └─ Ejecutar código avanzado
+
+┃ ⚙️ *.setcmd*
+┃ └─ Configurar comandos
+
+┃ ✏️ *.setprefix*
+┃ └─ Cambiar prefijo del bot
+
+┃ 👑 *.dsowner*
+┃ └─ Gestionar propietario
+
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+
+╭━━〔 👥 CONTROL DE GRUPOS 〕━━╮
+
+┃ 🔗 *.join <link>*
+┃ └─ Unirse a un grupo
+
+┃ ♻️ *.resetlink*
+┃ └─ Restablecer enlace del grupo
+
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+
+╭━━〔 🛡️ ADMINISTRACIÓN 〕━━╮
+
+┃ 👑 *Acceso exclusivo Owner*
+┃
+┃ 🔐 Este panel contiene comandos
+┃ de administración avanzada.
+┃
+┃ ⚠️ Algunos comandos pueden afectar
+┃ directamente al funcionamiento del bot.
+
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+
+╭━━〔 📚 RESUMEN RÁPIDO 〕━━╮
+
+┃ 🎖️ INSIGNIAS
+┃ ├─ .otorgar
+┃ ├─ .quitar
+┃ └─ .verinsignias
+┃
+┃ 🚨 ADVERTENCIAS
+┃ ├─ .admad
+┃ ├─ .unadmad
+┃ ├─ .listadmad
+┃ ├─ .veradmad
+┃ └─ .clearadmad
+┃
+┃ 🚫 LISTA NEGRA
+┃ ├─ .ln
+┃ ├─ .unln
+┃ ├─ .vln
+┃ ├─ .clrn
+┃ └─ .resetuser
+┃
+┃ ⚙️ BOT
+┃ ├─ .restart
+┃ ├─ .update
+┃ ├─ .exec
+┃ ├─ .exec2
+┃ ├─ .setcmd
+┃ ├─ .setprefix
+┃ └─ .dsowner
+
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃ 👑 *WhatsApp-Bot*
+┃ 🛡️ *Panel exclusivo del Owner*
+┃ ⚡ *Control • Seguridad • Gestión*
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 `.trim()
 
-    await conn.sendMessage(m.chat, { text: menuText }, { quoted: m })
+    // ==========================================================
+    // 📤 ENVIAR MENÚ
+    // ==========================================================
+
+    await conn.sendMessage(
+      m.chat,
+      {
+        text: menuText
+      },
+      {
+        quoted: m
+      }
+    )
+
   } catch (e) {
-    console.error(e)
-    await m.reply('✖️ Error al mostrar el menú del dueño.')
+
+    console.error(
+      '[MENU-OWNER]',
+      e
+    )
+
+    await m.reply(
+      '✖️ Ocurrió un error al mostrar el panel del Owner.'
+    )
   }
 }
 
-handler.command = ['menuow', 'mw']
+// ============================================================
+// ⚙️ COMANDOS
+// ============================================================
+
+handler.command = [
+  'menuow',
+  'mw'
+]
+
+// ============================================================
+// 👑 SOLO OWNER
+// ============================================================
+
 handler.owner = true
+
+// ============================================================
+// 📚 AYUDA
+// ============================================================
+
+handler.help = [
+  'menuow',
+  'mw'
+]
+
+// ============================================================
+// 🏷️ TAG
+// ============================================================
+
+handler.tags = [
+  'owner'
+]
+
+// ============================================================
+// 📤 EXPORT
+// ============================================================
 
 export default handler

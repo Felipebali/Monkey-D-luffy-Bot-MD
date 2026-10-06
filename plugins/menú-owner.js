@@ -1,15 +1,11 @@
-// 📂 plugins/menu-owner.js
-// 👑 PANEL DEL OWNER — WhatsApp-Bot
+// 📂 plugins/menu-owner.js — PANEL DEL DUEÑO 👑
+// WhatsApp-Bot — Control Total
 // ============================================================
 
 let handler = async (m, { conn }) => {
-
   try {
 
-    // ==========================================================
     // 👑 REACCIÓN
-    // ==========================================================
-
     await conn.sendMessage(
       m.chat,
       {
@@ -20,195 +16,133 @@ let handler = async (m, { conn }) => {
       }
     )
 
-    // ==========================================================
     // 📅 FECHA Y HORA
-    // ==========================================================
-
     const fecha = new Date().toLocaleString('es-UY', {
       timeZone: 'America/Montevideo',
       hour12: false
     })
 
     // ==========================================================
-    // 📋 MENÚ
+    // 📋 MENÚ DEL OWNER
     // ==========================================================
 
     const menuText = `
-╭━━━〔 👑 *PANEL DEL OWNER* 〕━━━╮
-┃ 🤖 *WhatsApp-Bot*
-┃ 🛡️ Centro de control administrativo
+╭━━━〔 *👑 PANEL DEL DUEÑO* 〕━━━╮
+┃ 🤖 *WhatsApp-Bot – Control Total*
 ┃ 📆 ${fecha}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-╭━━〔 🖼️ MULTIMEDIA / PERFIL 〕━━╮
+🖼️ *MULTIMEDIA / PERFIL*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-┃ 🧑‍💻 *.gpu @user*
-┃ └─ Obtener foto de perfil del usuario
+• .gpu — Descargar foto de perfil de usuario 🧑🖼️
+• .gpo — Descargar foto del grupo 🏞️
 
-┃ 🏞️ *.gpo*
-┃ └─ Obtener foto de perfil del grupo
+🎖️ *GESTIÓN DE INSIGNIAS*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-┃ 🤖 *.setpp*
-┃ └─ Cambiar foto de perfil del bot
+• .otorgar @user <insignia>
+  └─ Otorgar una insignia 🏅
 
-┃ 👥 *.setpg*
-┃ └─ Cambiar foto del grupo
+• .quitar @user <número>
+  └─ Quitar una insignia por número ❌
 
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-
-╭━━〔 🎖️ SISTEMA DE INSIGNIAS 〕━━╮
-
-┃ 🏅 *.otorgar @user <insignia>*
-┃ └─ Otorgar una insignia
-
-┃ ❌ *.quitar @user <número>*
-┃ └─ Quitar una insignia por número
-
-┃ 📋 *.verinsignias @user*
-┃ └─ Ver las insignias del usuario
-
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+• .verinsignias @user
+  └─ Ver insignias del usuario 📋
 
 
-╭━━〔 🚨 ADVERTENCIAS DE ADMINS 〕━━╮
+🚨 *ADVERTENCIAS PARA ADMINISTRADORES*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-┃ ⚠️ *.admad @admin <motivo>*
-┃ └─ Dar una advertencia
+• .admad @admin <motivo>
+  └─ Dar advertencia ⚠️
 
-┃ 🟢 *.unadmad @admin*
-┃ └─ Quitar la última advertencia
+• .unadmad @admin
+  └─ Quitar 1 advertencia 🟢
 
-┃ 📋 *.listadmad*
-┃ └─ Ver administradores advertidos
+• .listadmad
+  └─ Ver administradores advertidos 📋
 
-┃ 🔎 *.veradmad @admin*
-┃ └─ Ver historial completo
+• .veradmad @admin
+  └─ Ver historial completo 🔎
 
-┃ 🧹 *.clearadmad*
-┃ └─ Limpiar todas las advertencias
-
-┃
-┃ 🚨 *Límite: 3 advertencias*
-┃ └─ 3/3 → Despromoción automática
-
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+• .clearadmad
+  └─ Eliminar todas las advertencias 🧹
 
 
-╭━━〔 🚫 LISTA NEGRA 〕━━╮
+👑 *GESTIÓN DE OWNERS*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-┃ 🚫 *.ln @user*
-┃ └─ Agregar usuario a la lista negra
+• .adowner @user
+  └─ Agregar usuario a global.owner ➕
 
-┃ ✅ *.unln @user*
-┃ └─ Quitar usuario de la lista negra
-
-┃ 📋 *.vln*
-┃ └─ Ver lista negra
-
-┃ 🗑️ *.clrn*
-┃ └─ Limpiar lista negra
-
-┃ 🔄 *.resetuser @user*
-┃ └─ Reiniciar datos del usuario
-
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+• .rowner @user
+  └─ Quitar usuario de global.owner ➖
 
 
-╭━━〔 ⚙️ CONTROL DEL BOT 〕━━╮
+🚫 *LISTA NEGRA*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-┃ 🔁 *.restart*
-┃ └─ Reiniciar WhatsApp-Bot
+• .ln @user
+  └─ Agregar a lista negra ⚠️
 
-┃ 🆙 *.update*
-┃ └─ Actualizar el bot
+• .unln @user
+  └─ Quitar de lista negra ✅
 
-┃ 💻 *.exec*
-┃ └─ Ejecutar código
+• .vln
+  └─ Ver lista negra 📋
 
-┃ 💻 *.exec2*
-┃ └─ Ejecutar código avanzado
+• .clrn
+  └─ Limpiar lista negra 🗑️
 
-┃ ⚙️ *.setcmd*
-┃ └─ Configurar comandos
-
-┃ ✏️ *.setprefix*
-┃ └─ Cambiar prefijo del bot
-
-┃ 👑 *.dsowner*
-┃ └─ Gestionar propietario
-
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+• .resetuser @user
+  └─ Reiniciar datos del usuario 🔄
 
 
-╭━━〔 👥 CONTROL DE GRUPOS 〕━━╮
+⚙️ *GESTIÓN DEL BOT*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-┃ 🔗 *.join <link>*
-┃ └─ Unirse a un grupo
+• .restart
+  └─ Reiniciar el bot 🔁
 
-┃ ♻️ *.resetlink*
-┃ └─ Restablecer enlace del grupo
+• .update
+  └─ Actualizar el bot 🆙
 
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+• .exec / .exec2
+  └─ Ejecutar código 💻
 
+• .setcmd
+  └─ Configurar comandos ⚙️
 
-╭━━〔 🛡️ ADMINISTRACIÓN 〕━━╮
+• .setprefix
+  └─ Cambiar prefijo ✏️
 
-┃ 👑 *Acceso exclusivo Owner*
-┃
-┃ 🔐 Este panel contiene comandos
-┃ de administración avanzada.
-┃
-┃ ⚠️ Algunos comandos pueden afectar
-┃ directamente al funcionamiento del bot.
+• .join <link>
+  └─ Unirse a un grupo 🔗
 
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+• .resetlink
+  └─ Resetear link del grupo ♻️
 
+• .setpp
+  └─ Cambiar foto del bot 🤖🖼️
 
-╭━━〔 📚 RESUMEN RÁPIDO 〕━━╮
-
-┃ 🎖️ INSIGNIAS
-┃ ├─ .otorgar
-┃ ├─ .quitar
-┃ └─ .verinsignias
-┃
-┃ 🚨 ADVERTENCIAS
-┃ ├─ .admad
-┃ ├─ .unadmad
-┃ ├─ .listadmad
-┃ ├─ .veradmad
-┃ └─ .clearadmad
-┃
-┃ 🚫 LISTA NEGRA
-┃ ├─ .ln
-┃ ├─ .unln
-┃ ├─ .vln
-┃ ├─ .clrn
-┃ └─ .resetuser
-┃
-┃ ⚙️ BOT
-┃ ├─ .restart
-┃ ├─ .update
-┃ ├─ .exec
-┃ ├─ .exec2
-┃ ├─ .setcmd
-┃ ├─ .setprefix
-┃ └─ .dsowner
-
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+• .setpg
+  └─ Cambiar foto del grupo 👥🖼️
 
 
-╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃ 👑 *WhatsApp-Bot*
-┃ 🛡️ *Panel exclusivo del Owner*
-┃ ⚡ *Control • Seguridad • Gestión*
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👑 *WHATSAPP-BOT — PROPIETARIO SUPREMO*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💠 Control total del sistema.
+💠 Gestión de owners.
+💠 Gestión de administradores.
+💠 Gestión de seguridad.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `.trim()
 
-    // ==========================================================
     // 📤 ENVIAR MENÚ
-    // ==========================================================
-
     await conn.sendMessage(
       m.chat,
       {
@@ -221,13 +155,10 @@ let handler = async (m, { conn }) => {
 
   } catch (e) {
 
-    console.error(
-      '[MENU-OWNER]',
-      e
-    )
+    console.error('❌ Error en menu-owner:', e)
 
     await m.reply(
-      '✖️ Ocurrió un error al mostrar el panel del Owner.'
+      '✖️ Ocurrió un error al mostrar el menú del dueño.'
     )
   }
 }
@@ -246,26 +177,5 @@ handler.command = [
 // ============================================================
 
 handler.owner = true
-
-// ============================================================
-// 📚 AYUDA
-// ============================================================
-
-handler.help = [
-  'menuow',
-  'mw'
-]
-
-// ============================================================
-// 🏷️ TAG
-// ============================================================
-
-handler.tags = [
-  'owner'
-]
-
-// ============================================================
-// 📤 EXPORT
-// ============================================================
 
 export default handler

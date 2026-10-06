@@ -582,7 +582,7 @@ const handler = async (
             const max =
                 Math.min(
                     list.length,
-                    250
+                    500
                 )
 
 

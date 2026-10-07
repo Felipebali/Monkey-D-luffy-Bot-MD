@@ -99,24 +99,24 @@ let handler = async (m, { conn, isAdmin }) => {
 
     try {
 
-        await m.react("🔎")
-
         const pendingList =
             await conn.groupRequestParticipantsList(m.chat)
+
+        // ====================================================
+        // 📭 SIN SOLICITUDES
+        // ====================================================
 
         if (
             !Array.isArray(pendingList) ||
             pendingList.length === 0
         ) {
 
-            await m.react("ℹ️")
-
             return conn.sendMessage(
                 m.chat,
                 {
                     text:
                         `📋 *SOLICITUDES DE INGRESO*\n\n` +
-                        `✅ No hay solicitudes pendientes de aprobación.`
+                        `✅ No hay solicitudes pendientes.`
                 },
                 { quoted: m }
             )
@@ -134,8 +134,6 @@ let handler = async (m, { conn, isAdmin }) => {
 
         if (!users.length) {
 
-            await m.react("❌")
-
             return conn.sendMessage(
                 m.chat,
                 {
@@ -148,28 +146,12 @@ let handler = async (m, { conn, isAdmin }) => {
         }
 
         // ====================================================
-        // ⏳ AVISO
-        // ====================================================
-
-        await conn.sendMessage(
-            m.chat,
-            {
-                text:
-                    `⏳ *APROBANDO SOLICITUDES...*\n\n` +
-                    `👥 Solicitudes encontradas: *${users.length}*\n` +
-                    `⚡ Procesando...`
-            },
-            { quoted: m }
-        )
-
-        // ====================================================
         // ⚡ APROBAR
         // ====================================================
 
         let aprobados = 0
         let fallidos = 0
 
-        // Se procesa en lotes para evitar errores
         const batchSize = 10
 
         for (
@@ -227,7 +209,7 @@ let handler = async (m, { conn, isAdmin }) => {
         }
 
         // ====================================================
-        // ✅ RESULTADO
+        // ✅ ÚNICO MENSAJE FINAL
         // ====================================================
 
         await m.react(

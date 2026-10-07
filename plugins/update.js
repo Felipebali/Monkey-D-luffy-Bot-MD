@@ -175,9 +175,7 @@ let handler = async (
 
     'grupo-warn.js',
 
-    'database/owners.json',
-
-    'plugins/owner.js'
+    'owners.js',
 
   ]
 

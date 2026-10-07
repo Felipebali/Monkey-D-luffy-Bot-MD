@@ -4,16 +4,17 @@
 // 🛡️ Protege archivos importantes
 // 🧩 Detecta cambios en plugins
 //
+// ============================================================
 // 🔐 PROTEGE:
+//
 // - config.js
 // - .env
 // - owner-ban.js
 // - grupo-warn.js
 // - database/owners.json
+// - plugins/owner.js
 // - LuffySessions
-
-// ============================================================
-// 📦 IMPORTACIONES
+//
 // ============================================================
 
 import fs from 'fs'
@@ -45,6 +46,7 @@ function scanPlugins() {
   if (
     !fs.existsSync(dir)
   ) {
+
     return []
   }
 
@@ -58,6 +60,7 @@ function scanPlugins() {
     .map(
       file => ({
         name: file,
+
         mtime:
           fs.statSync(
             path.join(
@@ -79,6 +82,7 @@ function git(command) {
     command,
     {
       encoding: 'utf8',
+
       stdio: [
         'ignore',
         'pipe',
@@ -138,7 +142,7 @@ let handler = async (
   }
 
   // ==========================================================
-  // 🧩 ESTADO ACTUAL DE PLUGINS
+  // 🧩 ESTADO ACTUAL
   // ==========================================================
 
   const pluginsBeforeUpdate =
@@ -146,18 +150,18 @@ let handler = async (
 
   // ==========================================================
   // 🛡️ ARCHIVOS PROTEGIDOS
-  // ==========================================================
+  // ============================================================
   //
   // IMPORTANTE:
   //
-  // database/owners.json queda protegido para que:
+  // Estos archivos se respaldan ANTES de:
   //
-  // .adowner
-  // .rowner
+  // git reset --hard origin/main
   //
-  // no pierdan los owners después de usar:
+  // y se restauran DESPUÉS.
   //
-  // .up
+  // De esta manera GitHub no puede sobrescribir
+  // la configuración local de owners.
   //
   // ==========================================================
 
@@ -171,7 +175,9 @@ let handler = async (
 
     'grupo-warn.js',
 
-    'database/owners.json'
+    'database/owners.json',
+
+    'plugins/owner.js'
 
   ]
 
@@ -249,6 +255,7 @@ let handler = async (
         fullPath
       )
     ) {
+
       continue
     }
 
@@ -450,7 +457,7 @@ let handler = async (
           }
 
           // --------------------------------------------------
-          // 💾 RESTAURAR ARCHIVO
+          // 💾 RESTAURAR
           // --------------------------------------------------
 
           fs.writeFileSync(
@@ -461,7 +468,7 @@ let handler = async (
       }
 
       // ======================================================
-      // 👑 COMPROBAR OWNERS DESPUÉS DE RESTAURAR
+      // 👑 COMPROBAR OWNERS
       // ======================================================
 
       const ownersFile =
@@ -488,7 +495,11 @@ let handler = async (
             )
 
           console.log(
-            `👑 [OWNERS] Base de datos preservada: ${Array.isArray(owners) ? owners.length : 0} owners`
+            `👑 [OWNERS] Base de datos preservada: ${
+              Array.isArray(owners)
+                ? owners.length
+                : 0
+            } owners`
           )
 
         } catch {
@@ -607,7 +618,7 @@ let handler = async (
     ).toFixed(2)
 
   // ==========================================================
-  // 🧱 CONSTRUIR MENSAJE
+  // 🧱 MENSAJE
   // ==========================================================
 
   let msg = ''
@@ -779,6 +790,7 @@ let handler = async (
 ┃ ✅ Configuración preservada
 ┃ ✅ Sesiones preservadas
 ┃ 👑 Owners preservados
+┃ 📄 plugins/owner.js protegido
 ┃ 💾 database/owners.json protegido
 ╰━━━━━━━━━━━━━━━━━━━━⬣
 
@@ -814,19 +826,19 @@ let handler = async (
   ) {
 
     msg +=
-`🔴 *ESTADO: ACTUALIZACIÓN CON ERROR*`
+      `🔴 *ESTADO: ACTUALIZACIÓN CON ERROR*`
 
   } else if (
     hasUpdates
   ) {
 
     msg +=
-`🟢 *ESTADO: BOT ACTUALIZADO CORRECTAMENTE*`
+      `🟢 *ESTADO: BOT ACTUALIZADO CORRECTAMENTE*`
 
   } else {
 
     msg +=
-`🟡 *ESTADO: BOT YA ACTUALIZADO*`
+      `🟡 *ESTADO: BOT YA ACTUALIZADO*`
   }
 
   // ==========================================================

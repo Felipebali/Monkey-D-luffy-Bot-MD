@@ -28,16 +28,22 @@ import path from 'path'
 // ============================================================
 
 const DATABASE_FOLDER = './database'
-const OWNERS_DB_FILE = path.join(
-  DATABASE_FOLDER,
-  'owners.json'
-)
+
+const OWNERS_DB_FILE =
+  path.join(
+    DATABASE_FOLDER,
+    'owners.json'
+  )
 
 // ============================================================
 // 📂 CREAR CARPETA DATABASE
 // ============================================================
 
-if (!fs.existsSync(DATABASE_FOLDER)) {
+if (
+  !fs.existsSync(
+    DATABASE_FOLDER
+  )
+) {
 
   fs.mkdirSync(
     DATABASE_FOLDER,
@@ -52,7 +58,9 @@ if (!fs.existsSync(DATABASE_FOLDER)) {
 // ============================================================
 
 const ORIGINAL_OWNERS =
-  Array.isArray(global.owner)
+  Array.isArray(
+    global.owner
+  )
 
     ? global.owner
         .filter(
@@ -60,17 +68,22 @@ const ORIGINAL_OWNERS =
             Array.isArray(o) &&
             o[0]
         )
-        .map(o => ({
-          id:
-            String(o[0])
-              .split('@')[0]
-              .split(':')[0]
-              .replace(/[^0-9]/g, ''),
+        .map(
+          o => ({
+            id:
+              String(o[0])
+                .split('@')[0]
+                .split(':')[0]
+                .replace(
+                  /[^0-9]/g,
+                  ''
+                ),
 
-          name:
-            o[1] ||
-            'Owner'
-        }))
+            name:
+              o[1] ||
+              'Owner'
+          })
+        )
 
     : []
 
@@ -116,7 +129,9 @@ function isOriginalOwner(id) {
 
 function originalOwnersText() {
 
-  if (!ORIGINAL_OWNERS.length) {
+  if (
+    !ORIGINAL_OWNERS.length
+  ) {
 
     return (
       '⚠️ No hay owners originales configurados.'
@@ -164,14 +179,26 @@ function loadOwnersDatabase() {
         'utf8'
       )
 
-    if (!data.trim())
+    if (
+      !data.trim()
+    ) {
+
       return []
+    }
 
     const parsed =
-      JSON.parse(data)
+      JSON.parse(
+        data
+      )
 
-    if (!Array.isArray(parsed))
+    if (
+      !Array.isArray(
+        parsed
+      )
+    ) {
+
       return []
+    }
 
     return parsed.filter(
       owner =>
@@ -199,7 +226,9 @@ function saveOwnersDatabase() {
   try {
 
     if (
-      !Array.isArray(global.owner)
+      !Array.isArray(
+        global.owner
+      )
     ) {
 
       global.owner = []
@@ -264,7 +293,9 @@ function restoreOwners() {
   try {
 
     if (
-      !Array.isArray(global.owner)
+      !Array.isArray(
+        global.owner
+      )
     ) {
 
       global.owner = []
@@ -316,7 +347,9 @@ function restoreOwners() {
           current => {
 
             if (
-              !Array.isArray(current)
+              !Array.isArray(
+                current
+              )
             ) {
 
               return false
@@ -451,7 +484,9 @@ async function getQuotedUser(
   // 📱 SI EL CITADO VIENE COMO NÚMERO
   // ==========================================================
 
-  if (quotedSender) {
+  if (
+    quotedSender
+  ) {
 
     const senderString =
       String(
@@ -487,7 +522,9 @@ async function getQuotedUser(
   // 👥 BUSCAR EN PARTICIPANTES DEL GRUPO
   // ==========================================================
 
-  if (m.isGroup) {
+  if (
+    m.isGroup
+  ) {
 
     try {
 
@@ -530,7 +567,9 @@ async function getQuotedUser(
           }
         )
 
-      if (participant) {
+      if (
+        participant
+      ) {
 
         // ====================================================
         // 📱 NÚMERO
@@ -549,7 +588,9 @@ async function getQuotedUser(
               : null
           )
 
-        if (possibleJid) {
+        if (
+          possibleJid
+        ) {
 
           number =
             cleanId(
@@ -574,7 +615,9 @@ async function getQuotedUser(
               : null
           )
 
-        if (possibleLid) {
+        if (
+          possibleLid
+        ) {
 
           lid =
             cleanId(
@@ -664,7 +707,9 @@ async function addOwner(
   // 🔐 SOLO OWNER
   // ==========================================================
 
-  if (!isOwner(m)) {
+  if (
+    !isOwner(m)
+  ) {
 
     return conn.reply(
       m.chat,
@@ -677,7 +722,9 @@ async function addOwner(
   // 💬 OBLIGATORIO CITAR
   // ==========================================================
 
-  if (!m.quoted) {
+  if (
+    !m.quoted
+  ) {
 
     return conn.reply(
       m.chat,
@@ -704,7 +751,9 @@ Respondé a su mensaje y escribí:
       conn
     )
 
-  if (!user) {
+  if (
+    !user
+  ) {
 
     return conn.reply(
       m.chat,
@@ -731,7 +780,9 @@ Respondé a su mensaje y escribí:
       )
     )
 
-  if (originalTarget) {
+  if (
+    originalTarget
+  ) {
 
     return conn.reply(
       m.chat,
@@ -784,7 +835,9 @@ ${originalOwnersText()}`,
   // 📱 AGREGAR NÚMERO
   // ==========================================================
 
-  if (user.number) {
+  if (
+    user.number
+  ) {
 
     global.owner.push([
       user.number,
@@ -797,7 +850,9 @@ ${originalOwnersText()}`,
   // 🆔 AGREGAR LID
   // ==========================================================
 
-  if (user.lid) {
+  if (
+    user.lid
+  ) {
 
     global.owner.push([
       user.lid,
@@ -868,7 +923,9 @@ async function removeOwner(
   // 🔐 SOLO OWNER
   // ==========================================================
 
-  if (!isOwner(m)) {
+  if (
+    !isOwner(m)
+  ) {
 
     return conn.reply(
       m.chat,
@@ -881,7 +938,9 @@ async function removeOwner(
   // 💬 OBLIGATORIO CITAR
   // ==========================================================
 
-  if (!m.quoted) {
+  if (
+    !m.quoted
+  ) {
 
     return conn.reply(
       m.chat,
@@ -908,7 +967,9 @@ Respondé a su mensaje y escribí:
       conn
     )
 
-  if (!user) {
+  if (
+    !user
+  ) {
 
     return conn.reply(
       m.chat,
@@ -935,7 +996,9 @@ Respondé a su mensaje y escribí:
       )
     )
 
-  if (originalTarget) {
+  if (
+    originalTarget
+  ) {
 
     return conn.reply(
       m.chat,
@@ -1096,7 +1159,9 @@ async function listOwners(
   // 🔐 SOLO OWNER
   // ==========================================================
 
-  if (!isOwner(m)) {
+  if (
+    !isOwner(m)
+  ) {
 
     return conn.reply(
       m.chat,
@@ -1113,7 +1178,7 @@ async function listOwners(
     getOwners()
 
   // ==========================================================
-  // 🛡️ FILTRAR OWNERS ORIGINALES
+  // 🛡️ FILTRAR OWNERS ORIGINALES Y LID
   // ==========================================================
 
   const addedOwners =
@@ -1128,10 +1193,27 @@ async function listOwners(
           return false
         }
 
+        // ----------------------------------------------------
+        // ❌ NO MOSTRAR LID
+        // ----------------------------------------------------
+
+        if (
+          String(owner[0])
+            .toLowerCase()
+            .includes('@lid')
+        ) {
+
+          return false
+        }
+
         const id =
           cleanId(
             owner[0]
           )
+
+        // ----------------------------------------------------
+        // 🛡️ NO MOSTRAR OWNERS ORIGINALES
+        // ----------------------------------------------------
 
         return !isOriginalOwner(
           id
@@ -1174,7 +1256,7 @@ async function listOwners(
       .map(
         (owner, index) => {
 
-          const id =
+          const number =
             cleanId(
               owner[0]
             )
@@ -1183,21 +1265,9 @@ async function listOwners(
             owner[1] ||
             'Owner'
 
-          const isLid =
-            String(
-              owner[0]
-            ).includes(
-              '@lid'
-            ) ||
-            /LID$/i.test(
-              name
-            )
-
           return (
 `*${index + 1}.* 👑 *${name}*
-${isLid
-  ? '🆔 LID'
-  : '📱 Número'}: \`${id}\``
+📱 Número: \`${number}\``
           )
         }
       )

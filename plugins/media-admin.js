@@ -1,7 +1,7 @@
 // 📂 plugins/media-admin.js
 // 🛡️ FELIXCAT BOT — SISTEMA COMPLETO DE MEDIOS
 // 💾 Guardado automático + administrador + limpieza automática de DB
-// 📌 Recuperación de medios en grupo central
+// 📌 Recuperación de medios en grupos centrales
 // ============================================================
 
 import fs from 'fs'
@@ -16,10 +16,13 @@ const MEDIA_DB_FILE = './database/media.json'
 const MEDIA_FOLDER = './media'
 
 // ============================================================
-// 📌 GRUPO CENTRAL DE MEDIOS
+// 📌 GRUPOS CENTRALES DE MEDIOS
 // ============================================================
 
-const MEDIA_GROUP_ID = '120363410955044864@g.us'
+const MEDIA_GROUP_IDS = [
+    '120363410955044864@g.us',
+    '120363430366807750@q.us'
+]
 
 // ============================================================
 // 📂 CREAR CARPETAS
@@ -200,20 +203,6 @@ function syncMediaDB() {
 
         const originalLength =
             list.length
-
-        let filesInFolder = []
-
-        try {
-
-            filesInFolder =
-                fs.readdirSync(
-                    MEDIA_FOLDER
-                )
-
-        } catch {
-
-            filesInFolder = []
-        }
 
         list =
             list.filter(item => {
@@ -926,7 +915,7 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
         // .media 5
         // .medias 5
         //
-        // 📌 SIEMPRE SE ENVÍA AL GRUPO CENTRAL
+        // 📌 SE ENVÍA A LOS DOS GRUPOS CENTRALES
         // ========================================================
 
         if (/^\d+$/.test(cmd)) {
@@ -994,44 +983,44 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
             }
 
             // ----------------------------------------------------
-            // Verificar acceso al grupo central
+            // Verificar acceso a los grupos centrales
             // ----------------------------------------------------
 
-            let destinationMetadata
+            const availableGroups = []
 
-            try {
+            for (
+                const groupId of MEDIA_GROUP_IDS
+            ) {
 
-                destinationMetadata =
-                    await conn.groupMetadata(
-                        MEDIA_GROUP_ID
+                try {
+
+                    const metadata =
+                        await conn.groupMetadata(
+                            groupId
+                        )
+
+                    if (metadata) {
+                        availableGroups.push(
+                            groupId
+                        )
+                    }
+
+                } catch (groupError) {
+
+                    console.error(
+                        `[MEDIA] No se pudo acceder a ${groupId}:`,
+                        groupError
                     )
-
-            } catch (groupError) {
-
-                console.error(
-                    '[MEDIA] Error accediendo al grupo central:',
-                    groupError
-                )
-
-                return conn.reply(
-                    m.chat,
-`❌ *NO PUEDO ACCEDER AL GRUPO CENTRAL*
-
-📍 *ID:*
-${MEDIA_GROUP_ID}
-
-⚠️ El grupo existe, pero esta sesión de WhatsApp no pudo obtener su información.
-
-🔎 Verificá que el bot siga dentro del grupo y que la sesión actual tenga acceso a él.`,
-                    m
-                )
+                }
             }
 
-            if (!destinationMetadata) {
+            if (!availableGroups.length) {
 
                 return conn.reply(
                     m.chat,
-                    '❌ No se pudo obtener la información del grupo central.',
+`❌ *NO PUEDO ACCEDER A LOS GRUPOS CENTRALES*
+
+⚠️ Verificá que el bot siga dentro de los grupos y que la sesión actual tenga acceso a ellos.`,
                     m
                 )
             }
@@ -1066,95 +1055,97 @@ ${MEDIA_GROUP_ID}
 📌 *Recuperado en grupo central*`
 
             // ====================================================
-            // 📌 DESTINO FIJO
+            // 📌 ENVIAR A LOS GRUPOS DISPONIBLES
             // ====================================================
 
-            const destination =
-                MEDIA_GROUP_ID
-
-            // ====================================================
-            // 🖼️ IMAGEN
-            // ====================================================
-
-            if (
-                item.type === 'image'
+            for (
+                const destination of availableGroups
             ) {
+
+                // =================================================
+                // 🖼️ IMAGEN
+                // =================================================
+
+                if (
+                    item.type === 'image'
+                ) {
+
+                    await conn.sendMessage(
+                        destination,
+                        {
+                            image: buffer,
+                            caption
+                        }
+                    )
+
+                    continue
+                }
+
+                // =================================================
+                // 🎥 VIDEO
+                // =================================================
+
+                if (
+                    item.type === 'video'
+                ) {
+
+                    await conn.sendMessage(
+                        destination,
+                        {
+                            video: buffer,
+                            caption,
+                            fileName:
+                                item.filename,
+                            mimetype:
+                                item.mimetype ||
+                                'video/mp4'
+                        }
+                    )
+
+                    continue
+                }
+
+                // =================================================
+                // 🎵 AUDIO
+                // =================================================
+
+                if (
+                    item.type === 'audio'
+                ) {
+
+                    await conn.sendMessage(
+                        destination,
+                        {
+                            audio: buffer,
+                            ptt: false,
+                            fileName:
+                                item.filename,
+                            mimetype:
+                                item.mimetype ||
+                                'audio/mpeg'
+                        }
+                    )
+
+                    continue
+                }
+
+                // =================================================
+                // 📄 DOCUMENTO
+                // =================================================
 
                 await conn.sendMessage(
                     destination,
                     {
-                        image: buffer,
+                        document: buffer,
+                        fileName:
+                            item.filename,
+                        mimetype:
+                            item.mimetype ||
+                            'application/octet-stream',
                         caption
                     }
                 )
-
-                return
             }
-
-            // ====================================================
-            // 🎥 VIDEO
-            // ====================================================
-
-            if (
-                item.type === 'video'
-            ) {
-
-                await conn.sendMessage(
-                    destination,
-                    {
-                        video: buffer,
-                        caption,
-                        fileName:
-                            item.filename,
-                        mimetype:
-                            item.mimetype ||
-                            'video/mp4'
-                    }
-                )
-
-                return
-            }
-
-            // ====================================================
-            // 🎵 AUDIO
-            // ====================================================
-
-            if (
-                item.type === 'audio'
-            ) {
-
-                await conn.sendMessage(
-                    destination,
-                    {
-                        audio: buffer,
-                        ptt: false,
-                        fileName:
-                            item.filename,
-                        mimetype:
-                            item.mimetype ||
-                            'audio/mpeg'
-                    }
-                )
-
-                return
-            }
-
-            // ====================================================
-            // 📄 DOCUMENTO
-            // ====================================================
-
-            await conn.sendMessage(
-                destination,
-                {
-                    document: buffer,
-                    fileName:
-                        item.filename,
-                    mimetype:
-                        item.mimetype ||
-                        'application/octet-stream',
-                    caption
-                }
-            )
 
             return
         }
@@ -1234,9 +1225,7 @@ su número de ID.
 ➡️ El bot buscará el medio con ID *25*.
 
 📍 El archivo recuperado será enviado
-automáticamente al:
-
-👥 *GRUPO CENTRAL DE MEDIOS*
+automáticamente a los *2 grupos centrales*.
 
 ⚠️ El archivo debe existir físicamente
 en la carpeta *./media*.
@@ -1356,15 +1345,16 @@ recuperar o eliminar un archivo.
 
 ━━━━━━━━━━━━━━━━━━━━━━━
 
-📍 *GRUPO CENTRAL*
+📍 *GRUPOS CENTRALES*
 
 Los medios recuperados mediante:
 
 *.media <ID>*
 
-se envían automáticamente al grupo:
+se envían automáticamente a:
 
-${MEDIA_GROUP_ID}
+1️⃣ ${MEDIA_GROUP_IDS[0]}
+2️⃣ ${MEDIA_GROUP_IDS[1]}
 
 ━━━━━━━━━━━━━━━━━━━━━━━
 

@@ -3,12 +3,29 @@
 // 📦 Actualiza desde GitHub
 // 🛡️ Protege archivos importantes
 // 🧩 Detecta cambios en plugins
+//
+// 🔐 PROTEGE:
+// - config.js
+// - .env
+// - owner-ban.js
+// - grupo-warn.js
+// - database/owners.json
+// - LuffySessions
+
+// ============================================================
+// 📦 IMPORTACIONES
+// ============================================================
 
 import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
 
-const SNAPSHOT = '.last_update_snapshot.json'
+// ============================================================
+// ⚙️ CONFIGURACIÓN
+// ============================================================
+
+const SNAPSHOT =
+  '.last_update_snapshot.json'
 
 const REPO =
   'https://github.com/Felipebali/Monkey-D-luffy-Bot-MD.git'
@@ -20,20 +37,36 @@ const REPO =
 function scanPlugins() {
 
   const dir =
-    path.join(process.cwd(), 'plugins')
+    path.join(
+      process.cwd(),
+      'plugins'
+    )
 
-  if (!fs.existsSync(dir))
+  if (
+    !fs.existsSync(dir)
+  ) {
     return []
+  }
 
-  return fs.readdirSync(dir)
-    .filter(file => file.endsWith('.js'))
+  return fs
+    .readdirSync(dir)
+    .filter(
+      file =>
+        file.endsWith('.js')
+    )
     .sort()
-    .map(file => ({
-      name: file,
-      mtime: fs.statSync(
-        path.join(dir, file)
-      ).mtimeMs
-    }))
+    .map(
+      file => ({
+        name: file,
+        mtime:
+          fs.statSync(
+            path.join(
+              dir,
+              file
+            )
+          ).mtimeMs
+      })
+    )
 }
 
 // ============================================================
@@ -46,7 +79,11 @@ function git(command) {
     command,
     {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore']
+      stdio: [
+        'ignore',
+        'pipe',
+        'ignore'
+      ]
     }
   ).trim()
 }
@@ -55,14 +92,22 @@ function git(command) {
 // 🚀 HANDLER
 // ============================================================
 
-let handler = async (m, { conn }) => {
+let handler = async (
+  m,
+  { conn }
+) => {
 
-  const startTime = Date.now()
+  const startTime =
+    Date.now()
 
-  let hasUpdates = false
-  let updateError = null
+  let hasUpdates =
+    false
 
-  let remoteCommit = 'Desconocido'
+  let updateError =
+    null
+
+  let remoteCommit =
+    'Desconocido'
 
   // ==========================================================
   // 📸 SNAPSHOT ANTERIOR
@@ -70,7 +115,11 @@ let handler = async (m, { conn }) => {
 
   let before = []
 
-  if (fs.existsSync(SNAPSHOT)) {
+  if (
+    fs.existsSync(
+      SNAPSHOT
+    )
+  ) {
 
     try {
 
@@ -98,60 +147,139 @@ let handler = async (m, { conn }) => {
   // ==========================================================
   // 🛡️ ARCHIVOS PROTEGIDOS
   // ==========================================================
+  //
+  // IMPORTANTE:
+  //
+  // database/owners.json queda protegido para que:
+  //
+  // .adowner
+  // .rowner
+  //
+  // no pierdan los owners después de usar:
+  //
+  // .up
+  //
+  // ==========================================================
 
   const backupFiles = [
+
     'config.js',
+
     '.env',
+
     'owner-ban.js',
-    'grupo-warn.js'
+
+    'grupo-warn.js',
+
+    'database/owners.json'
+
   ]
 
+  // ==========================================================
+  // 📁 CARPETAS PROTEGIDAS
+  // ==========================================================
+
   const backupDirs = [
+
     'LuffySessions'
+
   ]
+
+  // ==========================================================
+  // 💾 RESPALDOS
+  // ==========================================================
 
   const backups = {}
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // 📄 RESPALDAR ARCHIVOS
-  // ----------------------------------------------------------
+  // ==========================================================
 
-  for (const file of backupFiles) {
+  for (
+    const file
+    of backupFiles
+  ) {
 
-    if (fs.existsSync(file)) {
+    const fullPath =
+      path.join(
+        process.cwd(),
+        file
+      )
 
-      backups[file] =
-        fs.readFileSync(file)
+    if (
+      fs.existsSync(
+        fullPath
+      )
+    ) {
+
+      try {
+
+        backups[file] =
+          fs.readFileSync(
+            fullPath
+          )
+
+      } catch (e) {
+
+        console.error(
+          `⚠️ No se pudo respaldar ${file}:`,
+          e
+        )
+      }
     }
   }
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // 📁 RESPALDAR CARPETAS
-  // ----------------------------------------------------------
+  // ==========================================================
 
-  for (const dir of backupDirs) {
+  for (
+    const dir
+    of backupDirs
+  ) {
 
-    if (!fs.existsSync(dir))
+    const fullPath =
+      path.join(
+        process.cwd(),
+        dir
+      )
+
+    if (
+      !fs.existsSync(
+        fullPath
+      )
+    ) {
       continue
+    }
 
     backups[dir] =
-      fs.readdirSync(dir).reduce(
-        (acc, file) => {
+      fs
+        .readdirSync(
+          fullPath
+        )
+        .reduce(
+          (
+            acc,
+            file
+          ) => {
 
-          try {
+            try {
 
-            acc[file] =
-              fs.readFileSync(
-                path.join(dir, file)
-              )
+              acc[file] =
+                fs.readFileSync(
+                  path.join(
+                    fullPath,
+                    file
+                  )
+                )
 
-          } catch {}
+            } catch {}
 
-          return acc
+            return acc
 
-        },
-        {}
-      )
+          },
+          {}
+        )
   }
 
   // ==========================================================
@@ -160,19 +288,41 @@ let handler = async (m, { conn }) => {
 
   try {
 
-    try {
-      git('git init')
-    } catch {}
+    // --------------------------------------------------------
+    // 📦 INICIALIZAR GIT
+    // --------------------------------------------------------
 
     try {
-      git(`git remote add origin ${REPO}`)
+
+      git(
+        'git init'
+      )
+
+    } catch {}
+
+    // --------------------------------------------------------
+    // 🔗 AGREGAR REMOTO
+    // --------------------------------------------------------
+
+    try {
+
+      git(
+        `git remote add origin ${REPO}`
+      )
+
     } catch {}
 
     // --------------------------------------------------------
     // 📡 OBTENER ACTUALIZACIÓN
     // --------------------------------------------------------
 
-    git('git fetch origin main')
+    git(
+      'git fetch origin main'
+    )
+
+    // --------------------------------------------------------
+    // 📦 COMMIT REMOTO
+    // --------------------------------------------------------
 
     remoteCommit =
       git(
@@ -188,9 +338,12 @@ let handler = async (m, { conn }) => {
         'git diff --name-status origin/main'
       )
 
-    if (diff) {
+    if (
+      diff
+    ) {
 
-      hasUpdates = true
+      hasUpdates =
+        true
 
       // ------------------------------------------------------
       // 🔄 ACTUALIZAR
@@ -204,15 +357,37 @@ let handler = async (m, { conn }) => {
       // 🛡️ RESTAURAR ARCHIVOS PROTEGIDOS
       // ------------------------------------------------------
 
-      for (const file of Object.keys(backups)) {
+      for (
+        const file
+        of Object.keys(
+          backups
+        )
+      ) {
 
-        // Carpeta
-        if (backupDirs.includes(file)) {
+        // ====================================================
+        // 📁 CARPETA
+        // ====================================================
 
-          if (!fs.existsSync(file)) {
+        if (
+          backupDirs.includes(
+            file
+          )
+        ) {
+
+          const dirPath =
+            path.join(
+              process.cwd(),
+              file
+            )
+
+          if (
+            !fs.existsSync(
+              dirPath
+            )
+          ) {
 
             fs.mkdirSync(
-              file,
+              dirPath,
               {
                 recursive: true
               }
@@ -221,28 +396,113 @@ let handler = async (m, { conn }) => {
 
           for (
             const savedFile
-            of Object.keys(backups[file])
+            of Object.keys(
+              backups[file]
+            )
           ) {
 
             fs.writeFileSync(
               path.join(
-                file,
+                dirPath,
                 savedFile
               ),
-              backups[file][savedFile]
+              backups[file][
+                savedFile
+              ]
             )
           }
 
         }
 
-        // Archivo
+        // ====================================================
+        // 📄 ARCHIVO
+        // ====================================================
+
         else {
 
+          const filePath =
+            path.join(
+              process.cwd(),
+              file
+            )
+
+          // --------------------------------------------------
+          // 📁 ASEGURAR CARPETA PADRE
+          // --------------------------------------------------
+
+          const parentDir =
+            path.dirname(
+              filePath
+            )
+
+          if (
+            !fs.existsSync(
+              parentDir
+            )
+          ) {
+
+            fs.mkdirSync(
+              parentDir,
+              {
+                recursive: true
+              }
+            )
+          }
+
+          // --------------------------------------------------
+          // 💾 RESTAURAR ARCHIVO
+          // --------------------------------------------------
+
           fs.writeFileSync(
-            file,
+            filePath,
             backups[file]
           )
         }
+      }
+
+      // ======================================================
+      // 👑 COMPROBAR OWNERS DESPUÉS DE RESTAURAR
+      // ======================================================
+
+      const ownersFile =
+        path.join(
+          process.cwd(),
+          'database',
+          'owners.json'
+        )
+
+      if (
+        fs.existsSync(
+          ownersFile
+        )
+      ) {
+
+        try {
+
+          const owners =
+            JSON.parse(
+              fs.readFileSync(
+                ownersFile,
+                'utf8'
+              )
+            )
+
+          console.log(
+            `👑 [OWNERS] Base de datos preservada: ${Array.isArray(owners) ? owners.length : 0} owners`
+          )
+
+        } catch {
+
+          console.log(
+            '⚠️ [OWNERS] owners.json fue restaurado, pero no se pudo verificar su contenido.'
+          )
+        }
+
+      } else {
+
+        console.log(
+          '⚠️ [OWNERS] No existe database/owners.json después de la actualización.'
+        )
       }
     }
 
@@ -265,38 +525,56 @@ let handler = async (m, { conn }) => {
   const now =
     scanPlugins()
 
+  // ==========================================================
+  // ➕ PLUGINS AÑADIDOS
+  // ==========================================================
+
   const added =
     now.filter(
       plugin =>
         !before.find(
           old =>
-            old.name === plugin.name
+            old.name ===
+            plugin.name
         )
     )
+
+  // ==========================================================
+  // ❌ PLUGINS ELIMINADOS
+  // ==========================================================
 
   const removed =
     before.filter(
       old =>
         !now.find(
           plugin =>
-            plugin.name === old.name
+            plugin.name ===
+            old.name
         )
     )
 
+  // ==========================================================
+  // ✏️ PLUGINS MODIFICADOS
+  // ==========================================================
+
   const modified =
-    now.filter(plugin => {
+    now.filter(
+      plugin => {
 
-      const old =
-        before.find(
-          p =>
-            p.name === plugin.name
+        const old =
+          before.find(
+            p =>
+              p.name ===
+              plugin.name
+          )
+
+        return (
+          old &&
+          old.mtime !==
+            plugin.mtime
         )
-
-      return (
-        old &&
-        old.mtime !== plugin.mtime
-      )
-    })
+      }
+    )
 
   // ==========================================================
   // 💾 GUARDAR SNAPSHOT
@@ -321,7 +599,10 @@ let handler = async (m, { conn }) => {
 
   const duration =
     (
-      (Date.now() - startTime) /
+      (
+        Date.now() -
+        startTime
+      ) /
       1000
     ).toFixed(2)
 
@@ -354,7 +635,9 @@ let handler = async (m, { conn }) => {
   // 🔄 ESTADO
   // ==========================================================
 
-  if (updateError) {
+  if (
+    updateError
+  ) {
 
     msg +=
 `╭━━━〔 ❌ ACTUALIZACIÓN 〕━━━⬣
@@ -365,7 +648,9 @@ let handler = async (m, { conn }) => {
 
 `
 
-  } else if (hasUpdates) {
+  } else if (
+    hasUpdates
+  ) {
 
     msg +=
 `╭━━━〔 🟢 ACTUALIZACIÓN 〕━━━⬣
@@ -373,6 +658,7 @@ let handler = async (m, { conn }) => {
 ┃
 ┃ 🔄 Código actualizado
 ┃ 🛡️ Archivos protegidos restaurados
+┃ 👑 Owners preservados
 ╰━━━━━━━━━━━━━━━━━━━━⬣
 
 `
@@ -403,36 +689,63 @@ let handler = async (m, { conn }) => {
 `╭━━━〔 🧩 CAMBIOS EN PLUGINS 〕━━━⬣
 `
 
-    if (added.length) {
+    // --------------------------------------------------------
+    // ➕ AÑADIDOS
+    // --------------------------------------------------------
+
+    if (
+      added.length
+    ) {
 
       msg +=
 `\n┃ ➕ *Añadidos:* ${added.length}\n`
 
-      for (const plugin of added) {
+      for (
+        const plugin
+        of added
+      ) {
 
         msg +=
 `┃   └─ ${plugin.name}\n`
       }
     }
 
-    if (modified.length) {
+    // --------------------------------------------------------
+    // ✏️ MODIFICADOS
+    // --------------------------------------------------------
+
+    if (
+      modified.length
+    ) {
 
       msg +=
 `\n┃ ✏️ *Modificados:* ${modified.length}\n`
 
-      for (const plugin of modified) {
+      for (
+        const plugin
+        of modified
+      ) {
 
         msg +=
 `┃   └─ ${plugin.name}\n`
       }
     }
 
-    if (removed.length) {
+    // --------------------------------------------------------
+    // ❌ ELIMINADOS
+    // --------------------------------------------------------
+
+    if (
+      removed.length
+    ) {
 
       msg +=
 `\n┃ ❌ *Eliminados:* ${removed.length}\n`
 
-      for (const plugin of removed) {
+      for (
+        const plugin
+        of removed
+      ) {
 
         msg +=
 `┃   └─ ${plugin.name}\n`
@@ -465,6 +778,8 @@ let handler = async (m, { conn }) => {
 ┃
 ┃ ✅ Configuración preservada
 ┃ ✅ Sesiones preservadas
+┃ 👑 Owners preservados
+┃ 💾 database/owners.json protegido
 ╰━━━━━━━━━━━━━━━━━━━━⬣
 
 `
@@ -494,12 +809,16 @@ let handler = async (m, { conn }) => {
   // 🟢 ESTADO FINAL
   // ==========================================================
 
-  if (updateError) {
+  if (
+    updateError
+  ) {
 
     msg +=
 `🔴 *ESTADO: ACTUALIZACIÓN CON ERROR*`
 
-  } else if (hasUpdates) {
+  } else if (
+    hasUpdates
+  ) {
 
     msg +=
 `🟢 *ESTADO: BOT ACTUALIZADO CORRECTAMENTE*`
@@ -531,5 +850,9 @@ handler.command = [
 ]
 
 handler.rowner = true
+
+// ============================================================
+// 📤 EXPORTAR
+// ============================================================
 
 export default handler

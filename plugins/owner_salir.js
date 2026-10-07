@@ -1,22 +1,13 @@
 // 📂 plugins/salir.js
-// 🚪 .salir — El bot abandona el grupo
-// 👑 SOLO OWNERS
+// 🚪 .salir
+// 👑 SOLO OWNERS DE global.owner
 // ============================================================
 
-function normalizeJid(jid = '') {
-    return jid
-        .toString()
-        .replace(/:\d+@/, '@')
+const normalize = (value = '') =>
+    String(value)
+        .replace(/@s\.whatsapp\.net|@lid/g, '')
+        .replace(/:\d+/g, '')
         .trim()
-        .toLowerCase()
-}
-
-function getOwners() {
-    return (global.owner || [])
-        .map(owner => Array.isArray(owner) ? owner[0] : owner)
-        .filter(Boolean)
-        .map(normalizeJid)
-}
 
 let handler = async (m, { conn }) => {
 
@@ -28,27 +19,49 @@ let handler = async (m, { conn }) => {
         return conn.sendMessage(
             m.chat,
             {
-                text: '❌ Este comando solo puede utilizarse en grupos.'
+                text: '❌ Este comando solo funciona en grupos.'
             },
             { quoted: m }
         )
     }
 
     // ========================================================
-    // VERIFICAR OWNER
+    // OBTENER OWNERS DESDE global.owner
     // ========================================================
 
-    const owners = getOwners()
+    const owners = (global.owner || [])
+        .map(owner => {
+            if (Array.isArray(owner)) {
+                return normalize(owner[0])
+            }
 
-    const sender = normalizeJid(
-        m.sender || m.participant || ''
-    )
+            return normalize(owner)
+        })
+        .filter(Boolean)
+
+    // ========================================================
+    // IDENTIFICAR QUIÉN EJECUTÓ EL COMANDO
+    // ========================================================
+
+    const senderRaw =
+        m.sender ||
+        m.participant ||
+        ''
+
+    const sender = normalize(senderRaw)
+
+    // ========================================================
+    // VERIFICAR OWNER
+    // ========================================================
 
     if (!owners.includes(sender)) {
         return conn.sendMessage(
             m.chat,
             {
-                text: '❌ Solo los *owners* pueden utilizar este comando.'
+                text:
+`❌ *ACCESO DENEGADO*
+
+👑 Este comando solamente puede ser utilizado por los owners del bot.`
             },
             { quoted: m }
         )
@@ -67,7 +80,7 @@ let handler = async (m, { conn }) => {
     )
 
     // ========================================================
-    // SALIR
+    // SALIR DEL GRUPO
     // ========================================================
 
     try {

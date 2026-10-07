@@ -55,7 +55,7 @@ let handler = async (m, { conn, isAdmin }) => {
         return conn.sendMessage(
             m.chat,
             {
-                text: "❌ Este comando solamente funciona en grupos."
+                text: "❌ Solo funciona en grupos."
             },
             { quoted: m }
         )
@@ -84,10 +84,7 @@ let handler = async (m, { conn, isAdmin }) => {
         return conn.sendMessage(
             m.chat,
             {
-                text:
-                    `⛔ *ACCESO DENEGADO*\n\n` +
-                    `👮 Este comando solamente puede ser utilizado ` +
-                    `por administradores del grupo u owners del bot.`
+                text: "⛔ Solo admins u owners pueden usar este comando."
             },
             { quoted: m }
         )
@@ -110,13 +107,10 @@ let handler = async (m, { conn, isAdmin }) => {
             !Array.isArray(pendingList) ||
             pendingList.length === 0
         ) {
-
             return conn.sendMessage(
                 m.chat,
                 {
-                    text:
-                        `📋 *SOLICITUDES DE INGRESO*\n\n` +
-                        `✅ No hay solicitudes pendientes.`
+                    text: "📋 No hay solicitudes pendientes."
                 },
                 { quoted: m }
             )
@@ -133,13 +127,10 @@ let handler = async (m, { conn, isAdmin }) => {
             .filter(Boolean)
 
         if (!users.length) {
-
             return conn.sendMessage(
                 m.chat,
                 {
-                    text:
-                        `❌ Encontré solicitudes pendientes, ` +
-                        `pero no pude obtener sus JID.`
+                    text: "❌ No pude obtener los usuarios."
                 },
                 { quoted: m }
             )
@@ -209,7 +200,7 @@ let handler = async (m, { conn, isAdmin }) => {
         }
 
         // ====================================================
-        // ✅ ÚNICO MENSAJE FINAL
+        // ✅ RESULTADO
         // ====================================================
 
         await m.react(
@@ -219,18 +210,12 @@ let handler = async (m, { conn, isAdmin }) => {
         )
 
         let resultado =
-            `🎉 *SOLICITUDES PROCESADAS*\n\n` +
-            `👥 Encontradas: *${users.length}*\n` +
-            `✅ Aprobadas: *${aprobados}*\n`
+            `✅ *APROBACIÓN COMPLETADA*\n` +
+            `👥 ${aprobados} aprobados`
 
         if (fallidos > 0) {
-            resultado +=
-                `❌ No aprobadas: *${fallidos}*\n`
+            resultado += `\n❌ ${fallidos} fallidos`
         }
-
-        resultado +=
-            `\n━━━━━━━━━━━━━━━━━━━━\n` +
-            `📌 *Proceso finalizado.*`
 
         return conn.sendMessage(
             m.chat,
@@ -252,11 +237,7 @@ let handler = async (m, { conn, isAdmin }) => {
         return conn.sendMessage(
             m.chat,
             {
-                text:
-                    `⚠️ *ERROR AL APROBAR SOLICITUDES*\n\n` +
-                    `No fue posible procesar las solicitudes.\n\n` +
-                    `👮 Asegúrate de que el bot sea administrador ` +
-                    `del grupo y tenga permisos para aprobar solicitudes.`
+                text: "⚠️ No se pudieron aprobar las solicitudes."
             },
             { quoted: m }
         )

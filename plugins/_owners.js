@@ -1,465 +1,266 @@
 // 📂 plugins/owner.js — FelixCat-Bot 🐾
-// 👑 SISTEMA COMPLETO DE OWNERS
+// 👑 SISTEMA DE OWNERS DESDE CERO
 //
 // .adowner → agregar owner respondiendo/citando
 // .rowner  → eliminar owner respondiendo/citando
-// .owners  → ver lista de owners agregados
+// .owners  → ver owners agregados
 //
-// Los OWNERS ORIGINALES quedan protegidos.
-// No se pueden agregar nuevamente ni eliminar.
-//
-// 💾 OWNERS AGREGADOS → ./database/owners.json
-// 🔄 Se cargan automáticamente al iniciar el bot.
-//
-// 🧹 LIMPIEZA AUTOMÁTICA:
-// - Elimina LIDs de la database
-// - Elimina duplicados
-// - Elimina registros inválidos
-// - Mantiene solamente NÚMERO + NOMBRE
-//
-// Guarda:
-//
-// ['NUMERO', 'Nombre', true]
-
 // ============================================================
-// 📦 IMPORTACIONES
+// REGLAS
+// ============================================================
+//
+// ✅ Los owners originales quedan protegidos
+// ✅ Los owners agregados se guardan SOLO por número
+// ❌ Los LID NO se guardan en owners.json
+// ❌ Los LID NO aparecen en .owners
+// ✅ No permite duplicados
+// ✅ Se mantienen después de reiniciar el bot
+//
+// DATABASE:
+// ./database/owners.json
+//
+// FORMATO:
+//
+// [
+//   ["598XXXXXXXX", "Nombre", true]
+// ]
+//
 // ============================================================
 
 import fs from 'fs'
 import path from 'path'
 
 // ============================================================
-// 📁 CONFIGURACIÓN DE BASE DE DATOS
+// 📁 DATABASE
 // ============================================================
 
-const DATABASE_FOLDER =
-  './database'
+const DATABASE_FOLDER = './database'
 
-const OWNERS_DB_FILE =
-  path.join(
-    DATABASE_FOLDER,
-    'owners.json'
-  )
+const OWNERS_DB_FILE = path.join(
+  DATABASE_FOLDER,
+  'owners.json'
+)
 
 // ============================================================
-// 📂 CREAR CARPETA DATABASE
+// 📂 CREAR DATABASE
 // ============================================================
 
-if (
-  !fs.existsSync(
-    DATABASE_FOLDER
-  )
-) {
-
-  fs.mkdirSync(
-    DATABASE_FOLDER,
-    {
-      recursive: true
-    }
-  )
+if (!fs.existsSync(DATABASE_FOLDER)) {
+  fs.mkdirSync(DATABASE_FOLDER, {
+    recursive: true
+  })
 }
 
 // ============================================================
-// 👑 GUARDAR OWNERS ORIGINALES
+// 🔧 NORMALIZAR NÚMERO
 // ============================================================
 
-const ORIGINAL_OWNERS =
-  Array.isArray(
-    global.owner
-  )
+function normalizePhone(id) {
+  if (!id) return null
 
-    ? global.owner
-        .filter(
-          o =>
-            Array.isArray(o) &&
-            o[0]
-        )
-        .map(
-          o => ({
-            id:
-              String(o[0])
-                .split('@')[0]
-                .split(':')[0]
-                .replace(
-                  /[^0-9]/g,
-                  ''
-                ),
+  let value = String(id)
 
-            name:
-              o[1] ||
-              'Owner'
-          })
-        )
-
-    : []
-
-// ============================================================
-// 🔢 LIMPIAR ID
-// ============================================================
-
-function cleanId(id) {
-
-  if (!id)
+  // Nunca aceptar LID como número
+  if (value.includes('@lid')) {
     return null
+  }
 
-  return String(id)
-    .split('@')[0]
-    .split(':')[0]
-    .replace(
-      /[^0-9]/g,
-      ''
-    ) || null
+  // Eliminar dominio WhatsApp
+  value = value
+    .replace('@s.whatsapp.net', '')
+    .replace('@c.us', '')
+
+  // Eliminar device/sufijos
+  value = value.split(':')[0]
+  value = value.split('@')[0]
+
+  // Dejar solamente números
+  value = value.replace(/\D/g, '')
+
+  return value || null
 }
 
 // ============================================================
-// 📱 OBTENER SOLAMENTE NÚMERO
+// 🔧 NORMALIZAR LID
 // ============================================================
 
-function getNumber(id) {
+function normalizeLid(id) {
+  if (!id) return null
 
-  if (!id)
+  const value = String(id)
+
+  if (!value.includes('@lid')) {
     return null
+  }
 
-  const value =
-    String(id)
-
-  // ----------------------------------------------------------
-  // ❌ NO ACEPTAR LID
-  // ----------------------------------------------------------
-
-  if (
+  return (
     value
-      .toLowerCase()
-      .includes('@lid')
-  ) {
-
-    return null
-  }
-
-  // ----------------------------------------------------------
-  // 📱 SOLO WHATSAPP NORMAL
-  // ----------------------------------------------------------
-
-  const number =
-    cleanId(
-      value
-    )
-
-  if (
-    !number
-  ) {
-
-    return null
-  }
-
-  return number
+      .split('@')[0]
+      .split(':')[0]
+      .replace(/\D/g, '') || null
+  )
 }
 
 // ============================================================
-// 🛡️ COMPROBAR SI ES OWNER ORIGINAL
+// 👑 OBTENER OWNERS ORIGINALES
+// ============================================================
+
+const ORIGINAL_OWNERS = Array.isArray(global.owner)
+  ? global.owner
+      .filter(owner => {
+        return (
+          Array.isArray(owner) &&
+          owner[0]
+        )
+      })
+      .map(owner => ({
+        raw: String(owner[0]),
+
+        phone:
+          normalizePhone(owner[0]),
+
+        lid:
+          normalizeLid(owner[0]),
+
+        name:
+          owner[1] ||
+          'Owner'
+      }))
+  : []
+
+// ============================================================
+// 🛡️ COMPROBAR OWNER ORIGINAL
 // ============================================================
 
 function isOriginalOwner(id) {
 
-  const clean =
-    cleanId(id)
+  const phone =
+    normalizePhone(id)
 
-  if (
-    !clean
-  ) {
+  const lid =
+    normalizeLid(id)
 
-    return false
+  if (phone) {
+    return ORIGINAL_OWNERS.some(
+      owner =>
+        owner.phone === phone
+    )
   }
 
-  return ORIGINAL_OWNERS.some(
-    owner =>
-      owner.id === clean
-  )
+  if (lid) {
+    return ORIGINAL_OWNERS.some(
+      owner =>
+        owner.lid === lid
+    )
+  }
+
+  return false
 }
 
 // ============================================================
-// 📋 LISTA DE OWNERS ORIGINALES
+// 📋 TEXTO OWNERS ORIGINALES
 // ============================================================
 
 function originalOwnersText() {
 
-  if (
-    !ORIGINAL_OWNERS.length
-  ) {
-
-    return (
-      '⚠️ No hay owners originales configurados.'
-    )
+  if (!ORIGINAL_OWNERS.length) {
+    return '⚠️ No hay owners originales configurados.'
   }
 
   return ORIGINAL_OWNERS
-    .map(
-      (owner, index) =>
-        `${index + 1}. 👑 ${owner.name}\n   🆔 ${owner.id}`
-    )
-    .join(
-      '\n'
-    )
+    .map((owner, index) => {
+
+      const id =
+        owner.phone ||
+        owner.lid ||
+        owner.raw
+
+      return (
+        `${index + 1}. 👑 ${owner.name}\n` +
+        `   🆔 ${id}`
+      )
+    })
+    .join('\n')
 }
 
 // ============================================================
-// 💾 LIMPIAR DATABASE DE OWNERS
-// ============================================================
-//
-// Esta función elimina:
-//
-// ❌ LIDs
-// ❌ duplicados
-// ❌ registros vacíos
-// ❌ owners originales
-// ❌ entradas corruptas
-//
-// Y deja:
-//
-// ['NUMERO', 'Nombre', true]
-//
+// 💾 CREAR OWNERS.JSON
 // ============================================================
 
-function cleanOwnersDatabase(
-  owners
-) {
+function ensureOwnersDatabase() {
 
-  if (
-    !Array.isArray(
-      owners
+  if (!fs.existsSync(OWNERS_DB_FILE)) {
+
+    fs.writeFileSync(
+      OWNERS_DB_FILE,
+      '[]',
+      'utf8'
     )
-  ) {
-
-    return []
   }
-
-  const cleaned = []
-  const seen = new Set()
-
-  for (
-    const owner
-    of owners
-  ) {
-
-    if (
-      !Array.isArray(owner)
-    ) {
-
-      continue
-    }
-
-    if (
-      !owner[0]
-    ) {
-
-      continue
-    }
-
-    // --------------------------------------------------------
-    // 📱 OBTENER NÚMERO
-    // --------------------------------------------------------
-
-    const number =
-      getNumber(
-        owner[0]
-      )
-
-    // --------------------------------------------------------
-    // ❌ ELIMINAR LID
-    // --------------------------------------------------------
-
-    if (
-      !number
-    ) {
-
-      continue
-    }
-
-    // --------------------------------------------------------
-    // ❌ NO GUARDAR OWNER ORIGINAL
-    // --------------------------------------------------------
-
-    if (
-      isOriginalOwner(
-        number
-      )
-    ) {
-
-      continue
-    }
-
-    // --------------------------------------------------------
-    // ❌ ELIMINAR DUPLICADOS
-    // --------------------------------------------------------
-
-    if (
-      seen.has(
-        number
-      )
-    ) {
-
-      continue
-    }
-
-    seen.add(
-      number
-    )
-
-    // --------------------------------------------------------
-    // 👤 NOMBRE
-    // --------------------------------------------------------
-
-    const name =
-      String(
-        owner[1] ||
-        'Owner'
-      )
-        .replace(
-          /LID$/i,
-          ''
-        )
-        .trim() ||
-      'Owner'
-
-    // --------------------------------------------------------
-    // 💾 REGISTRO LIMPIO
-    // --------------------------------------------------------
-
-    cleaned.push([
-      number,
-      name,
-      true
-    ])
-  }
-
-  return cleaned
 }
 
 // ============================================================
-// 💾 CARGAR OWNERS DESDE DATABASE
+// 💾 CARGAR DATABASE
 // ============================================================
 
 function loadOwnersDatabase() {
 
   try {
 
-    // --------------------------------------------------------
-    // CREAR ARCHIVO SI NO EXISTE
-    // --------------------------------------------------------
+    ensureOwnersDatabase()
 
-    if (
-      !fs.existsSync(
-        OWNERS_DB_FILE
-      )
-    ) {
-
-      fs.writeFileSync(
-        OWNERS_DB_FILE,
-        '[]',
-        'utf8'
-      )
-
-      return []
-    }
-
-    // --------------------------------------------------------
-    // LEER
-    // --------------------------------------------------------
-
-    const data =
+    const raw =
       fs.readFileSync(
         OWNERS_DB_FILE,
         'utf8'
       )
 
-    if (
-      !data.trim()
-    ) {
-
-      fs.writeFileSync(
-        OWNERS_DB_FILE,
-        '[]',
-        'utf8'
-      )
-
+    if (!raw.trim()) {
       return []
     }
 
-    // --------------------------------------------------------
-    // PARSEAR
-    // --------------------------------------------------------
+    const data =
+      JSON.parse(raw)
 
-    const parsed =
-      JSON.parse(
-        data
-      )
-
-    if (
-      !Array.isArray(
-        parsed
-      )
-    ) {
-
-      fs.writeFileSync(
-        OWNERS_DB_FILE,
-        '[]',
-        'utf8'
-      )
-
+    if (!Array.isArray(data)) {
       return []
     }
 
-    // ========================================================
-    // 🧹 LIMPIEZA AUTOMÁTICA
-    // ========================================================
+    return data
 
-    const cleaned =
-      cleanOwnersDatabase(
-        parsed
-      )
+      // Solo arrays válidos
+      .filter(owner => {
+        return (
+          Array.isArray(owner) &&
+          owner[0]
+        )
+      })
 
-    // --------------------------------------------------------
-    // COMPROBAR SI HABÍA BASURA
-    // --------------------------------------------------------
+      // Solo números
+      .map(owner => {
 
-    const changed =
-      JSON.stringify(
-        parsed
-      ) !==
-      JSON.stringify(
-        cleaned
-      )
+        const phone =
+          normalizePhone(owner[0])
 
-    if (
-      changed
-    ) {
+        if (!phone) {
+          return null
+        }
 
-      fs.writeFileSync(
-        OWNERS_DB_FILE,
-        JSON.stringify(
-          cleaned,
-          null,
-          2
-        ),
-        'utf8'
-      )
+        return [
+          phone,
+          owner[1] ||
+            'Owner',
+          true
+        ]
+      })
 
-      console.log(
-        `🧹 [OWNERS] Database limpiada. ${cleaned.length} owners válidos conservados.`
-      )
+      .filter(Boolean)
 
-      console.log(
-        '🗑️ [OWNERS] Se eliminaron LIDs, duplicados y registros inválidos.'
-      )
-    }
-
-    return cleaned
-
-  } catch (e) {
+  } catch (error) {
 
     console.error(
-      '❌ Error cargando owners.json:',
-      e
+      '❌ [OWNERS] Error leyendo owners.json:',
+      error
     )
 
     return []
@@ -467,101 +268,138 @@ function loadOwnersDatabase() {
 }
 
 // ============================================================
-// 💾 GUARDAR OWNERS EN DATABASE
+// 🧹 LIMPIAR DATABASE
+// ============================================================
+
+function cleanOwnersDatabase() {
+
+  try {
+
+    const owners =
+      loadOwnersDatabase()
+
+    const unique = []
+
+    const used = new Set()
+
+    for (const owner of owners) {
+
+      const phone =
+        normalizePhone(owner[0])
+
+      if (!phone) {
+        continue
+      }
+
+      // Nunca guardar owners originales
+      if (
+        isOriginalOwner(phone)
+      ) {
+        continue
+      }
+
+      // Evitar duplicados
+      if (
+        used.has(phone)
+      ) {
+        continue
+      }
+
+      used.add(phone)
+
+      unique.push([
+        phone,
+        owner[1] ||
+          'Owner',
+        true
+      ])
+    }
+
+    fs.writeFileSync(
+      OWNERS_DB_FILE,
+      JSON.stringify(
+        unique,
+        null,
+        2
+      ),
+      'utf8'
+    )
+
+    return unique
+
+  } catch (error) {
+
+    console.error(
+      '❌ [OWNERS] Error limpiando owners.json:',
+      error
+    )
+
+    return []
+  }
+}
+
+// ============================================================
+// 💾 GUARDAR DATABASE
 // ============================================================
 
 function saveOwnersDatabase() {
 
   try {
 
-    if (
-      !Array.isArray(
-        global.owner
-      )
-    ) {
+    const owners =
+      Array.isArray(global.owner)
+        ? global.owner
+        : []
 
-      global.owner = []
+    const unique = []
+
+    const used = new Set()
+
+    for (const owner of owners) {
+
+      if (
+        !Array.isArray(owner) ||
+        !owner[0]
+      ) {
+        continue
+      }
+
+      const phone =
+        normalizePhone(owner[0])
+
+      // ❌ Nunca guardar LID
+      if (!phone) {
+        continue
+      }
+
+      // ❌ Nunca guardar owner original
+      if (
+        isOriginalOwner(phone)
+      ) {
+        continue
+      }
+
+      // ❌ Evitar duplicados
+      if (
+        used.has(phone)
+      ) {
+        continue
+      }
+
+      used.add(phone)
+
+      unique.push([
+        phone,
+        owner[1] ||
+          'Owner',
+        true
+      ])
     }
-
-    // ========================================================
-    // 👑 OBTENER SOLAMENTE OWNERS AGREGADOS
-    // ========================================================
-
-    const addedOwners =
-      global.owner
-        .filter(
-          owner => {
-
-            if (
-              !Array.isArray(owner) ||
-              !owner[0]
-            ) {
-
-              return false
-            }
-
-            const number =
-              getNumber(
-                owner[0]
-              )
-
-            if (
-              !number
-            ) {
-
-              return false
-            }
-
-            return !isOriginalOwner(
-              number
-            )
-          }
-        )
-        .map(
-          owner => {
-
-            const number =
-              getNumber(
-                owner[0]
-              )
-
-            const name =
-              String(
-                owner[1] ||
-                'Owner'
-              )
-                .replace(
-                  /LID$/i,
-                  ''
-                )
-                .trim() ||
-              'Owner'
-
-            return [
-              number,
-              name,
-              true
-            ]
-          }
-        )
-
-    // ========================================================
-    // 🧹 ELIMINAR DUPLICADOS
-    // ========================================================
-
-    const cleaned =
-      cleanOwnersDatabase(
-        addedOwners
-      )
-
-    // ========================================================
-    // 💾 GUARDAR
-    // ========================================================
 
     fs.writeFileSync(
       OWNERS_DB_FILE,
       JSON.stringify(
-        cleaned,
+        unique,
         null,
         2
       ),
@@ -569,16 +407,16 @@ function saveOwnersDatabase() {
     )
 
     console.log(
-      `💾 [OWNERS] ${cleaned.length} owners guardados en ${OWNERS_DB_FILE}`
+      `💾 [OWNERS] ${unique.length} owners guardados`
     )
 
     return true
 
-  } catch (e) {
+  } catch (error) {
 
     console.error(
-      '❌ Error guardando owners.json:',
-      e
+      '❌ [OWNERS] Error guardando owners.json:',
+      error
     )
 
     return false
@@ -586,7 +424,7 @@ function saveOwnersDatabase() {
 }
 
 // ============================================================
-// 🔄 CARGAR OWNERS GUARDADOS AL INICIAR
+// 🔄 RESTAURAR OWNERS
 // ============================================================
 
 function restoreOwners() {
@@ -594,108 +432,66 @@ function restoreOwners() {
   try {
 
     if (
-      !Array.isArray(
-        global.owner
-      )
+      !Array.isArray(global.owner)
     ) {
-
       global.owner = []
     }
 
-    // ========================================================
-    // 📂 CARGAR + LIMPIAR DATABASE
-    // ========================================================
-
+    // Primero limpiar database
     const savedOwners =
-      loadOwnersDatabase()
+      cleanOwnersDatabase()
 
-    let restored =
-      0
-
-    // ========================================================
-    // 🔄 RESTAURAR
-    // ========================================================
+    let restored = 0
 
     for (
-      const owner
-      of savedOwners
+      const owner of savedOwners
     ) {
 
-      if (
-        !Array.isArray(owner) ||
-        !owner[0]
-      ) {
+      const phone =
+        normalizePhone(owner[0])
 
+      if (!phone) {
         continue
       }
 
-      const number =
-        getNumber(
-          owner[0]
-        )
-
+      // No restaurar originales
       if (
-        !number
+        isOriginalOwner(phone)
       ) {
-
         continue
       }
 
-      // ------------------------------------------------------
-      // 🛡️ NO RESTAURAR ORIGINALES
-      // ------------------------------------------------------
-
-      if (
-        isOriginalOwner(
-          number
-        )
-      ) {
-
-        continue
-      }
-
-      // ------------------------------------------------------
-      // 🔍 EVITAR DUPLICADOS
-      // ------------------------------------------------------
-
+      // Comprobar si ya está
       const exists =
         global.owner.some(
           current => {
 
             if (
-              !Array.isArray(
-                current
-              )
+              !Array.isArray(current) ||
+              !current[0]
             ) {
-
               return false
             }
 
-            const currentId =
-              cleanId(
+            const currentPhone =
+              normalizePhone(
                 current[0]
               )
 
             return (
-              currentId ===
-              number
+              currentPhone ===
+              phone
             )
           }
         )
 
-      if (
-        exists
-      ) {
-
+      if (exists) {
         continue
       }
 
-      // ------------------------------------------------------
-      // 👑 RESTAURAR SOLO NÚMERO
-      // ------------------------------------------------------
-
+      // Guardar SOLO número
       global.owner.push([
-        number,
+        phone,
         owner[1] ||
           'Owner',
         true
@@ -705,36 +501,33 @@ function restoreOwners() {
     }
 
     console.log(
-      `🔄 [OWNERS] ${restored} owners restaurados desde ${OWNERS_DB_FILE}`
+      `🔄 [OWNERS] ${restored} owners restaurados`
     )
 
-  } catch (e) {
+  } catch (error) {
 
     console.error(
-      '❌ Error restaurando owners:',
-      e
+      '❌ [OWNERS] Error restaurando owners:',
+      error
     )
   }
 }
 
 // ============================================================
-// 🚀 RESTAURAR AL CARGAR EL PLUGIN
+// 🚀 RESTAURAR AL CARGAR
 // ============================================================
 
 restoreOwners()
 
 // ============================================================
-// 👑 OBTENER OWNERS ACTUALES
+// 👑 OBTENER OWNERS
 // ============================================================
 
 function getOwners() {
 
   if (
-    !Array.isArray(
-      global.owner
-    )
+    !Array.isArray(global.owner)
   ) {
-
     global.owner = []
   }
 
@@ -742,7 +535,7 @@ function getOwners() {
 }
 
 // ============================================================
-// 🛡️ COMPROBAR SI QUIEN USA EL COMANDO ES OWNER
+// 🛡️ COMPROBAR SI ES OWNER
 // ============================================================
 
 function isOwner(m) {
@@ -752,15 +545,13 @@ function isOwner(m) {
       m.sender || ''
     )
 
-  const senderId =
-    cleanId(
-      sender
-    )
+  const senderPhone =
+    normalizePhone(sender)
 
-  if (
-    !senderId
-  ) {
+  const senderLid =
+    normalizeLid(sender)
 
+  if (!senderPhone && !senderLid) {
     return false
   }
 
@@ -768,20 +559,28 @@ function isOwner(m) {
     owner => {
 
       if (
-        !Array.isArray(
-          owner
-        )
+        !Array.isArray(owner) ||
+        !owner[0]
       ) {
-
         return false
       }
 
-      return (
-        cleanId(
+      const ownerPhone =
+        normalizePhone(
           owner[0]
-        ) ===
-        senderId
-      )
+        )
+
+      if (
+        senderPhone &&
+        ownerPhone
+      ) {
+        return (
+          senderPhone ===
+          ownerPhone
+        )
+      }
+
+      return false
     }
   )
 }
@@ -795,18 +594,12 @@ async function getQuotedUser(
   conn
 ) {
 
-  if (
-    !m.quoted
-  ) {
-
+  if (!m.quoted) {
     return null
   }
 
-  let number =
-    null
-
-  let lid =
-    null
+  let number = null
+  let lid = null
 
   // ==========================================================
   // 👤 ID DEL MENSAJE CITADO
@@ -819,40 +612,26 @@ async function getQuotedUser(
     null
 
   // ==========================================================
-  // 📱 DETECTAR NÚMERO / LID
+  // 📱 SI YA VIENE COMO NÚMERO
   // ==========================================================
 
-  if (
-    quotedSender
-  ) {
+  if (quotedSender) {
 
-    const senderString =
-      String(
-        quotedSender
-      )
+    const sender =
+      String(quotedSender)
 
-    if (
-      senderString.includes(
-        '@s.whatsapp.net'
-      )
-    ) {
+    const phone =
+      normalizePhone(sender)
 
-      number =
-        cleanId(
-          senderString
-        )
+    const senderLid =
+      normalizeLid(sender)
+
+    if (phone) {
+      number = phone
     }
 
-    if (
-      senderString.includes(
-        '@lid'
-      )
-    ) {
-
-      lid =
-        cleanId(
-          senderString
-        )
+    if (senderLid) {
+      lid = senderLid
     }
   }
 
@@ -861,7 +640,8 @@ async function getQuotedUser(
   // ==========================================================
 
   if (
-    m.isGroup
+    m.isGroup &&
+    quotedSender
   ) {
 
     try {
@@ -880,103 +660,98 @@ async function getQuotedUser(
           p => {
 
             const ids = [
-              p.id,
-              p.jid,
-              p.lid
+              p?.id,
+              p?.jid,
+              p?.lid
             ]
+              .filter(Boolean)
+              .map(String)
 
-            return ids.some(
-              id => {
-
-                if (
-                  !id ||
-                  !quotedSender
-                ) {
-
-                  return false
-                }
-
-                return (
-                  String(id) ===
-                  String(
-                    quotedSender
-                  )
-                )
-              }
+            return ids.includes(
+              String(quotedSender)
             )
           }
         )
 
-      if (
-        participant
-      ) {
+      if (participant) {
 
-        // ----------------------------------------------------
-        // 📱 NÚMERO
-        // ----------------------------------------------------
+        // ====================================================
+        // 📱 OBTENER NÚMERO REAL
+        // ====================================================
 
-        const possibleJid =
-          participant.jid ||
-          (
-            String(
-              participant.id ||
-              ''
-            ).includes(
-              '@s.whatsapp.net'
-            )
-              ? participant.id
-              : null
-          )
+        const possibleNumbers = [
+          participant.jid,
+          participant.id
+        ]
 
-        if (
-          possibleJid
+        for (
+          const possible of
+          possibleNumbers
         ) {
 
-          number =
-            cleanId(
-              possibleJid
+          if (!possible) {
+            continue
+          }
+
+          const value =
+            String(possible)
+
+          const phone =
+            normalizePhone(
+              value
             )
+
+          if (
+            phone &&
+            !value.includes('@lid')
+          ) {
+
+            number = phone
+            break
+          }
         }
 
-        // ----------------------------------------------------
+        // ====================================================
         // 🆔 LID
-        // ----------------------------------------------------
+        // ====================================================
 
-        const possibleLid =
-          participant.lid ||
-          (
-            String(
-              participant.id ||
-              ''
-            ).includes(
-              '@lid'
-            )
-              ? participant.id
-              : null
-          )
+        const possibleLids = [
+          participant.lid,
+          participant.id
+        ]
 
-        if (
-          possibleLid
+        for (
+          const possible of
+          possibleLids
         ) {
 
-          lid =
-            cleanId(
-              possibleLid
+          if (!possible) {
+            continue
+          }
+
+          const found =
+            normalizeLid(
+              possible
             )
+
+          if (found) {
+            lid = found
+            break
+          }
         }
       }
 
-    } catch (e) {
+    } catch (error) {
 
       console.log(
-        '⚠️ Error obteniendo participante:',
-        e
+        '⚠️ [OWNERS] Error obteniendo participante:',
+        error
       )
     }
   }
 
   // ==========================================================
-  // 🏷️ NOMBRE
+  // 👤 NOMBRE
   // ==========================================================
 
   const name =
@@ -985,15 +760,16 @@ async function getQuotedUser(
     'Owner'
 
   // ==========================================================
-  // ❌ NO SE ENCONTRÓ NADA
+  // ❌ NO HAY NÚMERO
   // ==========================================================
 
-  if (
-    !number &&
-    !lid
-  ) {
+  if (!number) {
 
-    return null
+    return {
+      number: null,
+      lid,
+      name
+    }
   }
 
   return {
@@ -1004,39 +780,35 @@ async function getQuotedUser(
 }
 
 // ============================================================
-// 🔍 COMPROBAR SI UN ID YA EXISTE
+// 🔍 COMPROBAR SI EXISTE OWNER POR NÚMERO
 // ============================================================
 
-function ownerExists(id) {
-
-  if (
-    !id
-  ) {
-
-    return false
-  }
+function ownerExists(phone) {
 
   const clean =
-    cleanId(
-      id
-    )
+    normalizePhone(phone)
+
+  if (!clean) {
+    return false
+  }
 
   return getOwners().some(
     owner => {
 
       if (
-        !Array.isArray(
-          owner
-        )
+        !Array.isArray(owner) ||
+        !owner[0]
       ) {
-
         return false
       }
 
-      return (
-        cleanId(
+      const ownerPhone =
+        normalizePhone(
           owner[0]
-        ) ===
+        )
+
+      return (
+        ownerPhone ===
         clean
       )
     }
@@ -1052,9 +824,11 @@ async function addOwner(
   { conn }
 ) {
 
-  if (
-    !isOwner(m)
-  ) {
+  // ==========================================================
+  // 🔐 SOLO OWNER
+  // ==========================================================
+
+  if (!isOwner(m)) {
 
     return conn.reply(
       m.chat,
@@ -1067,13 +841,11 @@ async function addOwner(
   // 💬 OBLIGATORIO CITAR
   // ==========================================================
 
-  if (
-    !m.quoted
-  ) {
+  if (!m.quoted) {
 
     return conn.reply(
       m.chat,
-`⚠️ *ADOWNER*
+      `⚠️ *ADOWNER*
 
 Tenés que responder/citar el mensaje del usuario.
 
@@ -1096,42 +868,50 @@ Respondé a su mensaje y escribí:
       conn
     )
 
-  if (
-    !user
-  ) {
+  if (!user) {
 
     return conn.reply(
       m.chat,
-      '❌ No pude obtener el número o LID del usuario citado.',
+      '❌ No pude obtener los datos del usuario citado.',
       m
     )
   }
 
   // ==========================================================
-  // 🛡️ PROTEGER OWNER ORIGINAL
+  // 📱 EL NÚMERO ES OBLIGATORIO
   // ==========================================================
 
-  const originalTarget =
-    (
-      user.number &&
-      isOriginalOwner(
-        user.number
-      )
-    ) ||
-    (
-      user.lid &&
-      isOriginalOwner(
-        user.lid
-      )
+  if (!user.number) {
+
+    return conn.reply(
+      m.chat,
+      `❌ *NO PUDE OBTENER EL NÚMERO*
+
+👤 Nombre: ${user.name}
+
+🆔 LID detectado:
+\`${user.lid || 'No encontrado'}\`
+
+⚠️ No voy a guardar el LID como owner.
+
+Respondé directamente a un mensaje del usuario dentro del grupo e intentá nuevamente.`,
+      m
     )
+  }
+
+  // ==========================================================
+  // 🛡️ OWNER ORIGINAL
+  // ==========================================================
 
   if (
-    originalTarget
+    isOriginalOwner(
+      user.number
+    )
   ) {
 
     return conn.reply(
       m.chat,
-`🛡️ *OWNER ORIGINAL*
+      `🛡️ *OWNER ORIGINAL*
 
 ❌ No se puede usar *.adowner* con un owner original.
 
@@ -1144,86 +924,98 @@ ${originalOwnersText()}`,
   }
 
   // ==========================================================
-  // 🔍 COMPROBAR SI YA EXISTE
+  // 🔍 YA EXISTE
   // ==========================================================
 
-  const numberExists =
-    user.number &&
+  if (
     ownerExists(
       user.number
     )
-
-  const lidExists =
-    user.lid &&
-    ownerExists(
-      user.lid
-    )
-
-  if (
-    numberExists ||
-    lidExists
   ) {
 
     return conn.reply(
       m.chat,
-`⚠️ *${user.name}* ya figura como owner.
-
-📱 Número: ${user.number || 'No encontrado'}
-
-💾 Este owner ya está guardado en la base de datos.`,
-      m
-    )
-  }
-
-  // ==========================================================
-  // 📱 AGREGAR SOLAMENTE EL NÚMERO
-  // ==========================================================
-
-  if (
-    user.number
-  ) {
-
-    global.owner.push([
-      user.number,
-      user.name,
-      true
-    ])
-
-  } else {
-
-    // --------------------------------------------------------
-    // ⚠️ SI SOLO TENEMOS LID
-    // --------------------------------------------------------
-
-    return conn.reply(
-      m.chat,
-`⚠️ *NO SE PUDO OBTENER EL NÚMERO*
+      `⚠️ *YA ES OWNER*
 
 👤 *${user.name}*
 
-El usuario fue identificado mediante LID, pero para evitar la lista bugueada necesito su número de WhatsApp.
+📱 Número:
+\`${user.number}\`
 
-📌 Citá nuevamente un mensaje del usuario e intentá *.adowner* otra vez.`,
+💾 Este número ya está registrado como owner.
+
+📋 Usá *.owners* para ver la lista.`,
       m
     )
   }
 
   // ==========================================================
-  // 💾 GUARDAR DATABASE
+  // 👑 AGREGAR SOLO NÚMERO
+  // ==========================================================
+
+  global.owner.push([
+    user.number,
+    user.name,
+    true
+  ])
+
+  // ==========================================================
+  // 💾 GUARDAR
   // ==========================================================
 
   const saved =
     saveOwnersDatabase()
 
+  if (!saved) {
+
+    // Si falló la base de datos,
+    // revertimos el agregado de memoria.
+
+    global.owner =
+      global.owner.filter(
+        owner => {
+
+          if (
+            !Array.isArray(owner)
+          ) {
+            return true
+          }
+
+          return (
+            normalizePhone(
+              owner[0]
+            ) !==
+            user.number
+          )
+        }
+      )
+
+    return conn.reply(
+      m.chat,
+      `❌ *ERROR*
+
+No se pudo guardar el owner en:
+
+\`${OWNERS_DB_FILE}\`
+
+No se agregó el owner.`,
+      m
+    )
+  }
+
+  // ==========================================================
+  // 🧹 LIMPIAR DATABASE
+  // ==========================================================
+
+  cleanOwnersDatabase()
+
   // ==========================================================
   // ✅ REACCIÓN
   // ==========================================================
 
-  await m.react(
-    saved
-      ? '👑'
-      : '⚠️'
-  )
+  try {
+    await m.react('👑')
+  } catch {}
 
   // ==========================================================
   // 📤 RESULTADO
@@ -1231,7 +1023,7 @@ El usuario fue identificado mediante LID, pero para evitar la lista bugueada nec
 
   return conn.reply(
     m.chat,
-`👑 *OWNER AGREGADO*
+    `👑 *OWNER AGREGADO*
 
 ━━━━━━━━━━━━━━━━━━
 
@@ -1243,11 +1035,14 @@ ${user.name}
 
 ━━━━━━━━━━━━━━━━━━
 
-${saved
-  ? '💾 *Guardado permanentemente en la base de datos.*\n\n🔄 Aunque reinicies el bot o uses *.up*, este owner seguirá registrado.'
-  : '⚠️ *El owner fue agregado, pero ocurrió un error al guardar la base de datos.*'}
+💾 *Guardado correctamente.*
 
-🧹 Los registros LID ya no se guardan.`,
+🗄️ Base:
+\`${OWNERS_DB_FILE}\`
+
+🔄 Este owner seguirá registrado aunque reinicies el bot.
+
+📋 Usá *.owners* para verlo.`,
     m
   )
 }
@@ -1261,9 +1056,11 @@ async function removeOwner(
   { conn }
 ) {
 
-  if (
-    !isOwner(m)
-  ) {
+  // ==========================================================
+  // 🔐 SOLO OWNER
+  // ==========================================================
+
+  if (!isOwner(m)) {
 
     return conn.reply(
       m.chat,
@@ -1276,13 +1073,11 @@ async function removeOwner(
   // 💬 OBLIGATORIO CITAR
   // ==========================================================
 
-  if (
-    !m.quoted
-  ) {
+  if (!m.quoted) {
 
     return conn.reply(
       m.chat,
-`⚠️ *ROWNER*
+      `⚠️ *ROWNER*
 
 Tenés que responder/citar el mensaje del owner.
 
@@ -1305,44 +1100,51 @@ Respondé a su mensaje y escribí:
       conn
     )
 
-  if (
-    !user
-  ) {
+  if (!user) {
 
     return conn.reply(
       m.chat,
-      '❌ No pude obtener el número o LID del usuario citado.',
+      '❌ No pude obtener los datos del usuario citado.',
       m
     )
   }
 
   // ==========================================================
-  // 🛡️ PROTEGER OWNER ORIGINAL
+  // 📱 NECESITAMOS NÚMERO
   // ==========================================================
 
-  const originalTarget =
-    (
-      user.number &&
-      isOriginalOwner(
-        user.number
-      )
-    ) ||
-    (
-      user.lid &&
-      isOriginalOwner(
-        user.lid
-      )
+  if (!user.number) {
+
+    return conn.reply(
+      m.chat,
+      `❌ *NO PUDE OBTENER EL NÚMERO*
+
+👤 Nombre:
+${user.name}
+
+🆔 LID:
+\`${user.lid || 'No encontrado'}\`
+
+⚠️ El LID no se utiliza para eliminar owners.`,
+      m
     )
+  }
+
+  // ==========================================================
+  // 🛡️ OWNER ORIGINAL
+  // ==========================================================
 
   if (
-    originalTarget
+    isOriginalOwner(
+      user.number
+    )
   ) {
 
     return conn.reply(
       m.chat,
-`🛡️ *OWNER ORIGINAL*
+      `🛡️ *OWNER ORIGINAL*
 
-❌ No se puede usar *.rowner* con un owner original.
+❌ No se puede eliminar un owner original.
 
 👤 *${user.name}*
 
@@ -1356,117 +1158,115 @@ ${originalOwnersText()}`,
   // 🔍 BUSCAR OWNER
   // ==========================================================
 
+  const target =
+    user.number
+
   const currentOwners =
     getOwners()
 
-  const targetIds =
-    [
-      user.number,
-      user.lid
-    ]
-      .filter(Boolean)
-      .map(
-        id =>
-          cleanId(id)
-      )
+  const exists =
+    currentOwners.some(
+      owner => {
 
-  const remaining =
+        if (
+          !Array.isArray(owner) ||
+          !owner[0]
+        ) {
+          return false
+        }
+
+        return (
+          normalizePhone(
+            owner[0]
+          ) ===
+          target
+        )
+      }
+    )
+
+  if (!exists) {
+
+    return conn.reply(
+      m.chat,
+      `⚠️ *NO ES OWNER AGREGADO*
+
+👤 *${user.name}*
+
+📱 Número:
+\`${target}\`
+
+📋 Usá *.owners* para consultar los owners agregados.`,
+      m
+    )
+  }
+
+  // ==========================================================
+  // 🗑️ ELIMINAR
+  // ==========================================================
+
+  global.owner =
     currentOwners.filter(
       owner => {
 
         if (
-          !Array.isArray(
-            owner
-          )
+          !Array.isArray(owner) ||
+          !owner[0]
         ) {
-
           return true
         }
 
-        const id =
-          cleanId(
+        return (
+          normalizePhone(
             owner[0]
-          )
-
-        return !targetIds.includes(
-          id
+          ) !==
+          target
         )
       }
     )
 
   // ==========================================================
-  // ❌ NO ENCONTRADO
-  // ==========================================================
-
-  if (
-    remaining.length ===
-    currentOwners.length
-  ) {
-
-    return conn.reply(
-      m.chat,
-`⚠️ *${user.name}* no figura como owner agregado.
-
-📱 Número: ${user.number || 'No encontrado'}`,
-      m
-    )
-  }
-
-  // ==========================================================
-  // 🛡️ NO DEJAR SIN OWNER
-  // ==========================================================
-
-  const originalCount =
-    ORIGINAL_OWNERS.length
-
-  const addedRemaining =
-    remaining.filter(
-      owner =>
-        Array.isArray(owner) &&
-        !isOriginalOwner(
-          owner[0]
-        )
-    )
-
-  if (
-    originalCount === 0 &&
-    addedRemaining.length === 0
-  ) {
-
-    return conn.reply(
-      m.chat,
-      '🛡️ No podés eliminar al último owner.',
-      m
-    )
-  }
-
-  // ==========================================================
-  // 🗑️ ACTUALIZAR GLOBAL.OWNER
-  // ==========================================================
-
-  global.owner =
-    remaining
-
-  // ==========================================================
-  // 💾 ACTUALIZAR DATABASE
+  // 💾 GUARDAR
   // ==========================================================
 
   const saved =
     saveOwnersDatabase()
 
+  if (!saved) {
+
+    return conn.reply(
+      m.chat,
+      `⚠️ *OWNER ELIMINADO DE MEMORIA*
+
+Pero no se pudo actualizar:
+
+\`${OWNERS_DB_FILE}\`
+
+Revisá los permisos del archivo.`,
+      m
+    )
+  }
+
   // ==========================================================
-  // ✅ RESULTADO
+  // 🧹 LIMPIAR
   // ==========================================================
 
-  await m.react(
-    saved
-      ? '🗑️'
-      : '⚠️'
-  )
+  cleanOwnersDatabase()
+
+  // ==========================================================
+  // ✅ REACCIÓN
+  // ==========================================================
+
+  try {
+    await m.react('🗑️')
+  } catch {}
+
+  // ==========================================================
+  // 📤 RESULTADO
+  // ==========================================================
 
   return conn.reply(
     m.chat,
-`🗑️ *OWNER ELIMINADO*
+    `🗑️ *OWNER ELIMINADO*
 
 ━━━━━━━━━━━━━━━━━━
 
@@ -1474,15 +1274,11 @@ ${originalOwnersText()}`,
 ${user.name}
 
 📱 *Número:*
-${user.number
-  ? `\`${user.number}\``
-  : '❌ No encontrado'}
+\`${target}\`
 
 ━━━━━━━━━━━━━━━━━━
 
-${saved
-  ? '💾 *La eliminación también fue guardada en la base de datos.*'
-  : '⚠️ *Se eliminó de la memoria, pero ocurrió un error guardando la base de datos.*'}
+💾 *Eliminado correctamente de la base de datos.*
 
 🛡️ Los owners originales permanecen protegidos.`,
     m
@@ -1490,7 +1286,7 @@ ${saved
 }
 
 // ============================================================
-// 📋 LISTAR OWNERS AGREGADOS
+// 📋 LISTAR OWNERS
 // ============================================================
 
 async function listOwners(
@@ -1498,9 +1294,11 @@ async function listOwners(
   { conn }
 ) {
 
-  if (
-    !isOwner(m)
-  ) {
+  // ==========================================================
+  // 🔐 SOLO OWNER
+  // ==========================================================
+
+  if (!isOwner(m)) {
 
     return conn.reply(
       m.chat,
@@ -1510,53 +1308,62 @@ async function listOwners(
   }
 
   // ==========================================================
-  // 📋 OBTENER OWNERS
+  // 🧹 LIMPIAR ANTES DE MOSTRAR
   // ==========================================================
 
-  const currentOwners =
-    getOwners()
+  const databaseOwners =
+    cleanOwnersDatabase()
 
   // ==========================================================
-  // 🛡️ FILTRAR
+  // 🔄 SINCRONIZAR MEMORIA
   // ==========================================================
 
-  const addedOwners =
-    currentOwners.filter(
-      owner => {
+  const addedOwners = []
 
-        if (
-          !Array.isArray(owner) ||
-          !owner[0]
-        ) {
+  const used = new Set()
 
-          return false
-        }
+  for (
+    const owner of
+    databaseOwners
+  ) {
 
-        const number =
-          getNumber(
-            owner[0]
-          )
+    if (
+      !Array.isArray(owner) ||
+      !owner[0]
+    ) {
+      continue
+    }
 
-        // ----------------------------------------------------
-        // ❌ NUNCA MOSTRAR LID
-        // ----------------------------------------------------
+    const phone =
+      normalizePhone(
+        owner[0]
+      )
 
-        if (
-          !number
-        ) {
+    if (!phone) {
+      continue
+    }
 
-          return false
-        }
+    if (
+      isOriginalOwner(phone)
+    ) {
+      continue
+    }
 
-        // ----------------------------------------------------
-        // 🛡️ NO MOSTRAR ORIGINALES
-        // ----------------------------------------------------
+    if (
+      used.has(phone)
+    ) {
+      continue
+    }
 
-        return !isOriginalOwner(
-          number
-        )
-      }
-    )
+    used.add(phone)
+
+    addedOwners.push([
+      phone,
+      owner[1] ||
+        'Owner',
+      true
+    ])
+  }
 
   // ==========================================================
   // ❌ NO HAY OWNERS
@@ -1568,7 +1375,7 @@ async function listOwners(
 
     return conn.reply(
       m.chat,
-`👑 *OWNERS AGREGADOS*
+      `👑 *OWNERS AGREGADOS*
 
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -1593,44 +1400,38 @@ async function listOwners(
       .map(
         (owner, index) => {
 
-          const number =
-            getNumber(
+          const phone =
+            normalizePhone(
               owner[0]
             )
 
           const name =
-            String(
-              owner[1] ||
-              'Owner'
-            )
-              .replace(
-                /LID$/i,
-                ''
-              )
-              .trim() ||
+            owner[1] ||
             'Owner'
 
           return (
-`*${index + 1}.* 👑 *${name}*
-📱 Número: \`${number}\``
+            `*${index + 1}.* 👑 *${name}*\n` +
+            `📱 Número: \`${phone}\``
           )
         }
       )
-      .join(
-        '\n\n'
-      )
+      .join('\n\n')
 
   // ==========================================================
-  // 📊 RESULTADO
+  // ✅ REACCIÓN
   // ==========================================================
 
-  await m.react(
-    '📋'
-  )
+  try {
+    await m.react('📋')
+  } catch {}
+
+  // ==========================================================
+  // 📤 RESULTADO
+  // ==========================================================
 
   return conn.reply(
     m.chat,
-`👑 *LISTA DE OWNERS AGREGADOS*
+    `👑 *LISTA DE OWNERS AGREGADOS*
 
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -1668,19 +1469,17 @@ let handler = async (
 
   try {
 
-    command =
+    const cmd =
       String(
         command || ''
-      )
-        .toLowerCase()
+      ).toLowerCase()
 
     // ========================================================
     // 👑 ADOWNER
     // ========================================================
 
     if (
-      command ===
-      'adowner'
+      cmd === 'adowner'
     ) {
 
       return await addOwner(
@@ -1694,8 +1493,7 @@ let handler = async (
     // ========================================================
 
     if (
-      command ===
-      'rowner'
+      cmd === 'rowner'
     ) {
 
       return await removeOwner(
@@ -1709,8 +1507,7 @@ let handler = async (
     // ========================================================
 
     if (
-      command ===
-      'owners'
+      cmd === 'owners'
     ) {
 
       return await listOwners(
@@ -1719,11 +1516,11 @@ let handler = async (
       )
     }
 
-  } catch (e) {
+  } catch (error) {
 
     console.error(
-      '❌ Error en owner.js:',
-      e
+      '❌ [OWNER] Error:',
+      error
     )
 
     return conn.reply(

@@ -1,9 +1,10 @@
 // 📂 plugins/owner.js — FelixCat-Bot 🐾
 // 👑 SISTEMA COMPLETO DE OWNERS
 //
-// .adowner → agregar owner respondiendo/citando
-// .rowner  → eliminar owner respondiendo/citando
-// .owners  → ver lista de owners agregados
+// .adowner    → agregar owner respondiendo/citando
+// .rowner     → eliminar owner respondiendo/citando
+// .owners     → ver lista de owners agregados
+// .clearowner → borrar TODOS los owners agregados
 //
 // ============================================================
 // REGLAS
@@ -16,6 +17,8 @@
 // ❌ Los LID nunca aparecen en .owners
 // ❌ No se crean duplicados
 // ✅ Los owners sobreviven a reinicios
+// ✅ .clearowner elimina todos los owners agregados
+// ❌ .clearowner NO elimina owners originales
 //
 // FORMATO owners.json:
 //
@@ -52,14 +55,6 @@ if (!fs.existsSync(DATABASE_FOLDER)) {
 // ============================================================
 // 👑 CAPTURAR OWNERS ORIGINALES
 // ============================================================
-//
-// SOLO los owners que existían en global.owner al cargar
-// este plugin son considerados originales.
-//
-// Los owners agregados posteriormente con .adowner
-// NO se convierten en originales.
-//
-// ============================================================
 
 const ORIGINAL_OWNERS = Array.isArray(global.owner)
   ? global.owner
@@ -75,7 +70,6 @@ const ORIGINAL_OWNERS = Array.isArray(global.owner)
 
         const id = String(owner[0])
 
-        // Los LID no son owners originales
         if (id.includes('@lid')) {
           return false
         }
@@ -90,8 +84,11 @@ const ORIGINAL_OWNERS = Array.isArray(global.owner)
           id = id.split('@')[0]
         }
 
-        id = id.split(':')[0]
+        if (id.includes('@c.us')) {
+          id = id.split('@')[0]
+        }
 
+        id = id.split(':')[0]
         id = id.replace(/\D/g, '')
 
         return {
@@ -114,7 +111,6 @@ function normalizePhone(id) {
 
   let value = String(id)
 
-  // Nunca tratar un LID como número
   if (value.includes('@lid')) {
     return null
   }
@@ -167,12 +163,15 @@ function isOriginalOwner(id) {
 
   let value = String(id)
 
-  // Un LID jamás puede ser owner original
   if (value.includes('@lid')) {
     return false
   }
 
   if (value.includes('@s.whatsapp.net')) {
+    value = value.split('@')[0]
+  }
+
+  if (value.includes('@c.us')) {
     value = value.split('@')[0]
   }
 
@@ -264,17 +263,14 @@ function loadOwnersDatabase() {
 
       const phone = normalizePhone(owner[0])
 
-      // LID, ID inválido, etc.
       if (!phone) {
         continue
       }
 
-      // Nunca guardar owner original
       if (isOriginalOwner(phone)) {
         continue
       }
 
-      // Evitar duplicados
       if (used.has(phone)) {
         continue
       }
@@ -360,17 +356,14 @@ function saveOwnersDatabase() {
 
       const phone = normalizePhone(owner[0])
 
-      // Nunca guardar LID
       if (!phone) {
         continue
       }
 
-      // Nunca guardar owners originales
       if (isOriginalOwner(phone)) {
         continue
       }
 
-      // Evitar duplicados
       if (used.has(phone)) {
         continue
       }
@@ -795,10 +788,6 @@ Tenés que responder/citar el mensaje del usuario.
     )
   }
 
-  // ==========================================================
-  // 📱 NÚMERO OBLIGATORIO
-  // ==========================================================
-
   if (!user.number) {
 
     return conn.reply(
@@ -817,10 +806,6 @@ Respondé directamente al mensaje del usuario dentro del grupo e intentá nuevam
       m
     )
   }
-
-  // ==========================================================
-  // 🛡️ OWNER ORIGINAL
-  // ==========================================================
 
   if (
     isOriginalOwner(
@@ -844,10 +829,6 @@ ${originalOwnersText()}`,
       m
     )
   }
-
-  // ==========================================================
-  // 🔍 DUPLICADO
-  // ==========================================================
 
   if (
     ownerExists(
@@ -1013,10 +994,6 @@ ${user.name}
     )
   }
 
-  // ==========================================================
-  // 🛡️ ORIGINAL
-  // ==========================================================
-
   if (
     isOriginalOwner(
       user.number
@@ -1039,10 +1016,6 @@ ${originalOwnersText()}`,
       m
     )
   }
-
-  // ==========================================================
-  // 🔍 COMPROBAR
-  // ==========================================================
 
   const target =
     user.number
@@ -1167,10 +1140,6 @@ async function listOwners(
     )
   }
 
-  // ==========================================================
-  // 🧹 LIMPIAR DATABASE
-  // ==========================================================
-
   const databaseOwners =
     cleanOwnersDatabase()
 
@@ -1221,10 +1190,6 @@ async function listOwners(
     ])
   }
 
-  // ==========================================================
-  // ❌ VACÍO
-  // ==========================================================
-
   if (!addedOwners.length) {
 
     return conn.reply(
@@ -1244,10 +1209,6 @@ async function listOwners(
       m
     )
   }
-
-  // ==========================================================
-  // 📋 GENERAR
-  // ==========================================================
 
   const list =
     addedOwners
@@ -1302,6 +1263,114 @@ ${list}
 }
 
 // ============================================================
+// 🧹 CLEAROWNER
+// ============================================================
+//
+// Borra TODOS los owners agregados.
+// Los owners originales permanecen protegidos.
+//
+
+async function clearOwners(
+  m,
+  { conn }
+) {
+
+  if (!isOwner(m)) {
+
+    return conn.reply(
+      m.chat,
+      '❌ Solo los owners pueden usar este comando.',
+      m
+    )
+  }
+
+  try {
+
+    const before =
+      loadOwnersDatabase()
+
+    const deleted =
+      before.length
+
+    // ========================================================
+    // 🗑️ VACIAR DATABASE
+    // ========================================================
+
+    fs.writeFileSync(
+      OWNERS_DB_FILE,
+      '[]',
+      'utf8'
+    )
+
+    // ========================================================
+    // 🛡️ DEJAR SOLAMENTE LOS ORIGINALES EN MEMORIA
+    // ========================================================
+
+    if (!Array.isArray(global.owner)) {
+      global.owner = []
+    }
+
+    global.owner =
+      global.owner.filter(owner => {
+
+        if (
+          !Array.isArray(owner) ||
+          !owner[0]
+        ) {
+          return false
+        }
+
+        return isOriginalOwner(
+          owner[0]
+        )
+      })
+
+    try {
+      await m.react('🧹')
+    } catch {}
+
+    return conn.reply(
+      m.chat,
+      `🧹 *OWNERS LIMPIADOS*
+
+━━━━━━━━━━━━━━━━━━
+
+✅ Se eliminaron todos los owners agregados.
+
+🗑️ *Eliminados:* ${deleted}
+
+📁 Base de datos:
+\`${OWNERS_DB_FILE}\`
+
+🛡️ Los owners originales permanecen protegidos.
+
+━━━━━━━━━━━━━━━━━━
+
+🔄 Los owners originales siguen funcionando normalmente.`,
+      m
+    )
+
+  } catch (error) {
+
+    console.error(
+      '❌ [CLEAROWNER] Error:',
+      error
+    )
+
+    return conn.reply(
+      m.chat,
+      `❌ *ERROR*
+
+No se pudieron limpiar los owners agregados.
+
+📁 Archivo:
+\`${OWNERS_DB_FILE}\``,
+      m
+    )
+  }
+}
+
+// ============================================================
 // 🔧 HANDLER
 // ============================================================
 
@@ -1350,6 +1419,16 @@ let handler = async (
       )
     }
 
+    if (
+      cmd === 'clearowner'
+    ) {
+
+      return await clearOwners(
+        m,
+        { conn }
+      )
+    }
+
   } catch (error) {
 
     console.error(
@@ -1372,7 +1451,8 @@ let handler = async (
 handler.help = [
   'adowner',
   'rowner',
-  'owners'
+  'owners',
+  'clearowner'
 ]
 
 handler.tags = [
@@ -1382,7 +1462,8 @@ handler.tags = [
 handler.command = [
   'adowner',
   'rowner',
-  'owners'
+  'owners',
+  'clearowner'
 ]
 
 // ============================================================

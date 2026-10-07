@@ -1,8 +1,9 @@
 // 📂 plugins/owner.js — FelixCat-Bot 🐾
-// 👑 adowner / rowner
+// 👑 SISTEMA COMPLETO DE OWNERS
 //
-// .adowner → responder/citar a un usuario
-// .rowner  → responder/citar a un usuario
+// .adowner → agregar owner respondiendo/citando
+// .rowner  → eliminar owner respondiendo/citando
+// .owners  → ver lista de owners agregados
 //
 // Los OWNERS ORIGINALES quedan protegidos.
 // No se pueden agregar nuevamente ni eliminar.
@@ -16,10 +17,6 @@
 // ============================================================
 // 👑 GUARDAR OWNERS ORIGINALES
 // ============================================================
-//
-// Se toma una copia cuando se carga el plugin.
-// Estos owners quedan protegidos durante la ejecución del bot.
-//
 
 const ORIGINAL_OWNERS = Array.isArray(global.owner)
   ? global.owner
@@ -661,6 +658,125 @@ ${user.lid ? `\`${user.lid}\`` : '❌ No encontrado'}
 
 
 // ============================================================
+// 📋 LISTAR OWNERS AGREGADOS
+// ============================================================
+
+async function listOwners(m, { conn }) {
+
+  // ==========================================================
+  // 🔐 SOLO OWNER
+  // ==========================================================
+
+  if (!isOwner(m)) {
+
+    return conn.reply(
+      m.chat,
+      '❌ Solo los owners pueden usar este comando.',
+      m
+    )
+  }
+
+
+  // ==========================================================
+  // 📋 OBTENER OWNERS ACTUALES
+  // ==========================================================
+
+  const currentOwners =
+    getOwners()
+
+
+  // ==========================================================
+  // 🛡️ FILTRAR OWNERS ORIGINALES
+  // ==========================================================
+
+  const addedOwners =
+    currentOwners.filter(owner => {
+
+      if (!Array.isArray(owner) || !owner[0])
+        return false
+
+      const id =
+        cleanId(owner[0])
+
+      return !isOriginalOwner(id)
+    })
+
+
+  // ==========================================================
+  // ❌ NO HAY OWNERS AGREGADOS
+  // ==========================================================
+
+  if (!addedOwners.length) {
+
+    return conn.reply(
+      m.chat,
+`👑 *OWNERS AGREGADOS*
+
+━━━━━━━━━━━━━━━━━━━━
+
+⚠️ No hay owners agregados actualmente.
+
+🛡️ Los owners originales no aparecen en esta lista.
+
+━━━━━━━━━━━━━━━━━━━━`,
+      m
+    )
+  }
+
+
+  // ==========================================================
+  // 📋 GENERAR LISTA
+  // ==========================================================
+
+  const list =
+    addedOwners
+      .map((owner, index) => {
+
+        const id =
+          cleanId(owner[0])
+
+        const name =
+          owner[1] || 'Owner'
+
+        const isLid =
+          String(owner[0]).includes('@lid') ||
+          /LID$/i.test(name)
+
+        return (
+`*${index + 1}.* 👑 *${name}*
+${isLid ? '🆔 LID' : '📱 Número'}: \`${id}\``
+        )
+      })
+      .join('\n\n')
+
+
+  // ==========================================================
+  // 📊 RESULTADO
+  // ==========================================================
+
+  await m.react('📋')
+
+  return conn.reply(
+    m.chat,
+`👑 *LISTA DE OWNERS AGREGADOS*
+
+━━━━━━━━━━━━━━━━━━━━
+
+${list}
+
+━━━━━━━━━━━━━━━━━━━━
+
+📊 *Total:* ${addedOwners.length}
+
+🛡️ *Owners originales:* ${ORIGINAL_OWNERS.length}
+
+ℹ️ Los owners originales están protegidos y no pueden eliminarse con *.rowner*.`,
+    m
+  )
+}
+
+
+// ============================================================
 // 🔧 HANDLER
 // ============================================================
 
@@ -673,6 +789,10 @@ let handler = async (m, { conn, command }) => {
         .toLowerCase()
 
 
+    // ========================================================
+    // 👑 ADOWNER
+    // ========================================================
+
     if (command === 'adowner') {
 
       return await addOwner(
@@ -682,9 +802,26 @@ let handler = async (m, { conn, command }) => {
     }
 
 
+    // ========================================================
+    // 🗑️ ROWNER
+    // ========================================================
+
     if (command === 'rowner') {
 
       return await removeOwner(
+        m,
+        { conn }
+      )
+    }
+
+
+    // ========================================================
+    // 📋 OWNERS
+    // ========================================================
+
+    if (command === 'owners') {
+
+      return await listOwners(
         m,
         { conn }
       )
@@ -699,7 +836,7 @@ let handler = async (m, { conn, command }) => {
 
     return conn.reply(
       m.chat,
-      '❌ Ocurrió un error al modificar los owners.',
+      '❌ Ocurrió un error al modificar o consultar los owners.',
       m
     )
   }
@@ -712,7 +849,8 @@ let handler = async (m, { conn, command }) => {
 
 handler.help = [
   'adowner',
-  'rowner'
+  'rowner',
+  'owners'
 ]
 
 handler.tags = [
@@ -721,7 +859,8 @@ handler.tags = [
 
 handler.command = [
   'adowner',
-  'rowner'
+  'rowner',
+  'owners'
 ]
 
 export default handler

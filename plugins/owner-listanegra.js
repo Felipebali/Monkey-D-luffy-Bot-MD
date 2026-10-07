@@ -635,12 +635,13 @@ const handler = async (
 
         await sleep(500)
 
+        // 🔇 SIN MENSAJE EN LOS GRUPOS
         await kickUser(
           conn,
           jid,
           userJid,
           reason,
-          true
+          false
         )
       }
 
@@ -653,18 +654,16 @@ const handler = async (
     }
 
     // --------------------------------------------------------
-    // ✅ CONFIRMACIÓN
+    // ✅ ÚNICA CONFIRMACIÓN
     // --------------------------------------------------------
 
     return conn.sendMessage(
       m.chat,
       {
         text:
-`🚫 *USUARIO AGREGADO A LISTA NEGRA*
-${SEP}
+`🚫 *AGREGADO A LISTA NEGRA*
 👤 @${userJid.split('@')[0]}
-📝 *Motivo:* ${reason}
-${SEP}`,
+📝 ${reason}`,
         mentions: [
           userJid
         ]

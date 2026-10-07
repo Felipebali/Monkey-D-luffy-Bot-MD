@@ -20,8 +20,7 @@ const MEDIA_FOLDER = './media'
 // 📌 GRUPO CENTRAL DE MEDIOS
 // ============================================================
 
-const MEDIA_GROUP_ID = '120363429424906972@g.us'
-
+const MEDIA_GROUP_ID = '120363410955044864@g.us
 
 // ============================================================
 // 📂 CREAR CARPETAS

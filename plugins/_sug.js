@@ -7,6 +7,7 @@
 // .sugaceptar <ID>          → aceptar
 // .sugrechazar <ID>         → rechazar
 // .sugdesarrollo <ID>       → poner en desarrollo
+// .sugclear                 → eliminar TODAS las sugerencias
 //
 // 🆔 ID SIMPLE: SUG-001
 // 👤 El usuario NO ve el ID.
@@ -120,18 +121,19 @@ function generarId() {
 
   if (sugerencias.length > 0) {
 
-    const numeros = sugerencias
-      .map(s => {
+    const numeros =
+      sugerencias
+        .map(s => {
 
-        const match =
-          String(s.id || '')
-            .match(/^SUG-(\d+)$/i)
+          const match =
+            String(s.id || '')
+              .match(/^SUG-(\d+)$/i)
 
-        return match
-          ? parseInt(match[1])
-          : 0
-      })
-      .filter(n => n > 0)
+          return match
+            ? parseInt(match[1])
+            : 0
+        })
+        .filter(n => n > 0)
 
     if (numeros.length) {
 
@@ -401,9 +403,6 @@ let handler = async (
     // ========================================================
     // 📦 CREAR REGISTRO
     // ========================================================
-    // 📌 chat = grupo/chat donde se envió originalmente
-    //    la sugerencia. Se utilizará para avisar la resolución.
-    // ========================================================
 
     const registro = {
 
@@ -495,7 +494,6 @@ let handler = async (
 
       // ======================================================
       // 👤 RESPUESTA AL USUARIO
-      // 🚫 NO SE MUESTRA ID
       // ========================================================
 
       return m.reply(
@@ -552,22 +550,18 @@ no estar disponible.
         '❌ Solo el owner puede usar este comando.'
       )
 
-
     if (!args)
       return m.reply(
         '📌 Uso: *.suginfo SUG-001*'
       )
 
-
     const sug =
       buscarSugerencia(args)
-
 
     if (!sug)
       return m.reply(
         '❌ No encontré ninguna sugerencia con ese ID.'
       )
-
 
     return m.reply(
 `╭━━━〔 🔎 *SUGERENCIA* 〕━━━╮
@@ -603,7 +597,6 @@ no estar disponible.
         '❌ Solo el owner puede usar este comando.'
       )
 
-
     const pendientes =
       global.db.data
         .sugerencias
@@ -613,16 +606,13 @@ no estar disponible.
             'pendiente'
         )
 
-
     if (!pendientes.length)
       return m.reply(
         '📭 No hay sugerencias pendientes.'
       )
 
-
     const ultimas =
       pendientes.slice(-20)
-
 
     const lista =
       ultimas
@@ -634,7 +624,6 @@ no estar disponible.
 🟡 PENDIENTE`
         )
         .join('\n\n')
-
 
     return m.reply(
 `╭━━━〔 📋 *SUGERENCIAS PENDIENTES* 〕━━━╮
@@ -664,27 +653,21 @@ ${lista}
         '❌ Solo el owner puede usar este comando.'
       )
 
-
     const total =
       global.db.data
         .sugerencias.length
 
-
     const pendientes =
       contarEstado('pendiente')
-
 
     const aceptadas =
       contarEstado('aceptada')
 
-
     const rechazadas =
       contarEstado('rechazada')
 
-
     const desarrollo =
       contarEstado('desarrollo')
-
 
     return m.reply(
 `╭━━━〔 📊 *ESTADÍSTICAS* 〕━━━╮
@@ -697,6 +680,101 @@ ${lista}
 ┃ 🔵 *En desarrollo:* ${desarrollo}
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━╯`
+    )
+  }
+
+
+  // ==========================================================
+  // 🗑️ .SUGCLEAR
+  // ELIMINAR TODAS LAS SUGERENCIAS
+  // ==========================================================
+
+  if (cmd === 'sugclear') {
+
+    // --------------------------------------------------------
+    // 👑 SOLO OWNER
+    // --------------------------------------------------------
+
+    if (!owner) {
+
+      return m.reply(
+        '❌ Solo el owner puede limpiar las sugerencias.'
+      )
+    }
+
+
+    // --------------------------------------------------------
+    // 📊 CANTIDAD ACTUAL
+    // --------------------------------------------------------
+
+    const cantidad =
+      global.db.data.sugerencias.length
+
+
+    // --------------------------------------------------------
+    // 📭 NADA PARA ELIMINAR
+    // --------------------------------------------------------
+
+    if (cantidad === 0) {
+
+      return m.reply(
+`╭━━━〔 📭 *SISTEMA LIMPIO* 〕━━━╮
+┃
+┃ No hay sugerencias guardadas.
+┃
+┃ ✅ El sistema ya se encuentra
+┃ completamente limpio.
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━╯`
+      )
+    }
+
+
+    // --------------------------------------------------------
+    // 🗑️ ELIMINAR TODAS
+    // --------------------------------------------------------
+
+    global.db.data.sugerencias = []
+
+
+    // --------------------------------------------------------
+    // 🧹 LIMPIAR COOLDOWNS
+    // --------------------------------------------------------
+
+    global.db.data.sugerenciasCooldown = {}
+
+
+    // --------------------------------------------------------
+    // 💾 GUARDAR CAMBIOS
+    // --------------------------------------------------------
+
+    await guardarDB()
+
+
+    // --------------------------------------------------------
+    // 🗑️ REACCIÓN
+    // --------------------------------------------------------
+
+    try {
+      await m.react('🗑️')
+    } catch {}
+
+
+    // --------------------------------------------------------
+    // ✅ CONFIRMACIÓN
+    // --------------------------------------------------------
+
+    return m.reply(
+`╭━━━〔 🗑️ *SUGERENCIAS LIMPIADAS* 〕━━━╮
+┃
+┃ 💡 *Eliminadas:* ${cantidad}
+┃
+┃ 🗑️ Se eliminaron todos los registros.
+┃ 🧹 Se limpiaron los cooldowns.
+┃
+┃ ✅ *Sistema de sugerencias limpio.*
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
     )
   }
 
@@ -716,22 +794,18 @@ ${lista}
         '❌ Solo el owner puede modificar sugerencias.'
       )
 
-
     if (!args)
       return m.reply(
         '📌 Debés indicar el ID.'
       )
 
-
     const sug =
       buscarSugerencia(args)
-
 
     if (!sug)
       return m.reply(
         '❌ No encontré ninguna sugerencia con ese ID.'
       )
-
 
     let estado
     let emoji
@@ -837,14 +911,10 @@ ${lista}
 
     // ========================================================
     // 📢 AVISAR EN EL GRUPO DE ORIGEN
-    // 🚫 NO SE ENVÍA AL PRIVADO
     // ========================================================
 
     try {
 
-      // 📌 Compatibilidad con sugerencias antiguas:
-      // si no tienen "chat", se usa el grupo de revisión
-      // para evitar errores.
       const chatOrigen =
         sug.chat ||
         SUG_GROUP
@@ -878,7 +948,7 @@ ${lista}
     } catch (e) {
 
       console.error(
-        '⚠️ No se pudo avisar en el grupo de origen:',
+        '⚠️ No se pudo avisar al grupo de origen:',
         e
       )
     }
@@ -910,13 +980,16 @@ handler.help = [
   'sugs',
   'sugaceptar <ID>',
   'sugrechazar <ID>',
-  'sugdesarrollo <ID>'
+  'sugdesarrollo <ID>',
+  'sugclear'
 ]
+
 
 handler.tags = [
   'info',
   'owner'
 ]
+
 
 handler.command = [
   'sug',
@@ -925,8 +998,10 @@ handler.command = [
   'sugs',
   'sugaceptar',
   'sugrechazar',
-  'sugdesarrollo'
+  'sugdesarrollo',
+  'sugclear'
 ]
+
 
 handler.group = false
 handler.limit = false

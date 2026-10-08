@@ -1,7 +1,7 @@
 // 📦 WhatsApp-Bot — Sistema PRO de Sugerencias
 // ============================================================
 // .sug <texto>              → enviar sugerencia
-// .suginfo <ID>            → consultar sugerencia
+// .suginfo <ID>             → consultar sugerencia
 // .suglist                  → ver pendientes
 // .sugs                     → estadísticas
 // .sugaceptar <ID>          → aceptar
@@ -12,6 +12,8 @@
 // 👤 El usuario NO ve el ID.
 // 👥 El grupo de revisión SÍ ve el ID.
 // 💾 Datos guardados en global.db
+// 📢 Las resoluciones se envían al grupo de origen
+// 🚫 NO se envían mensajes privados
 // ============================================================
 
 
@@ -19,7 +21,7 @@
 // ⚙️ CONFIGURACIÓN
 // ============================================================
 
-const SUG_GROUP = '120363429424906972@g.us'
+const SUG_GROUP = '120363410955044864@g.us'
 
 const COOLDOWN_TIME =
   24 * 60 * 60 * 1000
@@ -363,7 +365,7 @@ let handler = async (
       !owner &&
       ultimoEnvio &&
       transcurrido <
-        COOLDOWN_TIME
+      COOLDOWN_TIME
     ) {
 
       return m.reply(
@@ -399,6 +401,9 @@ let handler = async (
     // ========================================================
     // 📦 CREAR REGISTRO
     // ========================================================
+    // 📌 chat = grupo/chat donde se envió originalmente
+    //    la sugerencia. Se utilizará para avisar la resolución.
+    // ========================================================
 
     const registro = {
 
@@ -407,6 +412,8 @@ let handler = async (
       user: user,
 
       numero: numero,
+
+      chat: m.chat,
 
       texto: sugerencia,
 
@@ -489,7 +496,7 @@ let handler = async (
       // ======================================================
       // 👤 RESPUESTA AL USUARIO
       // 🚫 NO SE MUESTRA ID
-      // ======================================================
+      // ========================================================
 
       return m.reply(
 `╭━━━〔 ✅ *SUGERENCIA ENVIADA* 〕━━━╮
@@ -829,45 +836,64 @@ ${lista}
 
 
     // ========================================================
-    // 📩 AVISAR AL USUARIO
-    // 🚫 SIN ID
+    // 📢 AVISAR EN EL GRUPO DE ORIGEN
+    // 🚫 NO SE ENVÍA AL PRIVADO
     // ========================================================
 
     try {
 
+      // 📌 Compatibilidad con sugerencias antiguas:
+      // si no tienen "chat", se usa el grupo de revisión
+      // para evitar errores.
+      const chatOrigen =
+        sug.chat ||
+        SUG_GROUP
+
       await conn.sendMessage(
-        sug.user,
+        chatOrigen,
         {
           text:
 `╭━━━〔 ${emoji} *SUGERENCIA ACTUALIZADA* 〕━━━╮
 ┃
-┃ 💡 Tu sugerencia recibió
-┃ una actualización.
+┃ 👤 @${sug.numero}
+┃
+┃ 💡 *Tu sugerencia recibió
+┃ una actualización.*
 ┃
 ┃ ${emoji} *Estado:* ${nombre}
 ┃
-┃ 📝 ${sug.texto}
+┃ 📝 *Sugerencia:*
+┃ ${sug.texto}
 ┃
 ┃ 🐾 Gracias por ayudar
 ┃ a mejorar WhatsApp-Bot.
 ┃
-╰━━━━━━━━━━━━━━━━━━━━━━╯`
+╰━━━━━━━━━━━━━━━━━━━━━━╯`,
+
+          mentions:
+            [sug.user]
         }
       )
 
     } catch (e) {
 
       console.error(
-        '⚠️ No se pudo avisar al usuario:',
+        '⚠️ No se pudo avisar en el grupo de origen:',
         e
       )
     }
 
 
+    // ========================================================
+    // 💬 CONFIRMACIÓN AL OWNER
+    // ========================================================
+
     return m.reply(
 `${emoji} *Sugerencia actualizada correctamente.*
 
-📌 Estado: *${nombre}*`
+📌 Estado: *${nombre}*
+📢 Se avisó en el grupo donde fue enviada.
+👤 Se mencionó al usuario.`
     )
   }
 }
@@ -910,4 +936,4 @@ handler.limit = false
 // 📤 EXPORTAR
 // ============================================================
 
-export default handler 
+export default handler

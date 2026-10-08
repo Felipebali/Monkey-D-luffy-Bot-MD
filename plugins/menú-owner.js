@@ -5,7 +5,10 @@
 let handler = async (m, { conn }) => {
   try {
 
+    // ========================================================
     // 👑 REACCIÓN
+    // ========================================================
+
     await conn.sendMessage(
       m.chat,
       {
@@ -16,138 +19,202 @@ let handler = async (m, { conn }) => {
       }
     )
 
+
+    // ========================================================
     // 📅 FECHA Y HORA
+    // ========================================================
+
     const fecha = new Date().toLocaleString('es-UY', {
       timeZone: 'America/Montevideo',
       hour12: false
     })
 
-    // ==========================================================
-    // 📋 MENÚ DEL OWNER
-    // ==========================================================
+
+    // ========================================================
+    // 📋 PANEL DEL OWNER
+    // ========================================================
 
     const menuText = `
 ╭━━━〔 *👑 PANEL DEL DUEÑO* 〕━━━╮
-┃ 🤖 *WhatsApp-Bot – Control Total*
+┃ 🤖 *WhatsApp-Bot — Control Total*
 ┃ 📆 ${fecha}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-🖼️ *MULTIMEDIA / PERFIL*
+
+👥 *GESTIÓN DEL GRUPO*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• .gpu — Descargar foto de perfil de usuario 🧑🖼️
-• .gpo — Descargar foto del grupo 🏞️
+• .name <nombre>
+  └─ Cambiar el nombre del grupo ✏️
 
-🖼️ *GESTIÓN DE FOTOS*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-• .setpp
-  └─ Cambiar foto de perfil del bot 🤖🖼️
+• .nombre <nombre>
+  └─ Cambiar el nombre del grupo ✏️
 
 • .setpg
-  └─ Cambiar foto de perfil del grupo 👥🖼️
+  └─ Cambiar la foto del grupo 🖼️
+
+• .resetlink
+  └─ Restablecer/resetear el enlace del grupo 🔗
+
+• .join <link>
+  └─ Hacer que el bot se una a un grupo mediante un enlace 🔗
 
 
-🎖️ *GESTIÓN DE INSIGNIAS*
+🖼️ *FOTOS Y MULTIMEDIA*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• .otorgar @user <insignia>
-  └─ Otorgar una insignia 🏅
+• .gpu @user
+  └─ Obtener la foto de perfil de un usuario 🧑🖼️
 
-• .quitar @user <número>
-  └─ Quitar una insignia por número ❌
+• .gpo
+  └─ Obtener la foto de perfil del grupo 👥🖼️
 
-• .verinsignias @user
-  └─ Ver insignias del usuario 📋
+• .setpp
+  └─ Cambiar la foto de perfil del bot 🤖🖼️
 
-
-🚨 *ADVERTENCIAS PARA ADMINISTRADORES*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-• .admad @admin <motivo>
-  └─ Dar advertencia ⚠️
-
-• .unadmad @admin
-  └─ Quitar 1 advertencia 🟢
-
-• .listadmad
-  └─ Ver administradores advertidos 📋
-
-• .veradmad @admin
-  └─ Ver historial completo 🔎
-
-• .clearadmad
-  └─ Eliminar todas las advertencias 🧹
+• .setpg
+  └─ Cambiar la foto de perfil del grupo 👥🖼️
 
 
 👑 *GESTIÓN DE OWNERS*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .adowner @user
-  └─ Agregar usuario a global.owner ➕
+  └─ Agregar un usuario como owner del bot ➕
 
 • .rowner @user
-  └─ Quitar usuario de global.owner ➖
+  └─ Quitar un owner agregado del bot ➖
+
+• .clearowner
+  └─ Eliminar todos los owners agregados 🧹
+
+• .owners
+  └─ Ver la lista de owners agregados 📋
 
 
-🚫 *LISTA NEGRA*
+🎖️ *GESTIÓN DE INSIGNIAS*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• .otorgar @user <insignia>
+  └─ Otorgar una insignia a un usuario 🏅
+
+• .quitar @user <número>
+  └─ Quitar una insignia específica ❌
+
+• .verinsignias @user
+  └─ Ver las insignias de un usuario 📋
+
+
+🚨 *ADVERTENCIAS DE ADMINISTRADORES*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• .admad @admin <motivo>
+  └─ Dar una advertencia a un administrador ⚠️
+
+• .unadmad @admin
+  └─ Quitar una advertencia a un administrador 🟢
+
+• .listadmad
+  └─ Ver administradores que tienen advertencias 📋
+
+• .veradmad @admin
+  └─ Ver el historial de advertencias 🔎
+
+• .clearadmad
+  └─ Eliminar todas las advertencias de administradores 🧹
+
+
+🚫 *SEGURIDAD Y LISTA NEGRA*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .ln @user
-  └─ Agregar a lista negra ⚠️
+  └─ Agregar un usuario a la lista negra 🚫
 
 • .unln @user
-  └─ Quitar de lista negra ✅
+  └─ Quitar un usuario de la lista negra ✅
 
 • .vln
-  └─ Ver lista negra 📋
+  └─ Ver todos los usuarios en lista negra 📋
 
 • .clrn
-  └─ Limpiar lista negra 🗑️
+  └─ Limpiar completamente la lista negra 🗑️
 
 • .resetuser @user
-  └─ Reiniciar datos del usuario 🔄
+  └─ Reiniciar los datos del usuario 🔄
 
 
-⚙️ *GESTIÓN DEL BOT*
+💡 *SISTEMA DE SUGERENCIAS*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+• .suginfo <ID>
+  └─ Consultar una sugerencia específica 🔎
+
+• .suglist
+  └─ Ver las sugerencias pendientes 📋
+
+• .sugs
+  └─ Ver estadísticas de sugerencias 📊
+
+• .sugaceptar <ID>
+  └─ Aceptar una sugerencia 🟢
+
+• .sugrechazar <ID>
+  └─ Rechazar una sugerencia 🔴
+
+• .sugdesarrollo <ID>
+  └─ Marcar una sugerencia en desarrollo 🔵
+
+
+⚙️ *CONFIGURACIÓN DEL BOT*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• .setcmd
+  └─ Configurar comandos del bot ⚙️
+
+• .setprefix
+  └─ Cambiar el prefijo del bot ✏️
+
 • .restart
-  └─ Reiniciar el bot 🔁
+  └─ Reiniciar el bot 🔄
 
 • .update
   └─ Actualizar el bot 🆙
 
-• .exec / .exec2
-  └─ Ejecutar código 💻
 
-• .setcmd
-  └─ Configurar comandos ⚙️
+💻 *CONTROL AVANZADO*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• .setprefix
-  └─ Cambiar prefijo ✏️
+• .exec
+  └─ Ejecutar código en el bot 💻
 
-• .join <link>
-  └─ Unirse a un grupo 🔗
-
-• .resetlink
-  └─ Resetear link del grupo ♻️
+• .exec2
+  └─ Ejecutar código mediante el sistema alternativo 💻
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👑 *WHATSAPP-BOT — PROPIETARIO SUPREMO*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💠 Control total del sistema.
+💠 Control total del bot.
+💠 Gestión de grupos.
 💠 Gestión de owners.
 💠 Gestión de administradores.
+💠 Gestión de usuarios.
 💠 Gestión de seguridad.
-💠 Gestión de perfiles y grupos.
+💠 Gestión de sugerencias.
+💠 Gestión de configuración.
+
+🔐 *Todos los comandos de este panel
+son exclusivos para Owners.*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `.trim()
 
+
+    // ========================================================
     // 📤 ENVIAR MENÚ
+    // ========================================================
+
     await conn.sendMessage(
       m.chat,
       {
@@ -158,9 +225,13 @@ let handler = async (m, { conn }) => {
       }
     )
 
+
   } catch (e) {
 
-    console.error('❌ Error en menu-owner:', e)
+    console.error(
+      '❌ Error en menu-owner:',
+      e
+    )
 
     await m.reply(
       '✖️ Ocurrió un error al mostrar el menú del dueño.'

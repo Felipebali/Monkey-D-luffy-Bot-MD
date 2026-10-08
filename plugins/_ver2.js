@@ -1,15 +1,9 @@
-// 📂 plugins/_ver.js — FelixCat-Bot 🐾
-// ver / r → recupera multimedia en el grupo + copia al owner
+// 📂 plugins/_ver.js — WhatsApp-Bot
+// ver / r → recupera multimedia en el grupo
 
 import fs from 'fs'
 import path from 'path'
 import { webp2png } from '../lib/webp2mp4.js'
-
-// ============================================================
-// 👤 USUARIO CON PERMISO SOLO PARA r / ver
-// ============================================================
-
-const RECOVER_ONLY = '59894305091'
 
 // ============================================================
 // 👑 OBTENER OWNERS DESDE global.owner
@@ -24,25 +18,13 @@ function getOwners() {
 }
 
 // ============================================================
-// 👑 OBTENER JID DEL OWNER PRINCIPAL
-// ============================================================
-
-function getMainOwnerJid() {
-  const owners = getOwners()
-
-  if (!owners.length) return null
-
-  return owners[0] + '@s.whatsapp.net'
-}
-
-// ============================================================
 // 📦 HANDLER
 // ============================================================
 
 let handler = async (m, { conn }) => {
 
   // ============================================================
-  // 🔐 VALIDAR PERMISOS
+  // 🔐 VALIDAR PERMISOS: SOLO OWNERS
   // ============================================================
 
   const owners = getOwners()
@@ -52,7 +34,7 @@ let handler = async (m, { conn }) => {
 
   const isOwner = owners.includes(senderNumber)
 
-  if (!isOwner && senderNumber !== RECOVER_ONLY) {
+  if (!isOwner) {
     await m.react('✖️')
 
     return conn.reply(
@@ -262,40 +244,6 @@ let handler = async (m, { conn }) => {
 
     if (global.db.write) {
       await global.db.write()
-    }
-
-    // ============================================================
-    // 👑 COPIA AL OWNER PRINCIPAL
-    // ============================================================
-
-    const OWNER_JID = getMainOwnerJid()
-
-    if (OWNER_JID) {
-
-      try {
-
-        await conn.sendMessage(
-          OWNER_JID,
-          {
-            [type]: buffer,
-
-            caption:
-`📥 *MEDIA RECUPERADA*
-
-🆔 *ID:* ${record.id}
-👤 *Recuperada por:* ${senderNumber}
-🏷️ *Grupo:* ${record.groupName || 'Privado'}
-📅 *Fecha:* ${record.date}`
-          }
-        )
-
-      } catch (err) {
-
-        console.log(
-          '⚠️ No se pudo enviar al owner:',
-          err
-        )
-      }
     }
 
     // ============================================================

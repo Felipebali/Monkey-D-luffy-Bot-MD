@@ -35,177 +35,177 @@ let handler = async (m, { conn }) => {
     // ========================================================
 
     const menuText = `
-╭━━━〔 *👑 PANEL DEL DUEÑO* 〕━━━╮
-┃ 🤖 *WhatsApp-Bot — Control Total*
+╭━━━〔 *👑 𝐏𝐀𝐍𝐄𝐋 𝐃𝐄𝐋 𝐃𝐔𝐄Ñ𝐎* 〕━━━╮
+┃ 🤖 *𝐖𝐡𝐚𝐭𝐬𝐀𝐩𝐩-𝐁𝐨𝐭 — 𝐂𝐨𝐧𝐭𝐫𝐨𝐥 𝐓𝐨𝐭𝐚𝐥*
 ┃ 📆 ${fecha}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 
-👥 *GESTIÓN DEL GRUPO*
+👥 *𝐆𝐄𝐒𝐓𝐈Ó𝐍 𝐃𝐄𝐋 𝐆𝐑𝐔𝐏𝐎*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .name <nombre>
-  └─ Cambiar el nombre del grupo ✏️
+  └─ 𝐂𝐚𝐦𝐛𝐢𝐚𝐫 𝐞𝐥 𝐧𝐨𝐦𝐛𝐫𝐞 𝐝𝐞𝐥 𝐠𝐫𝐮𝐩𝐨 ✏️
 
 • .nombre <nombre>
-  └─ Cambiar el nombre del grupo ✏️
+  └─ 𝐂𝐚𝐦𝐛𝐢𝐚𝐫 𝐞𝐥 𝐧𝐨𝐦𝐛𝐫𝐞 𝐝𝐞𝐥 𝐠𝐫𝐮𝐩𝐨 ✏️
 
 • .setpg
-  └─ Cambiar la foto del grupo 🖼️
+  └─ 𝐂𝐚𝐦𝐛𝐢𝐚𝐫 𝐥𝐚 𝐟𝐨𝐭𝐨 𝐝𝐞𝐥 𝐠𝐫𝐮𝐩𝐨 🖼️
 
 • .resetlink
-  └─ Restablecer/resetear el enlace del grupo 🔗
+  └─ 𝐑𝐞𝐬𝐭𝐚𝐛𝐥𝐞𝐜𝐞𝐫 𝐞𝐥 𝐞𝐧𝐥𝐚𝐜𝐞 𝐝𝐞𝐥 𝐠𝐫𝐮𝐩𝐨 🔗
 
 • .join <link>
-  └─ Hacer que el bot se una a un grupo mediante un enlace 🔗
+  └─ 𝐇𝐚𝐜𝐞𝐫 𝐪𝐮𝐞 𝐞𝐥 𝐛𝐨𝐭 𝐬𝐞 𝐮𝐧𝐚 𝐚 𝐮𝐧 𝐠𝐫𝐮𝐩𝐨 🔗
 
 
-🖼️ *FOTOS Y MULTIMEDIA*
+🖼️ *𝐅𝐎𝐓𝐎𝐒 𝐘 𝐌𝐔𝐋𝐓𝐈𝐌𝐄𝐃𝐈𝐀*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .gpu @user
-  └─ Obtener la foto de perfil de un usuario 🧑🖼️
+  └─ 𝐎𝐛𝐭𝐞𝐧𝐞𝐫 𝐥𝐚 𝐟𝐨𝐭𝐨 𝐝𝐞 𝐩𝐞𝐫𝐟𝐢𝐥 𝐝𝐞 𝐮𝐧 𝐮𝐬𝐮𝐚𝐫𝐢𝐨 🧑🖼️
 
 • .gpo
-  └─ Obtener la foto de perfil del grupo 👥🖼️
+  └─ 𝐎𝐛𝐭𝐞𝐧𝐞𝐫 𝐥𝐚 𝐟𝐨𝐭𝐨 𝐝𝐞𝐥 𝐠𝐫𝐮𝐩𝐨 👥🖼️
 
 • .setpp
-  └─ Cambiar la foto de perfil del bot 🤖🖼️
+  └─ 𝐂𝐚𝐦𝐛𝐢𝐚𝐫 𝐥𝐚 𝐟𝐨𝐭𝐨 𝐝𝐞 𝐩𝐞𝐫𝐟𝐢𝐥 𝐝𝐞𝐥 𝐛𝐨𝐭 🤖🖼️
 
 • .setpg
-  └─ Cambiar la foto de perfil del grupo 👥🖼️
+  └─ 𝐂𝐚𝐦𝐛𝐢𝐚𝐫 𝐥𝐚 𝐟𝐨𝐭𝐨 𝐝𝐞𝐥 𝐠𝐫𝐮𝐩𝐨 👥🖼️
 
 
-👑 *GESTIÓN DE OWNERS*
+👑 *𝐆𝐄𝐒𝐓𝐈Ó𝐍 𝐃𝐄 𝐎𝐖𝐍𝐄𝐑𝐒*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .adowner @user
-  └─ Agregar un usuario como owner del bot ➕
+  └─ 𝐀𝐠𝐫𝐞𝐠𝐚𝐫 𝐮𝐧 𝐮𝐬𝐮𝐚𝐫𝐢𝐨 𝐜𝐨𝐦𝐨 𝐨𝐰𝐧𝐞𝐫 ➕
 
 • .rowner @user
-  └─ Quitar un owner agregado del bot ➖
+  └─ 𝐐𝐮𝐢𝐭𝐚𝐫 𝐮𝐧 𝐨𝐰𝐧𝐞𝐫 𝐚𝐠𝐫𝐞𝐠𝐚𝐝𝐨 ➖
 
 • .clearowner
-  └─ Eliminar todos los owners agregados 🧹
+  └─ 𝐄𝐥𝐢𝐦𝐢𝐧𝐚𝐫 𝐭𝐨𝐝𝐨𝐬 𝐥𝐨𝐬 𝐨𝐰𝐧𝐞𝐫𝐬 𝐚𝐠𝐫𝐞𝐠𝐚𝐝𝐨𝐬 🧹
 
 • .owners
-  └─ Ver la lista de owners agregados 📋
+  └─ 𝐕𝐞𝐫 𝐥𝐚 𝐥𝐢𝐬𝐭𝐚 𝐝𝐞 𝐨𝐰𝐧𝐞𝐫𝐬 𝐚𝐠𝐫𝐞𝐠𝐚𝐝𝐨𝐬 📋
 
 
-🎖️ *GESTIÓN DE INSIGNIAS*
+🎖️ *𝐆𝐄𝐒𝐓𝐈Ó𝐍 𝐃𝐄 𝐈𝐍𝐒𝐈𝐆𝐍𝐈𝐀𝐒*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .otorgar @user <insignia>
-  └─ Otorgar una insignia a un usuario 🏅
+  └─ 𝐎𝐭𝐨𝐫𝐠𝐚𝐫 𝐮𝐧𝐚 𝐢𝐧𝐬𝐢𝐠𝐧𝐢𝐚 𝐚 𝐮𝐧 𝐮𝐬𝐮𝐚𝐫𝐢𝐨 🏅
 
 • .quitar @user <número>
-  └─ Quitar una insignia específica ❌
+  └─ 𝐐𝐮𝐢𝐭𝐚𝐫 𝐮𝐧𝐚 𝐢𝐧𝐬𝐢𝐠𝐧𝐢𝐚 ❌
 
 • .verinsignias @user
-  └─ Ver las insignias de un usuario 📋
+  └─ 𝐕𝐞𝐫 𝐥𝐚𝐬 𝐢𝐧𝐬𝐢𝐠𝐧𝐢𝐚𝐬 𝐝𝐞 𝐮𝐧 𝐮𝐬𝐮𝐚𝐫𝐢𝐨 📋
 
 
-🚨 *ADVERTENCIAS DE ADMINISTRADORES*
+🚨 *𝐀𝐃𝐕𝐄𝐑𝐓𝐄𝐍𝐂𝐈𝐀𝐒 𝐃𝐄 𝐀𝐃𝐌𝐈𝐍𝐈𝐒𝐓𝐑𝐀𝐃𝐎𝐑𝐄𝐒*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .admad @admin <motivo>
-  └─ Dar una advertencia a un administrador ⚠️
+  └─ 𝐃𝐚𝐫 𝐮𝐧𝐚 𝐚𝐝𝐯𝐞𝐫𝐭𝐞𝐧𝐜𝐢𝐚 ⚠️
 
 • .unadmad @admin
-  └─ Quitar una advertencia a un administrador 🟢
+  └─ 𝐐𝐮𝐢𝐭𝐚𝐫 𝐮𝐧𝐚 𝐚𝐝𝐯𝐞𝐫𝐭𝐞𝐧𝐜𝐢𝐚 🟢
 
 • .listadmad
-  └─ Ver administradores que tienen advertencias 📋
+  └─ 𝐕𝐞𝐫 𝐥𝐨𝐬 𝐚𝐝𝐦𝐢𝐧𝐢𝐬𝐭𝐫𝐚𝐝𝐨𝐫𝐞𝐬 𝐚𝐝𝐯𝐞𝐫𝐭𝐢𝐝𝐨𝐬 📋
 
 • .veradmad @admin
-  └─ Ver el historial de advertencias 🔎
+  └─ 𝐕𝐞𝐫 𝐞𝐥 𝐡𝐢𝐬𝐭𝐨𝐫𝐢𝐚𝐥 𝐝𝐞 𝐚𝐝𝐯𝐞𝐫𝐭𝐞𝐧𝐜𝐢𝐚𝐬 🔎
 
 • .clearadmad
-  └─ Eliminar todas las advertencias de administradores 🧹
+  └─ 𝐄𝐥𝐢𝐦𝐢𝐧𝐚𝐫 𝐭𝐨𝐝𝐚𝐬 𝐥𝐚𝐬 𝐚𝐝𝐯𝐞𝐫𝐭𝐞𝐧𝐜𝐢𝐚𝐬 🧹
 
 
-🚫 *SEGURIDAD Y LISTA NEGRA*
+🚫 *𝐒𝐄𝐆𝐔𝐑𝐈𝐃𝐀𝐃 𝐘 𝐋𝐈𝐒𝐓𝐀 𝐍𝐄𝐆𝐑𝐀*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .ln @user
-  └─ Agregar un usuario a la lista negra 🚫
+  └─ 𝐀𝐠𝐫𝐞𝐠𝐚𝐫 𝐮𝐧 𝐮𝐬𝐮𝐚𝐫𝐢𝐨 𝐚 𝐥𝐚 𝐥𝐢𝐬𝐭𝐚 𝐧𝐞𝐠𝐫𝐚 🚫
 
 • .unln @user
-  └─ Quitar un usuario de la lista negra ✅
+  └─ 𝐐𝐮𝐢𝐭𝐚𝐫 𝐮𝐧 𝐮𝐬𝐮𝐚𝐫𝐢𝐨 𝐝𝐞 𝐥𝐚 𝐥𝐢𝐬𝐭𝐚 𝐧𝐞𝐠𝐫𝐚 ✅
 
 • .vln
-  └─ Ver todos los usuarios en lista negra 📋
+  └─ 𝐕𝐞𝐫 𝐥𝐚 𝐥𝐢𝐬𝐭𝐚 𝐧𝐞𝐠𝐫𝐚 📋
 
 • .clrn
-  └─ Limpiar completamente la lista negra 🗑️
+  └─ 𝐋𝐢𝐦𝐩𝐢𝐚𝐫 𝐥𝐚 𝐥𝐢𝐬𝐭𝐚 𝐧𝐞𝐠𝐫𝐚 🗑️
 
 • .resetuser @user
-  └─ Reiniciar los datos del usuario 🔄
+  └─ 𝐑𝐞𝐢𝐧𝐢𝐜𝐢𝐚𝐫 𝐥𝐨𝐬 𝐝𝐚𝐭𝐨𝐬 𝐝𝐞𝐥 𝐮𝐬𝐮𝐚𝐫𝐢𝐨 🔄
 
 
-💡 *SISTEMA DE SUGERENCIAS*
+💡 *𝐒𝐈𝐒𝐓𝐄𝐌𝐀 𝐃𝐄 𝐒𝐔𝐆𝐄𝐑𝐄𝐍𝐂𝐈𝐀𝐒*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .suginfo <ID>
-  └─ Consultar una sugerencia específica 🔎
+  └─ 𝐂𝐨𝐧𝐬𝐮𝐥𝐭𝐚𝐫 𝐮𝐧𝐚 𝐬𝐮𝐠𝐞𝐫𝐞𝐧𝐜𝐢𝐚 🔎
 
 • .suglist
-  └─ Ver las sugerencias pendientes 📋
+  └─ 𝐕𝐞𝐫 𝐥𝐚𝐬 𝐬𝐮𝐠𝐞𝐫𝐞𝐧𝐜𝐢𝐚𝐬 𝐩𝐞𝐧𝐝𝐢𝐞𝐧𝐭𝐞𝐬 📋
 
 • .sugs
-  └─ Ver estadísticas de sugerencias 📊
+  └─ 𝐕𝐞𝐫 𝐥𝐚𝐬 𝐞𝐬𝐭𝐚𝐝í𝐬𝐭𝐢𝐜𝐚𝐬 𝐝𝐞 𝐬𝐮𝐠𝐞𝐫𝐞𝐧𝐜𝐢𝐚𝐬 📊
 
 • .sugaceptar <ID>
-  └─ Aceptar una sugerencia 🟢
+  └─ 𝐀𝐜𝐞𝐩𝐭𝐚𝐫 𝐮𝐧𝐚 𝐬𝐮𝐠𝐞𝐫𝐞𝐧𝐜𝐢𝐚 🟢
 
 • .sugrechazar <ID>
-  └─ Rechazar una sugerencia 🔴
+  └─ 𝐑𝐞𝐜𝐡𝐚𝐳𝐚𝐫 𝐮𝐧𝐚 𝐬𝐮𝐠𝐞𝐫𝐞𝐧𝐜𝐢𝐚 🔴
 
 • .sugdesarrollo <ID>
-  └─ Marcar una sugerencia en desarrollo 🔵
+  └─ 𝐌𝐚𝐫𝐜𝐚𝐫 𝐮𝐧𝐚 𝐬𝐮𝐠𝐞𝐫𝐞𝐧𝐜𝐢𝐚 𝐞𝐧 𝐝𝐞𝐬𝐚𝐫𝐫𝐨𝐥𝐥𝐨 🔵
 
 
-⚙️ *CONFIGURACIÓN DEL BOT*
+⚙️ *𝐂𝐎𝐍𝐅𝐈𝐆𝐔𝐑𝐀𝐂𝐈Ó𝐍 𝐃𝐄𝐋 𝐁𝐎𝐓*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .setcmd
-  └─ Configurar comandos del bot ⚙️
+  └─ 𝐂𝐨𝐧𝐟𝐢𝐠𝐮𝐫𝐚𝐫 𝐥𝐨𝐬 𝐜𝐨𝐦𝐚𝐧𝐝𝐨𝐬 𝐝𝐞𝐥 𝐛𝐨𝐭 ⚙️
 
 • .setprefix
-  └─ Cambiar el prefijo del bot ✏️
+  └─ 𝐂𝐚𝐦𝐛𝐢𝐚𝐫 𝐞𝐥 𝐩𝐫𝐞𝐟𝐢𝐣𝐨 𝐝𝐞𝐥 𝐛𝐨𝐭 ✏️
 
 • .restart
-  └─ Reiniciar el bot 🔄
+  └─ 𝐑𝐞𝐢𝐧𝐢𝐜𝐢𝐚𝐫 𝐞𝐥 𝐛𝐨𝐭 🔄
 
 • .update
-  └─ Actualizar el bot 🆙
+  └─ 𝐀𝐜𝐭𝐮𝐚𝐥𝐢𝐳𝐚𝐫 𝐞𝐥 𝐛𝐨𝐭 🆙
 
 
-💻 *CONTROL AVANZADO*
+💻 *𝐂𝐎𝐍𝐓𝐑𝐎𝐋 𝐀𝐕𝐀𝐍𝐙𝐀𝐃𝐎*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • .exec
-  └─ Ejecutar código en el bot 💻
+  └─ 𝐄𝐣𝐞𝐜𝐮𝐭𝐚𝐫 𝐜ó𝐝𝐢𝐠𝐨 𝐞𝐧 𝐞𝐥 𝐛𝐨𝐭 💻
 
 • .exec2
-  └─ Ejecutar código mediante el sistema alternativo 💻
+  └─ 𝐄𝐣𝐞𝐜𝐮𝐭𝐚𝐫 𝐜ó𝐝𝐢𝐠𝐨 𝐦𝐞𝐝𝐢𝐚𝐧𝐭𝐞 𝐞𝐥 𝐬𝐢𝐬𝐭𝐞𝐦𝐚 𝐚𝐥𝐭𝐞𝐫𝐧𝐚𝐭𝐢𝐯𝐨 💻
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👑 *WHATSAPP-BOT — PROPIETARIO SUPREMO*
+👑 *𝐖𝐇𝐀𝐓𝐒𝐀𝐏𝐏-𝐁𝐎𝐓 — 𝐏𝐑𝐎𝐏𝐈𝐄𝐓𝐀𝐑𝐈𝐎 𝐒𝐔𝐏𝐑𝐄𝐌𝐎*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💠 Control total del bot.
-💠 Gestión de grupos.
-💠 Gestión de owners.
-💠 Gestión de administradores.
-💠 Gestión de usuarios.
-💠 Gestión de seguridad.
-💠 Gestión de sugerencias.
-💠 Gestión de configuración.
+💠 𝐂𝐨𝐧𝐭𝐫𝐨𝐥 𝐭𝐨𝐭𝐚𝐥 𝐝𝐞𝐥 𝐛𝐨𝐭.
+💠 𝐆𝐞𝐬𝐭𝐢ó𝐧 𝐝𝐞 𝐠𝐫𝐮𝐩𝐨𝐬.
+💠 𝐆𝐞𝐬𝐭𝐢ó𝐧 𝐝𝐞 𝐨𝐰𝐧𝐞𝐫𝐬.
+💠 𝐆𝐞𝐬𝐭𝐢ó𝐧 𝐝𝐞 𝐚𝐝𝐦𝐢𝐧𝐢𝐬𝐭𝐫𝐚𝐝𝐨𝐫𝐞𝐬.
+💠 𝐆𝐞𝐬𝐭𝐢ó𝐧 𝐝𝐞 𝐮𝐬𝐮𝐚𝐫𝐢𝐨𝐬.
+💠 𝐆𝐞𝐬𝐭𝐢ó𝐧 𝐝𝐞 𝐬𝐞𝐠𝐮𝐫𝐢𝐝𝐚𝐝.
+💠 𝐆𝐞𝐬𝐭𝐢ó𝐧 𝐝𝐞 𝐬𝐮𝐠𝐞𝐫𝐞𝐧𝐜𝐢𝐚𝐬.
+💠 𝐆𝐞𝐬𝐭𝐢ó𝐧 𝐝𝐞 𝐜𝐨𝐧𝐟𝐢𝐠𝐮𝐫𝐚𝐜𝐢ó𝐧.
 
-🔐 *Todos los comandos de este panel
-son exclusivos para Owners.*
+🔐 *𝐓𝐨𝐝𝐨𝐬 𝐥𝐨𝐬 𝐜𝐨𝐦𝐚𝐧𝐝𝐨𝐬 𝐝𝐞 𝐞𝐬𝐭𝐞 𝐩𝐚𝐧𝐞𝐥
+𝐬𝐨𝐧 𝐞𝐱𝐜𝐥𝐮𝐬𝐢𝐯𝐨𝐬 𝐩𝐚𝐫𝐚 𝐎𝐰𝐧𝐞𝐫𝐬.*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `.trim()

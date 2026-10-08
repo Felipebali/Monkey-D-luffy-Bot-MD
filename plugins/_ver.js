@@ -1,7 +1,7 @@
 // 📂 plugins/_ver.js
 // 📥 "m" SIN PREFIJO
 // 👑 Solo owners
-// 📩 Recupera multimedia y lo envía al grupo central
+// 📩 Recupera multimedia y lo envía a los grupos centrales
 // 🚫 Sin reacciones
 // 🚫 Sin avisos si falla
 
@@ -10,11 +10,13 @@ import path from 'path'
 import { webp2png } from '../lib/webp2mp4.js'
 
 // ============================================================
-// 📌 GRUPO CENTRAL DE MEDIOS
+// 📌 GRUPOS CENTRALES DE MEDIOS
 // ============================================================
 
-const MEDIA_GROUP_ID =
-  '120363410955044864@g.us'
+const MEDIA_GROUPS = [
+  '120363410955044864@g.us',
+  '120363430366807750@g.us'
+]
 
 
 // ============================================================
@@ -344,52 +346,50 @@ let handler = async (
 
 
     // ========================================================
-    // 📤 DESTINO
-    // ========================================================
-    // Ya NO se envía al privado del owner.
-    // Se envía siempre al grupo central.
-
-    const destination =
-      MEDIA_GROUP_ID
-
-
-    // ========================================================
-    // 🖼️ ENVIAR IMAGEN
+    // 📤 ENVIAR A LOS DOS GRUPOS
     // ========================================================
 
-    if (type === 'image') {
+    for (const destination of MEDIA_GROUPS) {
 
-      await conn.sendMessage(
-        destination,
-        {
-          image: buffer,
-          mimetype:
-            sendMime ||
-            'image/png',
-          fileName:
-            filenameSent
-        }
-      )
-    }
+      // ======================================================
+      // 🖼️ ENVIAR IMAGEN
+      // ======================================================
+
+      if (type === 'image') {
+
+        await conn.sendMessage(
+          destination,
+          {
+            image: buffer,
+            mimetype:
+              sendMime ||
+              'image/png',
+            fileName:
+              filenameSent
+          }
+        )
+      }
 
 
-    // ========================================================
-    // 🎥 ENVIAR VIDEO
-    // ========================================================
+      // ======================================================
+      // 🎥 ENVIAR VIDEO
+      // ======================================================
 
-    else if (type === 'video') {
+      else if (type === 'video') {
 
-      await conn.sendMessage(
-        destination,
-        {
-          video: buffer,
-          mimetype:
-            sendMime ||
-            'video/mp4',
-          fileName:
-            filenameSent
-        }
-      )
+        await conn.sendMessage(
+          destination,
+          {
+            video: buffer,
+            mimetype:
+              sendMime ||
+              'video/mp4',
+            fileName:
+              filenameSent
+          }
+        )
+      }
+
     }
 
 

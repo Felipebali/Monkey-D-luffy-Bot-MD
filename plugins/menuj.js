@@ -1,72 +1,187 @@
-// 📂 plugins/menuj.js — FelixCat_Bot
+// 📂 plugins/menuj.js — WhatsApp-Bot
+// ============================================================
+// 🎮 MENÚ DE MINI-JUEGOS
+// ============================================================
 
 let handler = async (m, { conn }) => {
   try {
 
-    const chatSettings = global.db.data.chats[m.chat] || {}
-    const gamesEnabled = chatSettings.games !== false
+    const chatSettings =
+      global.db.data.chats[m.chat] || {}
 
-    let menuText = [
-      '╔════════════════════════╗',
-      '🎮  MINI-JUEGOS WHATSAPP-BOT🐾',
-      '╚════════════════════════╝',
-      'Estado: ' + (gamesEnabled ? '🟢 Activados' : '🔴 Desactivados'),
-      '────────────────────────────'
-    ].join('\n')
+    const gamesEnabled =
+      chatSettings.games !== false
+
+
+    // ========================================================
+    // 🎮 ENCABEZADO
+    // ========================================================
+
+    let menuText = `╭━━━〔 🎮 *MINI-JUEGOS* 〕━━━╮
+┃
+┃ 🎲 *MENÚ DE JUEGOS*
+┃ 📱 WhatsApp-Bot
+┃
+┃ ⚙️ *Estado:* ${
+      gamesEnabled
+        ? '🟢 Activados'
+        : '🔴 Desactivados'
+    }
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
+
+
+    // ========================================================
+    // 🟢 JUEGOS ACTIVADOS
+    // ========================================================
 
     if (gamesEnabled) {
 
-      menuText += '\n' + [
-        '',
-        '🌟 *Juego Especial y Viral:*',
-        '🐾 *.therian* → Descubre tu animal interior PRO 🐲✨',
-        '────────────────────────────',
-        '',
-        '🎲 *Juegos Disponibles:*',
-        '',
-        '✊✋✌️ *.ppt <@user>* → Piedra, papel o tijera',
-        '💃🕺 *.dance <@user>* → Bailar con amigo',
-        '🌍 *.bandera* → Adivina la bandera',
-        '😸 *.adivinanza* → Resuelve adivinanzas',
-        '🏛️ *.capital* → Adivina la capital de un país',
-        '🎯 *.trivia* → Preguntas de cultura general',
-        '✨ *.consejo* → Te da un consejo aleatorio',
-        '💭 *.pensar <pregunta>* → Bola mágica que responde tu pregunta',
-        '🔢 *.numero* → Genera un número aleatorio',
-        '🎲 *.mayormenor* → Juego de Mayor o Menor',
-        '👑 *.top10* → Top 10 divertidos del grupo',
-        '🍽️ *.plato* → Adivina la opción correcta',
-        '❤️ *.match* → Empareja dos personas al azar 💞',
-        '💢 *.enemigo* → Enfrenta a dos personas al azar 😾',
-        '🏳️‍🌈 *.gay* → Descubre quién es el más gay del grupo',
-        '😻 *.lindo* → El bot elige al más lindo del grupo',
-        '💋 *.linda* → El bot elige a la más linda del grupo',
-        '😹 *.feo* → El bot elige al más feo del grupo',
-        '🙈 *.fea* → El bot elige a la más fea del grupo',
-        '────────────────────────────',
-        '',
-        '💅 *.trolo <@user>* → Test de trolez',
-        '🧢 *.cornudo <@user>* / *.cornuda <@user>* → Test de cornudez',
-        '💚 *.fiel <@user>* → Test de fidelidad',
-        '💔 *.infiel <@user>* → Test de infidelidad',
-        '🔥 *.zorra <@user>* / *.zorro <@user>* → Test de zorreada',
-        '😈 *.puta <@user>* → Comando divertido',
-        '😂 *.puto <@user>* → Comando divertido',
-        '🎉 *.sortear [premio]* → Sortea participantes del grupo',
-        '────────────────────────────'
-      ].join('\n')
+      menuText += `
+
+╭━━━〔 🌟 *ESPECIAL* 〕━━━╮
+┃
+┃ 🔮 *.aura <@usuario>*
+┃ └─ Descubre tu aura,
+┃    rango y estadísticas.
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━〔 🎲 *JUEGOS* 〕━━━╮
+┃
+┃ ✊ *.ppt <@usuario>*
+┃ └─ Piedra, papel o tijera
+┃
+┃ 💃 *.dance <@usuario>*
+┃ └─ Baila con un amigo
+┃
+┃ 🌍 *.bandera*
+┃ └─ Adivina la bandera
+┃
+┃ 😸 *.adivinanza*
+┃ └─ Resuelve una adivinanza
+┃
+┃ 🏛️ *.capital*
+┃ └─ Adivina la capital
+┃
+┃ 🎯 *.trivia*
+┃ └─ Preguntas de cultura general
+┃
+┃ ✨ *.consejo*
+┃ └─ Consejo aleatorio
+┃
+┃ 💭 *.pensar <pregunta>*
+┃ └─ Bola mágica
+┃
+┃ 🔢 *.numero*
+┃ └─ Número aleatorio
+┃
+┃ 🎲 *.mayormenor*
+┃ └─ Mayor o Menor
+┃
+┃ 👑 *.top10*
+┃ └─ Top 10 del grupo
+┃
+┃ 🍽️ *.plato*
+┃ └─ Adivina la opción correcta
+┃
+┃ ❤️ *.match*
+┃ └─ Empareja dos personas
+┃
+┃ 💢 *.enemigo*
+┃ └─ Enfrenta dos personas
+┃
+┃ 🏳️‍🌈 *.gay*
+┃ └─ Juego del grupo
+┃
+┃ 😻 *.lindo*
+┃ └─ El bot elige uno
+┃
+┃ 💋 *.linda*
+┃ └─ El bot elige una
+┃
+┃ 😹 *.feo*
+┃ └─ El bot elige uno
+┃
+┃ 🙈 *.fea*
+┃ └─ El bot elige una
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━〔 💅 *TESTS* 〕━━━╮
+┃
+┃ 💅 *.trolo <@usuario>*
+┃ └─ Test de trolez
+┃
+┃ 🧢 *.cornudo <@usuario>*
+┃ └─ Test de cornudez
+┃
+┃ 🧢 *.cornuda <@usuario>*
+┃ └─ Test de cornudez
+┃
+┃ 💚 *.fiel <@usuario>*
+┃ └─ Test de fidelidad
+┃
+┃ 💔 *.infiel <@usuario>*
+┃ └─ Test de infidelidad
+┃
+┃ 🔥 *.zorra <@usuario>*
+┃ └─ Test de zorreada
+┃
+┃ 🔥 *.zorro <@usuario>*
+┃ └─ Test de zorreada
+┃
+┃ 😈 *.puta <@usuario>*
+┃ └─ Comando divertido
+┃
+┃ 😂 *.puto <@usuario>*
+┃ └─ Comando divertido
+┃
+┃ 🎉 *.sortear [premio]*
+┃ └─ Sortea participantes
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
 
     } else {
 
-      menuText += '\n' + [
-        '',
-        '⚠️ *Mini-juegos desactivados.*',
-        'Menciona a un admin para activarlos 🔴',
-        '────────────────────────────'
-      ].join('\n')
+      // ======================================================
+      // 🔴 JUEGOS DESACTIVADOS
+      // ======================================================
+
+      menuText += `
+
+╭━━━〔 ⚠️ *MINI-JUEGOS* 〕━━━╮
+┃
+┃ 🔴 *Estado:* Desactivados
+┃
+┃ Los mini-juegos están
+┃ desactivados en este grupo.
+┃
+┃ 🔓 Un administrador puede
+┃ activarlos con:
+┃
+┃    *.juegos*
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
+
     }
 
-    menuText += '\n👑 *Powered by WhatsApp-Bot 🐾*'
+
+    // ========================================================
+    // 📌 PIE DEL MENÚ
+    // ========================================================
+
+    menuText += `
+
+╭━━━━━━━━━━━━━━━━━━━━╮
+┃ 🎮 *MINI-JUEGOS*
+┃ ⚡ ¡Elegí un comando y jugá!
+╰━━━━━━━━━━━━━━━━━━━━╯`
+
+
+    // ========================================================
+    // 📤 ENVIAR
+    // ========================================================
 
     await conn.sendMessage(
       m.chat,
@@ -80,15 +195,24 @@ let handler = async (m, { conn }) => {
 
   } catch (e) {
 
-    console.error(e)
+    console.error(
+      '❌ Error en menuj:',
+      e
+    )
 
     await conn.reply(
       m.chat,
-      '✖️ Error al mostrar el menú de mini-juegos.',
+      `╭━━━〔 ❌ *ERROR* 〕━━━╮
+┃
+┃ No se pudo mostrar
+┃ el menú de mini-juegos.
+┃
+╰━━━━━━━━━━━━━━━━━━╯`,
       m
     )
   }
 }
+
 
 // ============================================================
 // 📌 COMANDOS
@@ -100,5 +224,10 @@ handler.command = [
 ]
 
 handler.group = true
+
+
+// ============================================================
+// 📤 EXPORTAR
+// ============================================================
 
 export default handler

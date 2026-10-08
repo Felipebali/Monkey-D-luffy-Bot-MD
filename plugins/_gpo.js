@@ -1,49 +1,303 @@
 // 📂 plugins/gpo.js
-// 📸 Obtener foto del grupo — SOLO OWNERS reales del bot
+// 📸 GPO — Get Profile Group
+// 👑 SOLO OWNERS DEL BOT
+//
+// .gpo
+// → Obtiene la foto de perfil del grupo actual
+//
+// ============================================================
 
 let handler = async (m, { conn }) => {
+
   try {
-    if (!m.isGroup)
-      return m.reply('❌ Este comando solo funciona en grupos.')
 
-    // 🔐 Verificación REAL de dueños desde config.js (compatible con todos los formatos)
-    const owners = (global.owner || []).map(v => {
-      if (Array.isArray(v)) v = v[0]
-      if (typeof v !== 'string') return null
-      return v.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
-    }).filter(Boolean)
+    // ==========================================================
+    // 👥 SOLO GRUPOS
+    // ==========================================================
 
-    const sender = conn.decodeJid ? conn.decodeJid(m.sender) : m.sender
-    if (!owners.includes(sender))
-      return m.reply('🚫 Solo los dueños del bot pueden usar este comando.')
+    if (!m.isGroup) {
 
-    const groupId = m.chat
+      return m.reply(
+`❌ *COMANDO NO DISPONIBLE*
 
-    // 🖼️ Obtener foto del grupo
-    let ppUrl
-    try {
-      ppUrl = await conn.profilePictureUrl(groupId, 'image')
-    } catch {
-      ppUrl = null
+Este comando solamente puede utilizarse dentro de un grupo.`
+      )
     }
 
-    if (!ppUrl)
-      return m.reply('❌ Este grupo no tiene foto de perfil.')
+    // ==========================================================
+    // 📱 NORMALIZAR NÚMERO
+    // ==========================================================
 
-    await conn.sendMessage(m.chat, {
-      image: { url: ppUrl },
-      caption: '📸 Foto del grupo'
-    }, { quoted: m })
+    const normalizePhone = (id) => {
 
-  } catch (err) {
-    console.error(err)
-    m.reply('⚠️ Ocurrió un error al intentar descargar la foto del grupo.')
+      if (!id) {
+        return null
+      }
+
+      let value =
+        String(id)
+
+      // Nunca convertir un LID en número
+      if (
+        value.includes('@lid')
+      ) {
+        return null
+      }
+
+      value =
+        value
+          .split('@')[0]
+          .split(':')[0]
+          .replace(/\D/g, '')
+
+      return value || null
+    }
+
+    // ==========================================================
+    // 🔐 OBTENER OWNERS REALES
+    // ==========================================================
+
+    const ownerNumbers =
+      Array.isArray(global.owner)
+        ? global.owner
+            .map(owner =>
+              Array.isArray(owner)
+                ? owner[0]
+                : owner
+            )
+            .map(normalizePhone)
+            .filter(Boolean)
+        : []
+
+    // ==========================================================
+    // 👤 VERIFICAR SENDER
+    // ==========================================================
+
+    let sender =
+      String(
+        m.sender || ''
+      )
+
+    try {
+
+      if (conn.decodeJid) {
+        sender =
+          conn.decodeJid(sender)
+      }
+
+    } catch {}
+
+    const senderNumber =
+      normalizePhone(sender)
+
+    if (
+      !senderNumber ||
+      !ownerNumbers.includes(senderNumber)
+    ) {
+
+      return m.reply(
+`🚫 *ACCESO DENEGADO*
+
+Este comando está disponible únicamente para los owners del bot.`
+      )
+    }
+
+    // ==========================================================
+    // 🆔 ID DEL GRUPO
+    // ==========================================================
+
+    let groupId =
+      String(
+        m.chat || ''
+      )
+
+    try {
+
+      if (conn.decodeJid) {
+        groupId =
+          conn.decodeJid(groupId)
+      }
+
+    } catch {}
+
+    if (
+      !groupId ||
+      !groupId.includes('@g.us')
+    ) {
+
+      return m.reply(
+        '❌ No se pudo identificar correctamente el grupo.'
+      )
+    }
+
+    // ==========================================================
+    // ⏳ REACCIÓN
+    // ==========================================================
+
+    try {
+      await m.react('🖼️')
+    } catch {}
+
+    // ==========================================================
+    // 📸 OBTENER FOTO DEL GRUPO
+    // ==========================================================
+
+    let ppUrl = null
+
+    try {
+
+      ppUrl =
+        await conn.profilePictureUrl(
+          groupId,
+          'image'
+        )
+
+    } catch (error) {
+
+      console.log(
+        '⚠️ [GPO] No se pudo obtener la foto:',
+        error?.message || error
+      )
+
+      // --------------------------------------------------------
+      // 🔄 SEGUNDO INTENTO
+      // --------------------------------------------------------
+
+      try {
+
+        ppUrl =
+          await conn.profilePictureUrl(
+            groupId,
+            'preview'
+          )
+
+      } catch {}
+
+    }
+
+    // ==========================================================
+    // ❌ SIN FOTO
+    // ==========================================================
+
+    if (!ppUrl) {
+
+      try {
+        await m.react('❌')
+      } catch {}
+
+      return m.reply(
+`🖼️ *FOTO DEL GRUPO*
+
+━━━━━━━━━━━━━━━━━━
+
+❌ No se pudo obtener la foto de perfil de este grupo.
+
+Puede que:
+
+• El grupo no tenga foto.
+• La foto tenga restricciones de privacidad.
+• WhatsApp no permita acceder a ella en este momento.
+
+━━━━━━━━━━━━━━━━━━`
+      )
+    }
+
+    // ==========================================================
+    // 📊 OBTENER NOMBRE DEL GRUPO
+    // ==========================================================
+
+    let groupName =
+      'Grupo'
+
+    try {
+
+      const metadata =
+        await conn.groupMetadata(
+          groupId
+        )
+
+      if (
+        metadata?.subject
+      ) {
+        groupName =
+          metadata.subject
+      }
+
+    } catch {}
+
+    // ==========================================================
+    // 📤 ENVIAR FOTO
+    // ==========================================================
+
+    await conn.sendMessage(
+      m.chat,
+      {
+        image: {
+          url: ppUrl
+        },
+
+        caption:
+`╭━━━〔 🖼️ *GPO* 〕━━━╮
+┃
+┃ 👥 *Grupo:* ${groupName}
+┃
+┃ 📸 *Foto de perfil*
+┃
+┃ ✅ Obtenida correctamente
+┃
+╰━━━━━━━━━━━━━━━━━━╯`
+      },
+      {
+        quoted: m
+      }
+    )
+
+    // ==========================================================
+    // ✅ REACCIÓN FINAL
+    // ==========================================================
+
+    try {
+      await m.react('📸')
+    } catch {}
+
+  } catch (error) {
+
+    console.error(
+      '❌ [GPO] Error:',
+      error
+    )
+
+    try {
+      await m.react('❌')
+    } catch {}
+
+    return m.reply(
+`⚠️ *ERROR EN GPO*
+
+No se pudo obtener la foto de perfil del grupo.
+
+🔎 Revisá la consola del bot para más información.`
+    )
   }
 }
 
-handler.command = ['gpo']
-handler.tags = ['owner', 'tools']
-handler.help = ['gpo']
+// ============================================================
+// ⚙️ CONFIGURACIÓN
+// ============================================================
+
+handler.command = [
+  'gpo'
+]
+
+handler.tags = [
+  'owner',
+  'tools'
+]
+
+handler.help = [
+  'gpo'
+]
+
 handler.group = true
 
 export default handler

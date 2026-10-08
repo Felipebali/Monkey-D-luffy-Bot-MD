@@ -38,6 +38,16 @@ let handler = async (m, { conn }) => {
 • .gpu — Descargar foto de perfil de usuario 🧑🖼️
 • .gpo — Descargar foto del grupo 🏞️
 
+🖼️ *GESTIÓN DE FOTOS*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• .setpp
+  └─ Cambiar foto de perfil del bot 🤖🖼️
+
+• .setpg
+  └─ Cambiar foto de perfil del grupo 👥🖼️
+
+
 🎖️ *GESTIÓN DE INSIGNIAS*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -123,12 +133,6 @@ let handler = async (m, { conn }) => {
 • .resetlink
   └─ Resetear link del grupo ♻️
 
-• .setpp
-  └─ Cambiar foto del bot 🤖🖼️
-
-• .setpg
-  └─ Cambiar foto del grupo 👥🖼️
-
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👑 *WHATSAPP-BOT — PROPIETARIO SUPREMO*
@@ -138,6 +142,7 @@ let handler = async (m, { conn }) => {
 💠 Gestión de owners.
 💠 Gestión de administradores.
 💠 Gestión de seguridad.
+💠 Gestión de perfiles y grupos.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `.trim()
@@ -163,6 +168,7 @@ let handler = async (m, { conn }) => {
   }
 }
 
+
 // ============================================================
 // ⚙️ COMANDOS
 // ============================================================
@@ -172,10 +178,12 @@ handler.command = [
   'mw'
 ]
 
+
 // ============================================================
 // 👑 SOLO OWNER
 // ============================================================
 
 handler.owner = true
+
 
 export default handler

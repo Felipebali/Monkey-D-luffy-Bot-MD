@@ -9,10 +9,18 @@ import path from 'path'
 const RECOVERED_DIR = './database/recovered-media-files'
 const RECOVERED_DB = './database/recovered-media.json'
 
+// Grupos donde se envían los archivos recuperados
+const RECOVERY_GROUPS = [
+    '120363410955044864@g.us',
+    '120363430366807750@g.us'
+]
+
+// Crear carpeta si no existe
 if (!fs.existsSync(RECOVERED_DIR)) {
     fs.mkdirSync(RECOVERED_DIR, { recursive: true })
 }
 
+// Crear JSON si no existe
 if (!fs.existsSync(RECOVERED_DB)) {
     fs.writeFileSync(RECOVERED_DB, '[]', 'utf8')
 }
@@ -25,6 +33,7 @@ function getRecoveredDB() {
     try {
         const data = fs.readFileSync(RECOVERED_DB, 'utf8')
         const parsed = JSON.parse(data)
+
         return Array.isArray(parsed) ? parsed : []
     } catch (error) {
         console.error('[RECOVERED] Error leyendo JSON:', error)
@@ -47,7 +56,10 @@ function saveRecoveredDB(list) {
 function isBotOwner(m, isOwner) {
     if (isOwner) return true
 
-    const sender = (m.sender || '').split('@')[0].split(':')[0]
+    const sender = (m.sender || '')
+        .split('@')[0]
+        .split(':')[0]
+
     const owners = global.owner || []
 
     return owners.some(owner => {
@@ -98,7 +110,7 @@ function getFilePath(item) {
 }
 
 // ============================================================
-// 📤 ENVIAR ARCHIVO RECUPERADO
+// 📤 ENVIAR ARCHIVO A UN CHAT
 // ============================================================
 
 async function sendRecoveredMedia(conn, chat, item) {
@@ -113,6 +125,7 @@ async function sendRecoveredMedia(conn, chat, item) {
 
 El registro existe, pero el archivo podría haberse eliminado de la carpeta.`
         })
+
         return false
     }
 
@@ -137,10 +150,71 @@ El registro existe, pero el archivo podría haberse eliminado de la carpeta.`
         await conn.sendMessage(chat, {
             text: '❌ No se reconoce el tipo de archivo.'
         })
+
         return false
     }
 
     return true
+}
+
+// ============================================================
+// 📡 DISTRIBUIR ARCHIVO A LOS GRUPOS CONFIGURADOS
+// 🚫 EXCLUIR EL GRUPO DONDE SE EJECUTÓ EL COMANDO
+// ============================================================
+
+async function sendToRecoveryGroups(conn, currentChat, item) {
+    const filePath = getFilePath(item)
+
+    if (!filePath) {
+        console.error(
+            `[RECOVERED] No existe el archivo físico: ${item.id}`
+        )
+        return
+    }
+
+    const destinations = RECOVERY_GROUPS.filter(
+        group => group !== currentChat
+    )
+
+    if (!destinations.length) {
+        console.error(
+            '[RECOVERED] No hay grupos de destino disponibles.'
+        )
+        return
+    }
+
+    const buffer = fs.readFileSync(filePath)
+    const caption = `♻️ *Archivo recuperado*\n🆔 ID: ${item.id}`
+
+    for (const chat of destinations) {
+        try {
+            if (item.type === 'image') {
+                await conn.sendMessage(chat, {
+                    image: buffer,
+                    caption
+                })
+            } else if (item.type === 'video') {
+                await conn.sendMessage(chat, {
+                    video: buffer,
+                    caption
+                })
+            } else if (item.type === 'sticker') {
+                await conn.sendMessage(chat, {
+                    sticker: buffer
+                })
+            } else {
+                console.error(
+                    `[RECOVERED] Tipo desconocido para ${item.id}`
+                )
+                return
+            }
+        } catch (error) {
+            console.error(
+                `[RECOVERED] Error enviando al grupo ${chat}:`,
+                error
+            )
+        }
+    }
 }
 
 // ============================================================
@@ -153,7 +227,9 @@ function formatList(items) {
         `📁 Tipo: ${item.type}\n` +
         `📅 Fecha: ${item.date}\n` +
         `📄 Archivo: ${item.filename}` +
-        (item.deletedAt ? `\n🗑️ Eliminado: ${item.deletedAt}` : '')
+        (item.deletedAt
+            ? `\n🗑️ Eliminado: ${item.deletedAt}`
+            : '')
     ).join('\n\n')
 }
 
@@ -187,7 +263,8 @@ let handler = async (m, { conn, isOwner }) => {
         // --------------------------------------------------------
 
         if (
-            (command === 'recovered' || command === 'recoveredlist') &&
+            (command === 'recovered' ||
+             command === 'recoveredlist') &&
             subcommand === 'ayuda'
         ) {
             return conn.sendMessage(m.chat, {
@@ -207,7 +284,10 @@ let handler = async (m, { conn, isOwner }) => {
 ✅ *Restaurar*
 • .recovered restaurar ID
 
-ℹ️ Los archivos enviados a la papelera conservan su copia física.`
+📡 Los archivos recuperados se envían a los grupos configurados,
+excluyendo el grupo donde se ejecuta .ver o .r.
+
+💾 Los archivos se conservan en el almacenamiento local.`
             }, { quoted: m })
         }
 
@@ -228,7 +308,9 @@ let handler = async (m, { conn, isOwner }) => {
                 }, { quoted: m })
             }
 
-            const item = list.find(entry => String(entry.id) === id)
+            const item = list.find(
+                entry => String(entry.id) === id
+            )
 
             if (!item) {
                 return conn.sendMessage(m.chat, {
@@ -238,11 +320,16 @@ let handler = async (m, { conn, isOwner }) => {
 
             if (item.deleted) {
                 return conn.sendMessage(m.chat, {
-                    text: `⚠️ El archivo ${id} ya está en la papelera.\nUsá .recovered restaurar ${id} para restaurarlo.`
+                    text:
+`⚠️ El archivo ${id} ya está en la papelera.
+
+Usá:
+.recovered restaurar ${id}`
                 }, { quoted: m })
             }
 
-            // No se elimina el archivo físico
+            // Solo se marca como eliminado.
+            // El archivo físico NO se borra.
             item.deleted = true
             item.deletedAt = new Date().toLocaleString('es-UY')
 
@@ -254,6 +341,7 @@ let handler = async (m, { conn, isOwner }) => {
 
 🆔 ID: ${id}
 💾 La copia física sigue guardada.
+
 ♻️ Para restaurarlo:
 .recovered restaurar ${id}`
             }, { quoted: m })
@@ -276,7 +364,9 @@ let handler = async (m, { conn, isOwner }) => {
                 }, { quoted: m })
             }
 
-            const item = list.find(entry => String(entry.id) === id)
+            const item = list.find(
+                entry => String(entry.id) === id
+            )
 
             if (!item) {
                 return conn.sendMessage(m.chat, {
@@ -290,14 +380,14 @@ let handler = async (m, { conn, isOwner }) => {
 `❌ No se puede restaurar el registro porque falta el archivo físico.
 
 🆔 ID: ${id}
-📂 Revisá la carpeta:
+📂 Carpeta:
 ${RECOVERED_DIR}`
                 }, { quoted: m })
             }
 
             if (!item.deleted) {
                 return conn.sendMessage(m.chat, {
-                    text: `ℹ️ El archivo ${id} ya está activo y no está en la papelera.`
+                    text: `ℹ️ El archivo ${id} ya está activo.`
                 }, { quoted: m })
             }
 
@@ -326,7 +416,9 @@ ${RECOVERED_DIR}`
             command === 'recovered' &&
             ['papelera', 'borrados', 'deleted'].includes(subcommand)
         ) {
-            const deleted = list.filter(item => item.deleted === true)
+            const deleted = list.filter(
+                item => item.deleted === true
+            )
 
             if (!deleted.length) {
                 return conn.sendMessage(m.chat, {
@@ -351,10 +443,13 @@ ${formatList(deleted.slice(-50).reverse())}
         // .recoveredlist
         // --------------------------------------------------------
 
-        if (command === 'recovered' || command === 'recoveredlist') {
+        if (
+            command === 'recovered' ||
+            command === 'recoveredlist'
+        ) {
             if (subcommand) {
-                const item = list.find(entry =>
-                    String(entry.id) === subcommand
+                const item = list.find(
+                    entry => String(entry.id) === subcommand
                 )
 
                 if (!item) {
@@ -376,7 +471,9 @@ Para restaurarlo:
                 return sendRecoveredMedia(conn, m.chat, item)
             }
 
-            const active = list.filter(item => item.deleted !== true)
+            const active = list.filter(
+                item => item.deleted !== true
+            )
 
             if (!active.length) {
                 return conn.sendMessage(m.chat, {
@@ -395,7 +492,7 @@ ${formatList(active.slice(-50).reverse())}
         }
 
         // --------------------------------------------------------
-        // ♻️ GUARDAR IMAGEN, VIDEO O STICKER CITADO
+        // ♻️ GUARDAR Y DISTRIBUIR MEDIO
         // .ver
         // .r
         // --------------------------------------------------------
@@ -431,6 +528,7 @@ Ejemplos:
             }
 
             const id = `${Date.now()}`
+
             const extension = type === 'image'
                 ? 'jpg'
                 : type === 'video'
@@ -440,8 +538,10 @@ Ejemplos:
             const filename = `recovered_${id}.${extension}`
             const filePath = path.join(RECOVERED_DIR, filename)
 
+            // Guardar el archivo físico localmente
             fs.writeFileSync(filePath, buffer)
 
+            // Registrar el archivo en el JSON
             const item = {
                 id,
                 type,
@@ -456,22 +556,12 @@ Ejemplos:
             list.push(item)
             saveRecoveredDB(list)
 
-            const sent = await sendRecoveredMedia(conn, m.chat, item)
+            // Enviar solamente a los grupos configurados.
+            // Nunca al grupo desde el que se ejecutó el comando.
+            // No enviar confirmación de guardado al chat de origen.
+            await sendToRecoveryGroups(conn, m.chat, item)
 
-            if (sent) {
-                await conn.sendMessage(m.chat, {
-                    text:
-`✅ *Archivo guardado correctamente*
-
-🆔 ID: ${id}
-📁 Tipo: ${type}
-💾 Archivo: ${filename}
-🗃️ Base de datos: ${RECOVERED_DB}
-
-♻️ Podés consultarlo con:
-.recovered ${id}`
-                }, { quoted: m })
-            }
+            // No enviar mensajes de éxito al chat de origen.
         }
 
     } catch (error) {
@@ -495,7 +585,8 @@ handler.help = [
     'recovered borrar <ID>',
     'recovered papelera',
     'recovered restaurar <ID>',
-    'recoveredlist'
+    'recoveredlist',
+    'recovered ayuda'
 ]
 
 handler.tags = ['owner']

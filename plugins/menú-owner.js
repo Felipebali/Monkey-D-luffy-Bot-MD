@@ -1,7 +1,6 @@
-
- // 📂 plugins/menu-owner.js — PANEL DEL DUEÑO 👑
- // WhatsApp-Bot — Control Total
- // ============================================================
+// 📂 plugins/menu-owner.js — PANEL DEL DUEÑO 👑
+// WhatsApp-Bot — Control Total
+// ============================================================
 
 let handler = async (m, { conn }) => {
   try {
@@ -85,13 +84,33 @@ let handler = async (m, { conn }) => {
   └─ 𝐀𝐥𝐢𝐚𝐬 𝐝𝐞𝐥 𝐜𝐨𝐦𝐚𝐧𝐝𝐨 𝐝𝐞 𝐫𝐞𝐜𝐮𝐩𝐞𝐫𝐚𝐜𝐢ó𝐧 🔄
 
 • .recovered
-  └─ 𝐕𝐞𝐫 𝐞𝐥 𝐦𝐞𝐧ú 𝐲 𝐥𝐚 𝐥𝐢𝐬𝐭𝐚 𝐝𝐞 𝐚𝐫𝐜𝐡𝐢𝐯𝐨𝐬 𝐫𝐞𝐜𝐮𝐩𝐞𝐫𝐚𝐝𝐨𝐬 📋
+  └─ 𝐕𝐞𝐫 𝐥𝐚 𝐥𝐢𝐬𝐭𝐚 𝐝𝐞 𝐚𝐫𝐜𝐡𝐢𝐯𝐨𝐬 𝐫𝐞𝐜𝐮𝐩𝐞𝐫𝐚𝐝𝐨𝐬 📋
+
+• .recovered <ID>
+  └─ 𝐑𝐞𝐞𝐧𝐯𝐢𝐚𝐫 𝐮𝐧 𝐚𝐫𝐜𝐡𝐢𝐯𝐨 𝐩𝐨𝐫 𝐬𝐮 𝐧ú𝐦𝐞𝐫𝐨 📤
 
 • .recoveredlist
   └─ 𝐌𝐨𝐬𝐭𝐫𝐚𝐫 𝐥𝐨𝐬 𝐚𝐫𝐜𝐡𝐢𝐯𝐨𝐬 𝐫𝐞𝐜𝐮𝐩𝐞𝐫𝐚𝐝𝐨𝐬 📂
 
-• .recovered <ID>
-  └─ 𝐑𝐞𝐞𝐧𝐯𝐢𝐚𝐫 𝐮𝐧 𝐚𝐫𝐜𝐡𝐢𝐯𝐨 𝐩𝐨𝐫 𝐬𝐮 𝐧ú𝐦𝐞𝐫𝐨 📤
+• .recovered ayuda
+  └─ 𝐕𝐞𝐫 𝐥𝐚 𝐚𝐲𝐮𝐝𝐚 𝐝𝐞𝐥 𝐬𝐢𝐬𝐭𝐞𝐦𝐚 ℹ️
+
+• .recovered borrar <ID>
+  └─ 𝐄𝐧𝐯𝐢𝐚𝐫 𝐮𝐧 𝐫𝐞𝐠𝐢𝐬𝐭𝐫𝐨 𝐚 𝐥𝐚 𝐩𝐚𝐩𝐞𝐥𝐞𝐫𝐚 🗑️
+
+• .recovered papelera
+  └─ 𝐕𝐞𝐫 𝐥𝐨𝐬 𝐚𝐫𝐜𝐡𝐢𝐯𝐨𝐬 𝐞𝐥𝐢𝐦𝐢𝐧𝐚𝐝𝐨𝐬 🗑️
+
+• .recovered restaurar <ID>
+  └─ 𝐑𝐞𝐬𝐭𝐚𝐮𝐫𝐚𝐫 𝐮𝐧 𝐫𝐞𝐠𝐢𝐬𝐭𝐫𝐨 ♻️
+
+📡 *𝐃𝐈𝐒𝐓𝐑𝐈𝐁𝐔𝐂𝐈Ó𝐍 𝐃𝐄 𝐀𝐑𝐂𝐇𝐈𝐕𝐎𝐒*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• En un grupo C: el archivo se envía a C, A y B.
+• Por privado: el archivo se envía solamente a A y B.
+• Los archivos quedan guardados en el almacenamiento local y en JSON.
+• No se envía confirmación de guardado al chat de origen.
 
 
 👑 *𝐆𝐄𝐒𝐓𝐈Ó𝐍 𝐃𝐄 𝐎𝐖𝐍𝐄𝐑𝐒*

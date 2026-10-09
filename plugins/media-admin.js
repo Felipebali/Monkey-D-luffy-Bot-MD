@@ -1,10 +1,13 @@
 // 📂 plugins/media-admin.js
 // 🛡️ FELIXCAT BOT — SISTEMA COMPLETO DE MEDIOS
 // 💾 Guardado automático + administrador + limpieza automática de DB
+// 📌 Recuperación de medios en grupo central
+// ============================================================
 
 import fs from 'fs'
 import path from 'path'
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
+
 
 // ============================================================
 // 📁 CONFIGURACIÓN
@@ -12,6 +15,13 @@ import { downloadMediaMessage } from '@whiskeysockets/baileys'
 
 const MEDIA_DB_FILE = './database/media.json'
 const MEDIA_FOLDER = './media'
+
+// ============================================================
+// 📌 GRUPO CENTRAL DE MEDIOS
+// ============================================================
+
+const MEDIA_GROUP_ID = '120363429424906972@g.us'
+
 
 // ============================================================
 // 📂 CREAR CARPETAS
@@ -29,16 +39,22 @@ if (!fs.existsSync(MEDIA_DB_FILE)) {
     fs.writeFileSync(MEDIA_DB_FILE, '[]')
 }
 
+
 // ============================================================
 // 👑 OBTENER OWNERS
 // ============================================================
 
 function getOwners() {
+
     return (global.owner || [])
         .map(o => Array.isArray(o) ? o[0] : o)
         .filter(Boolean)
         .map(v => {
-            const number = String(v).replace(/[^0-9]/g, '')
+
+            const number =
+                String(v)
+                    .replace(/[^0-9]/g, '')
+
             return number
                 ? number + '@s.whatsapp.net'
                 : null
@@ -46,17 +62,21 @@ function getOwners() {
         .filter(Boolean)
 }
 
+
 // ============================================================
 // 🔐 NORMALIZAR JID
 // ============================================================
 
 function normalizeJid(jid) {
-    if (!jid) return ''
+
+    if (!jid)
+        return ''
 
     return String(jid)
         .replace(/:\d+@/, '@')
         .trim()
 }
+
 
 // ============================================================
 // 📂 CARGAR MEDIA.JSON
@@ -67,13 +87,22 @@ function loadMediaDB() {
     try {
 
         if (!fs.existsSync(MEDIA_DB_FILE)) {
-            fs.writeFileSync(MEDIA_DB_FILE, '[]')
+
+            fs.writeFileSync(
+                MEDIA_DB_FILE,
+                '[]'
+            )
+
             return []
         }
 
-        const data = JSON.parse(
-            fs.readFileSync(MEDIA_DB_FILE, 'utf8')
-        )
+        const data =
+            JSON.parse(
+                fs.readFileSync(
+                    MEDIA_DB_FILE,
+                    'utf8'
+                )
+            )
 
         return Array.isArray(data)
             ? data
@@ -90,6 +119,7 @@ function loadMediaDB() {
     }
 }
 
+
 // ============================================================
 // 💾 GUARDAR MEDIA.JSON
 // ============================================================
@@ -100,7 +130,11 @@ function saveMediaDB(list) {
 
         fs.writeFileSync(
             MEDIA_DB_FILE,
-            JSON.stringify(list, null, 2),
+            JSON.stringify(
+                list,
+                null,
+                2
+            ),
             'utf8'
         )
 
@@ -117,30 +151,30 @@ function saveMediaDB(list) {
     }
 }
 
+
 // ============================================================
 // 📍 OBTENER RUTA REAL DEL ARCHIVO
 // ============================================================
 
 function getFilePath(item) {
 
-    if (!item) return null
+    if (!item)
+        return null
 
-    // Si tiene path guardado
     if (item.path) {
 
-        // Si existe exactamente esa ruta
         if (fs.existsSync(item.path)) {
             return item.path
         }
     }
 
-    // Intentar buscarlo por filename
     if (item.filename) {
 
-        const fallback = path.join(
-            MEDIA_FOLDER,
-            item.filename
-        )
+        const fallback =
+            path.join(
+                MEDIA_FOLDER,
+                item.filename
+            )
 
         return fallback
     }
@@ -148,74 +182,59 @@ function getFilePath(item) {
     return null
 }
 
+
 // ============================================================
 // 🧹 SINCRONIZAR MEDIA.JSON CON ./MEDIA
-// ============================================================
-//
-// Esta función es MUY IMPORTANTE.
-//
-// Si el archivo físico fue borrado,
-// también elimina su registro de media.json.
-//
-// Así los archivos viejos NO vuelven a aparecer.
 // ============================================================
 
 function syncMediaDB() {
 
     try {
 
-        let list = loadMediaDB()
+        let list =
+            loadMediaDB()
 
         if (!Array.isArray(list)) {
             list = []
         }
 
-        const originalLength = list.length
-
-        // --------------------------------------------------------
-        // Si la carpeta está vacía, no puede haber registros
-        // --------------------------------------------------------
+        const originalLength =
+            list.length
 
         let filesInFolder = []
 
         try {
 
-            filesInFolder = fs.readdirSync(
-                MEDIA_FOLDER
-            )
+            filesInFolder =
+                fs.readdirSync(
+                    MEDIA_FOLDER
+                )
 
         } catch {
 
             filesInFolder = []
         }
 
-        // --------------------------------------------------------
-        // Eliminar registros cuyo archivo ya no existe
-        // --------------------------------------------------------
+        list =
+            list.filter(item => {
 
-        list = list.filter(item => {
+                const filepath =
+                    getFilePath(item)
 
-            const filepath = getFilePath(item)
+                if (!filepath) {
+                    return false
+                }
 
-            if (!filepath) {
-                return false
-            }
+                return fs.existsSync(filepath)
+            })
 
-            return fs.existsSync(filepath)
-        })
-
-        // --------------------------------------------------------
-        // Reorganizar IDs
-        // --------------------------------------------------------
-
-        list = list.map((item, index) => ({
-            ...item,
-            id: index + 1
-        }))
-
-        // --------------------------------------------------------
-        // Guardar si hubo cambios
-        // --------------------------------------------------------
+        list =
+            list.map(
+                (item, index) => ({
+                    ...item,
+                    id: index + 1
+                })
+            )
 
         if (
             list.length !== originalLength ||
@@ -223,12 +242,7 @@ function syncMediaDB() {
         ) {
 
             saveMediaDB(list)
-
         }
-
-        // --------------------------------------------------------
-        // Sincronizar DB global
-        // --------------------------------------------------------
 
         if (!global.db) {
             global.db = {}
@@ -238,7 +252,8 @@ function syncMediaDB() {
             global.db.data = {}
         }
 
-        global.db.data.mediaList = list
+        global.db.data.mediaList =
+            list
 
         return list
 
@@ -253,15 +268,13 @@ function syncMediaDB() {
     }
 }
 
+
 // ============================================================
-// 🚀 SINCRONIZACIÓN AL INICIAR EL PLUGIN
-// ============================================================
-//
-// Esto hace que si reiniciás el bot después de borrar archivos,
-// media.json se limpie automáticamente.
+// 🚀 SINCRONIZACIÓN AL INICIAR
 // ============================================================
 
 syncMediaDB()
+
 
 // ============================================================
 // 💾 GUARDAR MEDIA AUTOMÁTICAMENTE
@@ -271,52 +284,65 @@ async function saveIncomingMedia(m, conn) {
 
     try {
 
-        if (!m?.message) return
+        if (!m?.message)
+            return
 
-        // --------------------------------------------------------
-        // Detectar tipo
-        // --------------------------------------------------------
-
-        const mtype = m.mtype
+        const mtype =
+            m.mtype
 
         let type = null
 
-        if (mtype === 'imageMessage') {
+        if (
+            mtype === 'imageMessage'
+        ) {
+
             type = 'image'
-        }
 
-        else if (mtype === 'videoMessage') {
+        } else if (
+            mtype === 'videoMessage'
+        ) {
+
             type = 'video'
-        }
 
-        else if (mtype === 'audioMessage') {
+        } else if (
+            mtype === 'audioMessage'
+        ) {
+
             type = 'audio'
-        }
 
-        else if (mtype === 'documentMessage') {
+        } else if (
+            mtype === 'documentMessage'
+        ) {
+
             type = 'document'
-        }
 
-        else {
+        } else {
+
             return
         }
+
 
         // --------------------------------------------------------
         // Descargar media
         // --------------------------------------------------------
 
-        const buffer = await downloadMediaMessage(
-            m,
-            'buffer'
-        )
+        const buffer =
+            await downloadMediaMessage(
+                m,
+                'buffer'
+            )
 
-        if (!buffer) return
+        if (!buffer)
+            return
+
 
         // --------------------------------------------------------
-        // Sincronizar DB ANTES de agregar nuevo archivo
+        // Sincronizar DB
         // --------------------------------------------------------
 
-        let list = syncMediaDB()
+        let list =
+            syncMediaDB()
+
 
         // --------------------------------------------------------
         // Generar nombre
@@ -327,40 +353,51 @@ async function saveIncomingMedia(m, conn) {
 
         let extension = ''
 
+
         if (type === 'image') {
+
             extension = '.jpg'
-        }
 
-        else if (type === 'video') {
+        } else if (type === 'video') {
+
             extension = '.mp4'
-        }
 
-        else if (type === 'audio') {
+        } else if (type === 'audio') {
+
             extension = '.mp3'
-        }
 
-        else if (type === 'document') {
+        } else if (type === 'document') {
 
             let originalName =
                 m.message?.documentMessage?.fileName ||
                 'file'
 
-            // Limpiar nombre peligroso
-            originalName = String(originalName)
-                .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
-                .replace(/\s+/g, '_')
+            originalName =
+                String(originalName)
+                    .replace(
+                        /[<>:"/\\|?*\x00-\x1F]/g,
+                        '_'
+                    )
+                    .replace(
+                        /\s+/g,
+                        '_'
+                    )
 
-            extension = `_${originalName}`
+            extension =
+                `_${originalName}`
         }
+
 
         const finalName =
             uniqueName + extension
+
 
         const filepath =
             path.join(
                 MEDIA_FOLDER,
                 finalName
             )
+
 
         // --------------------------------------------------------
         // Guardar archivo
@@ -370,6 +407,7 @@ async function saveIncomingMedia(m, conn) {
             filepath,
             buffer
         )
+
 
         // --------------------------------------------------------
         // Obtener grupo
@@ -395,21 +433,26 @@ async function saveIncomingMedia(m, conn) {
             }
         }
 
+
         // --------------------------------------------------------
         // Crear registro
         // --------------------------------------------------------
 
         const entry = {
 
-            id: list.length + 1,
+            id:
+                list.length + 1,
 
-            filename: finalName,
+            filename:
+                finalName,
 
-            path: filepath,
+            path:
+                filepath,
 
             type,
 
-            from: m.sender || null,
+            from:
+                m.sender || null,
 
             groupId:
                 m.isGroup
@@ -418,7 +461,10 @@ async function saveIncomingMedia(m, conn) {
 
             groupName:
                 m.isGroup
-                    ? (chatInfo?.subject || '')
+                    ? (
+                        chatInfo?.subject ||
+                        ''
+                    )
                     : null,
 
             mimetype:
@@ -430,19 +476,12 @@ async function saveIncomingMedia(m, conn) {
                 new Date().toLocaleString()
         }
 
-        // --------------------------------------------------------
-        // Agregar
-        // --------------------------------------------------------
 
         list.push(entry)
 
-        // --------------------------------------------------------
-        // Guardar DB
-        // --------------------------------------------------------
-
         saveMediaDB(list)
 
-        // También actualizar global.db
+
         if (!global.db) {
             global.db = {}
         }
@@ -451,7 +490,9 @@ async function saveIncomingMedia(m, conn) {
             global.db.data = {}
         }
 
-        global.db.data.mediaList = list
+        global.db.data.mediaList =
+            list
+
 
         console.log(
             '[MEDIA GUARDADO]:',
@@ -467,18 +508,15 @@ async function saveIncomingMedia(m, conn) {
     }
 }
 
+
 // ============================================================
-// 📡 HANDLER GLOBAL
-// ============================================================
-//
-// Guarda automáticamente:
-// 🖼️ imágenes
-// 🎥 videos
-// 🎵 audios
-// 📄 documentos
+// 📡 HANDLER
 // ============================================================
 
-const handler = async (m, { conn, args }) => {
+const handler = async (
+    m,
+    { conn, args }
+) => {
 
     try {
 
@@ -492,35 +530,36 @@ const handler = async (m, { conn, args }) => {
                 : normalizeJid(m.sender)
 
         const owners =
-            getOwners().map(normalizeJid)
+            getOwners()
+                .map(normalizeJid)
 
         if (!owners.includes(sender)) {
-
             return
         }
 
+
         // ========================================================
-        // 🧹 SINCRONIZAR ANTES DE CUALQUIER OPERACIÓN
+        // 🧹 SINCRONIZAR
         // ========================================================
 
-        let list = syncMediaDB()
+        let list =
+            syncMediaDB()
+
 
         // ========================================================
         // ARGUMENTOS
         // ========================================================
 
         const cmd =
-            String(args?.[0] || '')
+            String(
+                args?.[0] || ''
+            )
                 .toLowerCase()
                 .trim()
 
+
         // ========================================================
         // 📋 LISTAR
-        //
-        // .media
-        // .medias
-        // .media list
-        // .media lista
         // ========================================================
 
         if (
@@ -539,11 +578,13 @@ const handler = async (m, { conn, args }) => {
                 )
             }
 
+
             const max =
                 Math.min(
                     list.length,
-                    250
+                    500
                 )
+
 
             const lines =
                 list
@@ -560,6 +601,7 @@ const handler = async (m, { conn, args }) => {
                         )
                     })
 
+
             const text =
 `📁 *MEDIOS GUARDADOS*
 
@@ -570,6 +612,7 @@ const handler = async (m, { conn, args }) => {
 
 ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
 
+
             return conn.reply(
                 m.chat,
                 text,
@@ -577,13 +620,9 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
             )
         }
 
+
         // ========================================================
         // 🧹 BORRAR TODO
-        //
-        // .media clear
-        // .media clean
-        // .media wipe
-        // .media limpiar
         // ========================================================
 
         if (
@@ -596,9 +635,6 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
             let deletedFiles = 0
             let failedFiles = 0
 
-            // ----------------------------------------------------
-            // Borrar archivos registrados
-            // ----------------------------------------------------
 
             for (const item of list) {
 
@@ -631,11 +667,6 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
                 }
             }
 
-            // ----------------------------------------------------
-            // IMPORTANTE:
-            // También eliminar cualquier archivo que haya quedado
-            // físicamente dentro de ./media
-            // ----------------------------------------------------
 
             try {
 
@@ -643,6 +674,7 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
                     fs.readdirSync(
                         MEDIA_FOLDER
                     )
+
 
                 for (const file of files) {
 
@@ -655,7 +687,8 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
                     try {
 
                         if (
-                            fs.statSync(filepath).isFile()
+                            fs.statSync(filepath)
+                                .isFile()
                         ) {
 
                             fs.unlinkSync(
@@ -685,15 +718,13 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
                 )
             }
 
-            // ----------------------------------------------------
-            // Vaciar DB
-            // ----------------------------------------------------
 
             saveMediaDB([])
 
             if (global.db?.data) {
                 global.db.data.mediaList = []
             }
+
 
             return conn.reply(
                 m.chat,
@@ -713,11 +744,9 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
             )
         }
 
+
         // ========================================================
-        // 🧹 SINCRONIZAR / LIMPIAR REGISTROS VIEJOS
-        //
-        // .media sync
-        // .media sincronizar
+        // 🔄 SINCRONIZAR
         // ========================================================
 
         if (
@@ -734,7 +763,9 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
                 syncMediaDB()
 
             const removed =
-                before - synced.length
+                before -
+                synced.length
+
 
             return conn.reply(
                 m.chat,
@@ -753,11 +784,9 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
             )
         }
 
+
         // ========================================================
         // 🗑️ BORRAR UNO O VARIOS
-        //
-        // .media del 5
-        // .media del 3 7 9
         // ========================================================
 
         if (
@@ -774,31 +803,42 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
                     .map(v => parseInt(v))
                     .filter(v => !isNaN(v))
 
+
             if (!ids.length) {
 
                 return conn.reply(
                     m.chat,
 `❌ *Debes indicar al menos un ID.*
 
-Ejemplos:
+━━━━━━━━━━━━━━━━━━
 
-*.media del 5*
+📌 *Ejemplos:*
 
-*.media del 3 7 9*
+• *.media del 5*
+  └─ Elimina el medio con ID 5.
 
-*.media borrar 10*`,
+• *.media del 3 7 9*
+  └─ Elimina los medios 3, 7 y 9.
+
+• *.media borrar 10*
+  └─ Elimina el medio con ID 10.
+
+⚠️ *Los archivos eliminados no podrán recuperarse desde este sistema.*`,
                     m
                 )
             }
 
+
             let deleted = 0
             let notFound = []
 
-            // Ordenar de mayor a menor
-            // para evitar problemas al eliminar
+
             const uniqueIds =
                 [...new Set(ids)]
-                    .sort((a, b) => b - a)
+                    .sort(
+                        (a, b) => b - a
+                    )
+
 
             for (const id of uniqueIds) {
 
@@ -808,6 +848,7 @@ Ejemplos:
                             Number(item.id) === id
                     )
 
+
                 if (index === -1) {
 
                     notFound.push(id)
@@ -815,15 +856,14 @@ Ejemplos:
                     continue
                 }
 
+
                 const item =
                     list[index]
+
 
                 const filepath =
                     getFilePath(item)
 
-                // ------------------------------------------------
-                // Borrar archivo físico
-                // ------------------------------------------------
 
                 if (
                     filepath &&
@@ -845,9 +885,6 @@ Ejemplos:
                     }
                 }
 
-                // ------------------------------------------------
-                // Eliminar registro
-                // ------------------------------------------------
 
                 list.splice(
                     index,
@@ -857,9 +894,6 @@ Ejemplos:
                 deleted++
             }
 
-            // ----------------------------------------------------
-            // Reorganizar IDs
-            // ----------------------------------------------------
 
             list =
                 list.map(
@@ -869,11 +903,15 @@ Ejemplos:
                     })
                 )
 
+
             saveMediaDB(list)
 
+
             if (global.db?.data) {
-                global.db.data.mediaList = list
+                global.db.data.mediaList =
+                    list
             }
+
 
             let respuesta =
 `🗑️ *MEDIOS ELIMINADOS*
@@ -882,11 +920,13 @@ Ejemplos:
 
 ✅ Eliminados: *${deleted}*`
 
+
             if (notFound.length) {
 
                 respuesta +=
                     `\n❌ No encontrados: *${notFound.join(', ')}*`
             }
+
 
             return conn.reply(
                 m.chat,
@@ -895,11 +935,14 @@ Ejemplos:
             )
         }
 
+
         // ========================================================
-        // 📤 ENVIAR ARCHIVO POR ID
+        // 📤 RECUPERAR MEDIO POR ID
         //
         // .media 5
         // .medias 5
+        //
+        // 📌 SIEMPRE SE ENVÍA AL GRUPO CENTRAL
         // ========================================================
 
         if (/^\d+$/.test(cmd)) {
@@ -907,11 +950,13 @@ Ejemplos:
             const id =
                 parseInt(cmd)
 
+
             const item =
                 list.find(
                     x =>
                         Number(x.id) === id
                 )
+
 
             if (!item) {
 
@@ -922,8 +967,10 @@ Ejemplos:
                 )
             }
 
+
             const filepath =
                 getFilePath(item)
+
 
             // ----------------------------------------------------
             // Verificar archivo
@@ -934,12 +981,12 @@ Ejemplos:
                 !fs.existsSync(filepath)
             ) {
 
-                // Eliminar registro viejo
                 list =
                     list.filter(
                         x =>
                             Number(x.id) !== id
                     )
+
 
                 list =
                     list.map(
@@ -949,11 +996,15 @@ Ejemplos:
                         })
                     )
 
+
                 saveMediaDB(list)
 
+
                 if (global.db?.data) {
-                    global.db.data.mediaList = list
+                    global.db.data.mediaList =
+                        list
                 }
+
 
                 return conn.reply(
                     m.chat,
@@ -966,6 +1017,7 @@ Ejemplos:
                 )
             }
 
+
             // ----------------------------------------------------
             // Leer archivo
             // ----------------------------------------------------
@@ -974,6 +1026,11 @@ Ejemplos:
                 fs.readFileSync(
                     filepath
                 )
+
+
+            // ----------------------------------------------------
+            // Caption
+            // ----------------------------------------------------
 
             const caption =
 `📁 *MEDIO GUARDADO*
@@ -987,18 +1044,29 @@ Ejemplos:
 👥 *Grupo:* ${item.groupName || item.groupId || 'Privado'}
 📅 *Fecha:* ${item.date || 'Desconocida'}
 
-━━━━━━━━━━━━━━━━━━`
+━━━━━━━━━━━━━━━━━━
 
-            // ----------------------------------------------------
-            // IMAGEN
-            // ----------------------------------------------------
+📌 *Recuperado en grupo central*`
+
+
+            // ====================================================
+            // 📌 DESTINO FIJO
+            // ====================================================
+
+            const destination =
+                MEDIA_GROUP_ID
+
+
+            // ====================================================
+            // 🖼️ IMAGEN
+            // ====================================================
 
             if (
                 item.type === 'image'
             ) {
 
                 await conn.sendMessage(
-                    sender,
+                    destination,
                     {
                         image: buffer,
                         caption
@@ -1011,20 +1079,22 @@ Ejemplos:
                 return
             }
 
-            // ----------------------------------------------------
-            // VIDEO
-            // ----------------------------------------------------
+
+            // ====================================================
+            // 🎥 VIDEO
+            // ====================================================
 
             if (
                 item.type === 'video'
             ) {
 
                 await conn.sendMessage(
-                    sender,
+                    destination,
                     {
                         video: buffer,
                         caption,
-                        fileName: item.filename,
+                        fileName:
+                            item.filename,
                         mimetype:
                             item.mimetype ||
                             'video/mp4'
@@ -1037,20 +1107,22 @@ Ejemplos:
                 return
             }
 
-            // ----------------------------------------------------
-            // AUDIO
-            // ----------------------------------------------------
+
+            // ====================================================
+            // 🎵 AUDIO
+            // ====================================================
 
             if (
                 item.type === 'audio'
             ) {
 
                 await conn.sendMessage(
-                    sender,
+                    destination,
                     {
                         audio: buffer,
                         ptt: false,
-                        fileName: item.filename,
+                        fileName:
+                            item.filename,
                         mimetype:
                             item.mimetype ||
                             'audio/mpeg'
@@ -1063,15 +1135,17 @@ Ejemplos:
                 return
             }
 
-            // ----------------------------------------------------
-            // DOCUMENTO
-            // ----------------------------------------------------
+
+            // ====================================================
+            // 📄 DOCUMENTO
+            // ====================================================
 
             await conn.sendMessage(
-                sender,
+                destination,
                 {
                     document: buffer,
-                    fileName: item.filename,
+                    fileName:
+                        item.filename,
                     mimetype:
                         item.mimetype ||
                         'application/octet-stream',
@@ -1085,46 +1159,258 @@ Ejemplos:
             return
         }
 
+
         // ========================================================
-        // ❓ AYUDA
+        // ❓ AYUDA / MENÚ COMPLETO
         // ========================================================
 
         return conn.reply(
             m.chat,
-`📂 *ADMINISTRADOR DE MEDIOS*
+`📂 *ADMINISTRADOR DE MEDIOS — FELIXCAT*
 
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-📋 *LISTAR*
+🛡️ *¿QUÉ HACE ESTE SISTEMA?*
+
+Este sistema guarda automáticamente los
+medios recibidos por el bot y permite al
+👑 *OWNER* administrarlos desde WhatsApp.
+
+📦 *TIPOS DE MEDIOS GUARDADOS:*
+
+🖼️ Imágenes
+🎥 Videos
+🎵 Audios
+📄 Documentos
+
+💾 Cada medio se guarda físicamente en:
+
+📁 *./media*
+
+Y su información se registra en:
+
+📂 *./database/media.json*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 *1. LISTAR MEDIOS*
+
+Muestra los medios almacenados junto con
+su información y su ID correspondiente.
+
+📝 *Comandos:*
 
 • *.media*
 • *.medias*
 • *.media list*
+• *.media lista*
 
-📤 *ENVIAR*
+📊 El listado muestra hasta *500 medios*.
 
-• *.media <id>*
-• *.medias <id>*
+🔎 Cada registro incluye:
 
-🗑️ *BORRAR*
+🆔 ID del medio
+📄 Nombre del archivo
+📦 Tipo de archivo
+👤 Usuario que lo envió
+👥 Grupo donde fue recibido
+📅 Fecha de guardado
 
-• *.media del <id>*
-• *.media del <id> <id> <id>*
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-🧹 *BORRAR TODO*
+📤 *2. RECUPERAR UN MEDIO*
+
+Permite recuperar un archivo utilizando
+su número de ID.
+
+📝 *Comandos:*
+
+• *.media <ID>*
+• *.medias <ID>*
+
+📌 *Ejemplo:*
+
+*.media 25*
+
+➡️ El bot buscará el medio con ID *25*.
+
+📍 El archivo recuperado será enviado
+automáticamente al:
+
+👥 *GRUPO CENTRAL DE MEDIOS*
+
+⚠️ El archivo debe existir físicamente
+en la carpeta *./media*.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🗑️ *3. ELIMINAR MEDIOS*
+
+Permite eliminar uno o varios medios
+utilizando sus respectivos IDs.
+
+📝 *Comandos:*
+
+• *.media del <ID>*
+• *.media borrar <ID>*
+• *.media delete <ID>*
+• *.media del <ID> <ID> <ID>*
+
+📌 *Ejemplos:*
+
+*.media del 5*
+
+➡️ Elimina solamente el medio 5.
+
+*.media del 3 7 12*
+
+➡️ Elimina los medios 3, 7 y 12.
+
+⚠️ Al eliminar un medio también se elimina
+su archivo físico de *./media*.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧹 *4. LIMPIAR TODO*
+
+Elimina completamente los medios
+almacenados por el sistema.
+
+📝 *Comandos:*
 
 • *.media clear*
 • *.media clean*
 • *.media wipe*
+• *.media limpiar*
 
-🔄 *SINCRONIZAR*
+💥 Esta acción elimina:
+
+🗑️ Archivos de *./media*
+🗑️ Registros de *media.json*
+🗑️ Lista de medios en la memoria del bot
+
+⚠️ *ATENCIÓN:*
+
+Esta operación elimina *TODOS* los medios.
+No utilices este comando si solamente
+querés borrar un archivo específico.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 *5. SINCRONIZAR / REPARAR*
+
+Comprueba que los registros de
+*media.json* todavía tengan su archivo
+correspondiente en *./media*.
+
+📝 *Comandos:*
 
 • *.media sync*
+• *.media sincronizar*
+• *.media repair*
 • *.media fix*
 
-━━━━━━━━━━━━━━━━━━
+🔎 El sistema revisa los archivos y elimina
+de la base de datos aquellos registros cuyo
+archivo físico ya no existe.
 
-👑 *Solo disponible para el owner.*`,
+📌 Esto ayuda a mantener sincronizados:
+
+📂 *./media*
+↕️
+📄 *media.json*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🤖 *6. GUARDADO AUTOMÁTICO*
+
+El bot detecta automáticamente cuando
+recibe:
+
+🖼️ Imagen
+🎥 Video
+🎵 Audio
+📄 Documento
+
+📥 El archivo se descarga automáticamente
+y se registra en la base de datos.
+
+No es necesario ejecutar ningún comando
+para guardar el medio.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 *7. IDENTIFICACIÓN DE MEDIOS*
+
+Cada archivo recibe un ID numérico.
+
+Ejemplo:
+
+🆔 ID 1
+🆔 ID 2
+🆔 ID 3
+🆔 ID 4
+🆔 ID 5
+
+Estos IDs permiten posteriormente
+recuperar o eliminar un archivo.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 *GRUPO CENTRAL*
+
+Los medios recuperados mediante:
+
+*.media <ID>*
+
+se envían automáticamente al grupo:
+
+${MEDIA_GROUP_ID}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+👑 *PERMISOS*
+
+🔐 Este administrador está disponible
+únicamente para el *OWNER* del bot.
+
+Los usuarios normales no pueden:
+
+❌ Ver la lista
+❌ Recuperar medios
+❌ Eliminar medios
+❌ Limpiar la biblioteca
+❌ Sincronizar la base de datos
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 *EJEMPLO RÁPIDO*
+
+1️⃣ Ver medios:
+
+*.media*
+
+2️⃣ Buscar un archivo por ID:
+
+*.media 25*
+
+3️⃣ Eliminar un archivo:
+
+*.media del 25*
+
+4️⃣ Reparar la base de datos:
+
+*.media sync*
+
+5️⃣ Eliminar absolutamente todo:
+
+*.media clear*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🐈 *FELIXCAT BOT*
+🛡️ *Administrador de medios*
+👑 *Solo para el OWNER*`,
             m
         )
 
@@ -1143,6 +1429,7 @@ Ejemplos:
     }
 }
 
+
 // ============================================================
 // 📡 GUARDADO AUTOMÁTICO
 // ============================================================
@@ -1151,13 +1438,13 @@ handler.all = async function (m) {
 
     try {
 
-        if (!m?.message) return
+        if (!m?.message)
+            return
 
-        // No guardar comandos normales
-        // solamente media real
 
         const mtype =
             m.mtype
+
 
         if (
             mtype !== 'imageMessage' &&
@@ -1165,17 +1452,16 @@ handler.all = async function (m) {
             mtype !== 'audioMessage' &&
             mtype !== 'documentMessage'
         ) {
+
             return
         }
 
-        // --------------------------------------------------------
-        // Obtener conexión
-        // --------------------------------------------------------
 
         const conn =
             this?.user
                 ? this
                 : null
+
 
         await saveIncomingMedia(
             m,
@@ -1190,6 +1476,7 @@ handler.all = async function (m) {
         )
     }
 }
+
 
 // ============================================================
 // ⚙️ CONFIGURACIÓN DEL PLUGIN
@@ -1210,6 +1497,7 @@ handler.command = [
 ]
 
 handler.owner = true
+
 
 // ============================================================
 // 📤 EXPORTAR

@@ -549,21 +549,27 @@ async function viewMedia(m, conn, id) {
 let handler = async (m, { conn }) => {
   const text = String(m.text || '').trim()
 
-  if (!/^m(?:\s|$)/i.test(text)) return
+  // Acepta únicamente los comandos sin prefijo: m y mm.
+  if (!/^(?:m|mm)(?:\s+.*)?$/i.test(text)) return
 
   if (!isOwner(m, conn)) return
 
   const parts = text.split(/\s+/)
+  const command = String(parts[0] || '').toLowerCase()
   const action = String(parts[1] || '').toLowerCase()
   const id = Number(parts[2])
 
   // ==========================================================
-  // 📋 MENÚ
+  // 📋 MENÚ: SOLO CON "mm"
   // ==========================================================
 
-  if (!action || action === 'menu' || action === 'ayuda') {
+  if (command === 'mm') {
     return showMenu(m, conn)
   }
+
+  // El comando m sin argumentos queda reservado para recuperar
+  // multimedia citada. Las acciones administrativas usan m + acción.
+  if (command !== 'm') return
 
   // ==========================================================
   // 📋 LISTADOS
@@ -697,13 +703,14 @@ let handler = async (m, { conn }) => {
 // 🔤 PREFIJO PERSONALIZADO: M SIN PREFIJO
 // ============================================================
 
-// Permite "m" y también "m menu", "m lista", etc.
-handler.customPrefix = /^m(?:\s+.*)?$/i
+// "m" recupera multimedia.
+// "mm" abre el menú.
+handler.customPrefix = /^(?:m|mm)(?:\s+.*)?$/i
 handler.command = new RegExp()
 
 handler.help = [
   'm',
-  'm menu',
+  'mm',
   'm lista',
   'm borrados',
   'm ver <ID>',

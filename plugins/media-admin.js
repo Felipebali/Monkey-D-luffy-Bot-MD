@@ -1,6 +1,6 @@
 // 📂 plugins/media-admin.js
 // 🛡️ SISTEMA COMPLETO DE MEDIOS
-// 💾 Guardado automático + administrador + limpieza de DB
+// 💾 Guardado automático + administrador + limpieza segura de DB
 // 📌 Recuperación de medios en grupo central
 // ============================================================
 
@@ -348,7 +348,7 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
         }
 
         // ========================================================
-        // 🧹 BORRAR TODO
+        // 🧹 BORRAR TODO DE MEDIA-ADMIN DE FORMA SEGURA
         // ========================================================
 
         if (
@@ -357,12 +357,37 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
             let deletedFiles = 0
             let failedFiles = 0
 
+            // Solo borrar archivos registrados en media.json.
+            // No recorrer toda la carpeta ./media.
             for (const item of list) {
                 const filepath = getFilePath(item)
 
                 if (filepath && fs.existsSync(filepath)) {
                     try {
-                        fs.unlinkSync(filepath)
+                        // Protección adicional: permitir únicamente
+                        // archivos ubicados dentro de ./media.
+                        const absoluteMediaFolder = path.resolve(MEDIA_FOLDER)
+                        const absoluteFilepath = path.resolve(filepath)
+                        const relativePath = path.relative(
+                            absoluteMediaFolder,
+                            absoluteFilepath
+                        )
+
+                        const isInsideMediaFolder =
+                            relativePath !== '' &&
+                            !relativePath.startsWith('..') &&
+                            !path.isAbsolute(relativePath)
+
+                        if (!isInsideMediaFolder) {
+                            console.warn(
+                                '[MEDIA] Archivo fuera de ./media; no se borra:',
+                                absoluteFilepath
+                            )
+                            failedFiles++
+                            continue
+                        }
+
+                        fs.unlinkSync(absoluteFilepath)
                         deletedFiles++
                     } catch (e) {
                         failedFiles++
@@ -375,33 +400,8 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
                 }
             }
 
-            try {
-                const files = fs.readdirSync(MEDIA_FOLDER)
-
-                for (const file of files) {
-                    const filepath = path.join(MEDIA_FOLDER, file)
-
-                    try {
-                        if (fs.statSync(filepath).isFile()) {
-                            fs.unlinkSync(filepath)
-                            deletedFiles++
-                        }
-                    } catch (e) {
-                        failedFiles++
-                        console.error(
-                            '[MEDIA] Error limpiando:',
-                            filepath,
-                            e
-                        )
-                    }
-                }
-            } catch (e) {
-                console.error(
-                    '[MEDIA] Error leyendo carpeta media:',
-                    e
-                )
-            }
-
+            // Vaciar solamente la base de datos de este plugin.
+            // Los archivos no registrados en media.json se conservan.
             saveMediaDB([])
 
             if (global.db?.data) {
@@ -410,7 +410,7 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
 
             return conn.reply(
                 m.chat,
-`🧹 *MEDIOS COMPLETAMENTE LIMPIADOS*
+`🧹 *MEDIOS DE MEDIA-ADMIN LIMPIADOS*
 
 ━━━━━━━━━━━━━━━━━━
 
@@ -420,8 +420,10 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
 
 ━━━━━━━━━━━━━━━━━━
 
-✅ *La carpeta ./media quedó limpia.*
-✅ *media.json quedó vacío.*`,
+✅ Se limpiaron los registros de media-admin.js.
+✅ media.json quedó vacío.
+🔒 Los archivos ajenos de ./media se conservaron.
+🔒 No se modificó la carpeta de recuperación de _ver.js.`,
                 m
             )
         }
@@ -510,7 +512,26 @@ ${lines.join('\n\n━━━━━━━━━━━━━━━━━━\n\n')}`
 
                 if (filepath && fs.existsSync(filepath)) {
                     try {
-                        fs.unlinkSync(filepath)
+                        const absoluteMediaFolder = path.resolve(MEDIA_FOLDER)
+                        const absoluteFilepath = path.resolve(filepath)
+                        const relativePath = path.relative(
+                            absoluteMediaFolder,
+                            absoluteFilepath
+                        )
+
+                        const isInsideMediaFolder =
+                            relativePath !== '' &&
+                            !relativePath.startsWith('..') &&
+                            !path.isAbsolute(relativePath)
+
+                        if (isInsideMediaFolder) {
+                            fs.unlinkSync(absoluteFilepath)
+                        } else {
+                            console.warn(
+                                '[MEDIA] Archivo fuera de ./media; no se borra:',
+                                absoluteFilepath
+                            )
+                        }
                     } catch (e) {
                         console.error(
                             '[MEDIA] Error borrando archivo:',
@@ -766,19 +787,22 @@ al grupo central de medios.
 • *.media del 3 7 12*
 
 ⚠️ Al eliminar un medio también se elimina
-su archivo físico de *./media*.
+su archivo físico registrado en *./media*.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
-🧹 *4. LIMPIAR TODO*
+🧹 *4. LIMPIAR REGISTROS Y ARCHIVOS DEL SISTEMA*
 
 • *.media clear*
 • *.media clean*
 • *.media wipe*
 • *.media limpiar*
 
-⚠️ Esta operación elimina todos los archivos
-de la carpeta *./media* y vacía los registros.
+🔒 Solo elimina los archivos registrados
+por *media-admin.js* en *media.json*.
+
+✅ Conserva los archivos ajenos de *./media*.
+✅ No vacía carpetas de otros plugins.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 

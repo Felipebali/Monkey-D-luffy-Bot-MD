@@ -1,4 +1,3 @@
-
 import fs from 'fs'
 import path from 'path'
 
@@ -9,7 +8,7 @@ import path from 'path'
 const RECOVERED_DIR = './database/recovered-media-files'
 const RECOVERED_DB = './database/recovered-media.json'
 
-// Grupos donde se envían los archivos recuperados
+// Grupos A y B donde también se envían los archivos recuperados
 const RECOVERY_GROUPS = [
     '120363410955044864@g.us',
     '120363430366807750@g.us'
@@ -117,49 +116,52 @@ async function sendRecoveredMedia(conn, chat, item) {
     const filePath = getFilePath(item)
 
     if (!filePath) {
-        await conn.sendMessage(chat, {
-            text:
-`❌ No se encontró la copia física del archivo.
-
-🆔 ID: ${item.id}
-
-El registro existe, pero el archivo podría haberse eliminado de la carpeta.`
-        })
-
+        console.error(
+            `[RECOVERED] No se encontró la copia física: ${item.id}`
+        )
         return false
     }
 
     const buffer = fs.readFileSync(filePath)
     const caption = `♻️ *Archivo recuperado*\n🆔 ID: ${item.id}`
 
-    if (item.type === 'image') {
-        await conn.sendMessage(chat, {
-            image: buffer,
-            caption
-        })
-    } else if (item.type === 'video') {
-        await conn.sendMessage(chat, {
-            video: buffer,
-            caption
-        })
-    } else if (item.type === 'sticker') {
-        await conn.sendMessage(chat, {
-            sticker: buffer
-        })
-    } else {
-        await conn.sendMessage(chat, {
-            text: '❌ No se reconoce el tipo de archivo.'
-        })
+    try {
+        if (item.type === 'image') {
+            await conn.sendMessage(chat, {
+                image: buffer,
+                caption
+            })
+        } else if (item.type === 'video') {
+            await conn.sendMessage(chat, {
+                video: buffer,
+                caption
+            })
+        } else if (item.type === 'sticker') {
+            await conn.sendMessage(chat, {
+                sticker: buffer
+            })
+        } else {
+            console.error(
+                `[RECOVERED] Tipo desconocido para ${item.id}`
+            )
+            return false
+        }
 
+        return true
+    } catch (error) {
+        console.error(
+            `[RECOVERED] Error enviando archivo a ${chat}:`,
+            error
+        )
         return false
     }
-
-    return true
 }
 
 // ============================================================
-// 📡 DISTRIBUIR ARCHIVO A LOS GRUPOS CONFIGURADOS
-// 🚫 EXCLUIR EL GRUPO DONDE SE EJECUTÓ EL COMANDO
+// 📡 DISTRIBUIR ARCHIVO A LOS GRUPOS A Y B
+// ============================================================
+// Si el comando se ejecuta en A o B, no duplicar el envío.
+// Si se ejecuta en C, enviar también a A y B.
 // ============================================================
 
 async function sendToRecoveryGroups(conn, currentChat, item) {
@@ -172,6 +174,8 @@ async function sendToRecoveryGroups(conn, currentChat, item) {
         return
     }
 
+    // Excluir únicamente el chat actual si ya es A o B.
+    // Si el comando se ejecuta en C, se envía a A y B.
     const destinations = RECOVERY_GROUPS.filter(
         group => group !== currentChat
     )
@@ -284,8 +288,13 @@ let handler = async (m, { conn, isOwner }) => {
 ✅ *Restaurar*
 • .recovered restaurar ID
 
-📡 Los archivos recuperados se envían a los grupos configurados,
-excluyendo el grupo donde se ejecuta .ver o .r.
+📡 *Distribución de archivos*
+• Si usás .ver o .r en un grupo C, el archivo
+  se envía a C y también a los grupos A y B.
+• Si usás .ver o .r por privado, el archivo
+  se envía solamente a A y B.
+• No se envían confirmaciones de guardado
+  al chat donde se ejecuta el comando.
 
 💾 Los archivos se conservan en el almacenamiento local.`
             }, { quoted: m })
@@ -556,17 +565,35 @@ Ejemplos:
             list.push(item)
             saveRecoveredDB(list)
 
-            // Enviar solamente a los grupos configurados.
-            // Nunca al grupo desde el que se ejecutó el comando.
-            // No enviar confirmación de guardado al chat de origen.
+            // ====================================================
+            // 📤 ENVIAR EL ARCHIVO RECUPERADO
+            // ====================================================
+
+            // En grupos:
+            // Enviar primero al grupo donde se usó .ver o .r.
+            // Esto incluye cualquier grupo C.
+            if (m.isGroup) {
+                await sendRecoveredMedia(conn, m.chat, item)
+            }
+
+            // Enviar también a A y B.
+            // Si el comando se ejecutó en A o B, ese grupo se
+            // excluye de esta segunda distribución para no duplicar.
+            //
+            // Si se ejecutó en C, se envía a A y B.
+            //
+            // Si se ejecutó por privado, no se envía al privado:
+            // solamente se envía a A y B.
             await sendToRecoveryGroups(conn, m.chat, item)
 
-            // No enviar mensajes de éxito al chat de origen.
+            // No enviar confirmación de guardado al chat de origen.
         }
 
     } catch (error) {
         console.error('[RECOVERED] Error:', error)
 
+        // No enviar confirmaciones de éxito al chat de origen.
+        // Este mensaje solo se envía si ocurre un error real.
         return conn.sendMessage(m.chat, {
             text: '❌ Ocurrió un error al procesar el archivo.'
         }, { quoted: m })

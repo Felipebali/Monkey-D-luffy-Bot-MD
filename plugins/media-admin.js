@@ -421,7 +421,8 @@ const handler = async (m, { conn, args, text }) => {
                 )
             }
 
-            const max = Math.min(list.length, 100)
+            // Mostrar hasta 800 medios.
+            const max = Math.min(list.length, 800)
 
             const lines = list.slice(0, max).map(item => (
                 `🆔 *ID:* ${item.id}\n` +

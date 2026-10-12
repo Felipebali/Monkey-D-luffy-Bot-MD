@@ -1,7 +1,7 @@
 // 📂 plugins/media-admin.js
 // 🛡️ FELIXCAT BOT — SISTEMA COMPLETO DE MEDIOS
 // 💾 Guardado automático + administrador + limpieza de DB
-// 📌 Recuperación silenciosa en dos grupos centrales
+// 📌 Recuperación silenciosa en un grupo central
 // ============================================================
 
 import fs from 'fs'
@@ -16,13 +16,10 @@ const MEDIA_DB_FILE = './database/media.json'
 const MEDIA_FOLDER = './media'
 
 // ============================================================
-// 📌 GRUPOS CENTRALES
+// 📌 GRUPO CENTRAL
 // ============================================================
 
-const MEDIA_GROUPS = [
-    '120363410955044864@g.us',
-    '120363430366807750@g.us'
-]
+const MEDIA_GROUP = '120363410955044864@g.us'
 
 // ============================================================
 // 📂 CREAR CARPETAS Y BASE DE DATOS
@@ -334,7 +331,7 @@ async function saveIncomingMedia(m, conn) {
 }
 
 // ============================================================
-// 📤 ENVIAR ARCHIVO A UN GRUPO
+// 📤 ENVIAR ARCHIVO AL GRUPO CENTRAL
 // ============================================================
 
 async function sendMediaToGroup(conn, groupId, item, filepath) {
@@ -575,6 +572,7 @@ const handler = async (m, { conn, args, text }) => {
         // .media 1
         // .medias 1
         //
+        // 🚫 SOLO ENVÍA AL GRUPO TERMINADO EN 864
         // 🚫 SIN CONFIRMACIÓN EN EL CHAT DE ORIGEN
         // --------------------------------------------------------
 
@@ -618,33 +616,23 @@ const handler = async (m, { conn, args, text }) => {
                 )
             }
 
-            // Enviar a los dos grupos sin citar el comando
-            // y sin responder en el chat donde se ejecutó.
-            const results = await Promise.allSettled(
-                MEDIA_GROUPS.map(groupId =>
-                    sendMediaToGroup(conn, groupId, item, filepath)
+            // Enviar únicamente al grupo central terminado en 864.
+            // Sin citar el comando y sin responder en el chat de origen.
+            try {
+                await sendMediaToGroup(
+                    conn,
+                    MEDIA_GROUP,
+                    item,
+                    filepath
                 )
-            )
-
-            const failed = results
-                .map((result, index) => ({
-                    result,
-                    groupId: MEDIA_GROUPS[index]
-                }))
-                .filter(({ result }) => result.status === 'rejected')
-
-            if (failed.length) {
+            } catch (error) {
                 console.error(
-                    `[MEDIA] Falló el envío del ID ${id} a uno o más grupos:`,
-                    failed.map(({ groupId, result }) => ({
-                        groupId,
-                        error: String(result.reason)
-                    }))
+                    `[MEDIA] Falló el envío del ID ${id} al grupo ${MEDIA_GROUP}:`,
+                    error
                 )
             }
 
-            // No enviar "media recuperado correctamente".
-            // Tampoco enviar otra confirmación al chat de origen.
+            // No enviar confirmación al chat de origen.
             return
         }
 

@@ -1,385 +1,366 @@
-// 📂 plugins/id-lid-owner.js
+
+ // 📂 plugins/id-lid-owner.js
 // 🧠 ID / LID — Solo Owner
+// Compatible con Baileys MD
 // ============================================================
 
+import { jidNormalizedUser } from '@whiskeysockets/baileys'
 
 // ============================================================
-// 🔢 NORMALIZADOR DE NÚMEROS
+// 🔢 NORMALIZAR JID
+// ============================================================
+
+function normalizeJid(jid = '') {
+  return String(jid).trim()
+    .replace(/:\d+(?=@)/g, '')
+}
+
+// ============================================================
+// 🔢 NORMALIZAR NÚMERO
 // ============================================================
 
 function normalizeNumber(input = '') {
   return String(input)
     .replace(/@s\.whatsapp\.net/gi, '')
-    .replace(/@lid/gi, '')
+    .replace(/@c\.us/gi, '')
     .replace(/[^0-9]/g, '')
     .replace(/^0+/, '')
 }
 
-
 // ============================================================
-// 👑 COMPROBAR SI ES OWNER
+// 👑 COMPROBAR OWNER
 // ============================================================
 
 function isOwner(m) {
-
   const owners = Array.isArray(global.owner)
     ? global.owner
     : []
 
-  // Número/JID del que ejecuta el comando
   const sender = normalizeNumber(
-    m.sender ||
-    m.participant ||
-    ''
+    m.sender || m.participant || ''
   )
 
-  if (!sender)
-    return false
+  if (!sender) return false
 
   for (let owner of owners) {
+    if (Array.isArray(owner)) owner = owner[0]
 
-    // Si global.owner tiene:
-    // ['598xxxxxxxx']
-    // [['598xxxxxxxx', 'Felipe']]
-    // ['+598xxxxxxxx@s.whatsapp.net']
+    const ownerRaw = String(owner || '')
+    const ownerNumber = normalizeNumber(ownerRaw)
 
-    if (Array.isArray(owner))
-      owner = owner[0]
+    // Los LID no son números telefónicos.
+    if (/@lid$/i.test(ownerRaw)) {
+      if (
+        normalizeJid(m.sender) === normalizeJid(ownerRaw)
+      ) return true
 
-    const ownerNumber = normalizeNumber(owner)
-
-    if (!ownerNumber)
       continue
+    }
 
-    // Comparación directa
-    if (sender === ownerNumber)
-      return true
+    if (!ownerNumber) continue
 
-    // ========================================================
-    // 🇺🇾 COMPATIBILIDAD URUGUAY
-    // Permite comparar:
-    // 598XXXXXXXX
-    // 09XXXXXXX
-    // XXXXXXXXX
-    // ========================================================
+    if (sender === ownerNumber) return true
 
-    const senderUY =
-      sender.startsWith('598')
-        ? sender.slice(3)
-        : sender
+    const senderUY = sender.startsWith('598')
+      ? sender.slice(3)
+      : sender
 
-    const ownerUY =
-      ownerNumber.startsWith('598')
-        ? ownerNumber.slice(3)
-        : ownerNumber
+    const ownerUY = ownerNumber.startsWith('598')
+      ? ownerNumber.slice(3)
+      : ownerNumber
 
-    if (senderUY === ownerUY)
-      return true
+    if (senderUY === ownerUY) return true
 
-    // También compara los últimos 8 dígitos
     if (
       sender.length >= 8 &&
       ownerNumber.length >= 8 &&
       sender.slice(-8) === ownerNumber.slice(-8)
-    ) {
-      return true
-    }
+    ) return true
   }
 
   return false
 }
-
 
 // ============================================================
 // 🔎 EXTRAER NÚMERO DEL TEXTO
 // ============================================================
 
 function extractNumberFromText(text = '') {
+  const clean = String(text)
+    .replace(/^[.!/#]\s*id\b/i, '')
+    .trim()
 
-  const match = String(text).match(/\+?\d{7,15}/)
+  const match = clean.match(/^\+?\d{7,15}$/)
 
-  return match
-    ? normalizeNumber(match[0])
-    : null
+  return match ? normalizeNumber(match[0]) : null
 }
 
+// ============================================================
+// 🧷 OBTENER USUARIO CITADO
+// ============================================================
+
+function getQuotedJid(m) {
+  const quoted = m.quoted
+
+  if (!quoted) return null
+
+  return (
+    quoted.sender ||
+    quoted.participant ||
+    quoted.key?.participant ||
+    quoted.key?.remoteJid ||
+    quoted.msg?.contextInfo?.participant ||
+    null
+  )
+}
+
+// ============================================================
+// 🆔 OBTENER IDENTIFICADOR DEL USUARIO
+// ============================================================
+
+async function getUserInfo(conn, m, groupMetadata) {
+  // 1. Usuario citado
+  let jid = getQuotedJid(m)
+
+  // 2. Usuario mencionado
+  if (!jid && m.mentionedJid?.length) {
+    jid = m.mentionedJid[0]
+  }
+
+  // 3. Usuario indicado mediante el número
+  if (!jid) {
+    const rawText =
+      m.text ||
+      m.message?.conversation ||
+      m.message?.extendedTextMessage?.text ||
+      ''
+
+    const number = extractNumberFromText(rawText)
+
+    if (number) jid = `${number}@s.whatsapp.net`
+  }
+
+  if (!jid) return null
+
+  jid = normalizeJid(jid)
+
+  // Buscar correspondencia JID/LID entre participantes.
+  const participants = groupMetadata?.participants || []
+
+  const participant = participants.find(p => {
+    const ids = [
+      p.id,
+      p.jid,
+      p.lid,
+      p.phoneNumber
+    ].filter(Boolean).map(normalizeJid)
+
+    return ids.includes(jid)
+  })
+
+  const phoneJid =
+    participant?.phoneNumber ||
+    (
+      jid.endsWith('@s.whatsapp.net')
+        ? jid
+        : null
+    )
+
+  const lid =
+    participant?.lid ||
+    (jid.endsWith('@lid') ? jid : null)
+
+  let name = 'Usuario'
+
+  try {
+    name = await conn.getName(jid) || name
+  } catch {}
+
+  const number = phoneJid
+    ? normalizeNumber(phoneJid)
+    : null
+
+  return {
+    jid,
+    lid,
+    phoneJid,
+    number,
+    name,
+    participant
+  }
+}
+
+// ============================================================
+// 🆔 FORMATEAR INFORMACIÓN
+// ============================================================
+
+function formatUserInfo(user) {
+  return `
+╭─✿ *ID / LID DE USUARIO* ✿─╮
+│
+│ 👤 *Nombre:* ${user.name}
+│ 📞 *Número:* ${user.number || 'No disponible'}
+│ 🆔 *JID/ID:* ${user.jid}
+│ 🪪 *LID:* ${user.lid || 'No disponible'}
+│
+╰───────────────────────────╯
+`.trim()
+}
 
 // ============================================================
 // 🆔 HANDLER .ID
 // ============================================================
 
 let handler = async function (m, { conn, groupMetadata }) {
-
-  // ==========================================================
-  // 👑 VERIFICACIÓN OWNER
-  // ==========================================================
-
-  if (!isOwner(m))
+  if (!isOwner(m)) {
     return m.reply('❌ Solo el owner puede usar este comando.')
+  }
 
+  // Priorizar el mensaje citado o la mención.
+  const user = await getUserInfo(conn, m, groupMetadata)
 
-  // ==========================================================
-  // 🧷 CASO 1 — MENCIÓN
-  // ==========================================================
-
-  if (m.mentionedJid && m.mentionedJid.length > 0) {
-
-    const userJid = m.mentionedJid[0]
-
-    const userName =
-      await conn.getName(userJid).catch(() => null) ||
-      'Usuario'
-
-    const number = normalizeNumber(userJid)
-
-    const mensaje = `
-╭─✿ *ID DE USUARIO* ✿─╮
-│
-│ 👤 *Nombre:* ${userName}
-│ 📞 *Número:* ${number}
-│ 🆔 *JID/ID:* ${userJid}
-│
-╰─────────────────────╯
-`.trim()
-
+  if (user) {
     return conn.reply(
       m.chat,
-      mensaje,
+      formatUserInfo(user),
       m,
       {
-        mentions: [userJid]
+        mentions: [user.jid]
       }
     )
   }
 
-
-  // ==========================================================
-  // 🧷 CASO 2 — NÚMERO ESCRITO
-  // ==========================================================
-
-  const rawText =
-    m.text ||
-    m.message?.conversation ||
-    m.message?.extendedTextMessage?.text ||
-    ''
-
-  const extracted = extractNumberFromText(rawText)
-
-  if (extracted) {
-
-    const userJid =
-      extracted + '@s.whatsapp.net'
-
-    const userName =
-      await conn.getName(userJid).catch(() => null) ||
-      'Usuario'
-
-    const mensaje = `
-╭─✿ *ID DE USUARIO* ✿─╮
-│
-│ 👤 *Nombre:* ${userName}
-│ 📞 *Número:* ${extracted}
-│ 🆔 *JID/ID:* ${userJid}
-│
-╰─────────────────────╯
-`.trim()
+  // Sin usuario seleccionado: mostrar el ID del grupo.
+  if (m.isGroup) {
+    const participants =
+      groupMetadata?.participants || []
 
     return conn.reply(
       m.chat,
-      mensaje,
-      m
-    )
-  }
-
-
-  // ==========================================================
-  // 🏢 CASO 3 — SIN DATOS EN GRUPO
-  // ==========================================================
-
-  if (m.isGroup) {
-
-    const participantes =
-      groupMetadata?.participants || []
-
-    const mensaje = `
+      `
 ╭─✿ *ID DEL GRUPO* ✿─╮
 │
 │ 🏢 *Nombre:* ${groupMetadata?.subject || 'Sin nombre'}
 │ 🆔 *JID/ID:* ${m.chat}
-│ 👥 *Participantes:* ${participantes.length}
+│ 👥 *Participantes:* ${participants.length}
 │
 ╰─────────────────────╯
-`.trim()
-
-    return conn.reply(
-      m.chat,
-      mensaje,
+`.trim(),
       m
     )
   }
 
-
-  // ==========================================================
-  // 📋 AYUDA
-  // ==========================================================
-
-  const ayuda = `
-📋 *USO DEL COMANDO ID/LID*
-
-🏷️ *.id @usuario*
-📞 *.id +598XXXXXXXX*
-🏢 *.id* — En un grupo
-📱 *.lid* — Lista completa
-
-💡 *Ejemplos:*
-
-• .id @juan
-• .id +59898116138
-• .id
-• .lid
-`.trim()
-
-  return conn.reply(
-    m.chat,
-    ayuda,
-    m
+  return m.reply(
+    '📋 *USO DEL COMANDO*\n\n' +
+    '• .id @usuario\n' +
+    '• Respondé a un mensaje con .id\n' +
+    '• .id +598XXXXXXXX\n' +
+    '• .lid — Lista de participantes'
   )
 }
-
 
 // ============================================================
 // 📱 HANDLER .LID
 // ============================================================
 
-let handlerLid = async function (
-  m,
-  { conn, groupMetadata }
-) {
+let handlerLid = async function (m, { conn, groupMetadata }) {
+  if (!m.isGroup) {
+    return m.reply('❌ Este comando solo funciona en grupos.')
+  }
 
-  // ==========================================================
-  // 👥 SOLO GRUPOS
-  // ==========================================================
+  if (!isOwner(m)) {
+    return m.reply('❌ Solo el owner puede usar este comando.')
+  }
 
-  if (!m.isGroup)
-    return m.reply(
-      '❌ Este comando solo funciona en grupos.'
-    )
-
-
-  // ==========================================================
-  // 👑 VERIFICACIÓN OWNER
-  // ==========================================================
-
-  if (!isOwner(m))
-    return m.reply(
-      '❌ Solo el owner puede usar este comando.'
-    )
-
-
-  // ==========================================================
-  // 👥 PARTICIPANTES
-  // ==========================================================
-
-  const participantes =
+  const participants =
     groupMetadata?.participants || []
 
+  if (!participants.length) {
+    return m.reply('❌ No se pudieron obtener los participantes.')
+  }
 
-  // ==========================================================
-  // 🪪 TARJETAS
-  // ==========================================================
+  const tarjetas = participants.map((p, index) => {
+    const jid = normalizeJid(p.id || p.jid || p.lid || 'N/A')
 
-  const tarjetas = participantes.map(
-    (p, index) => {
+    const lid = p.lid ||
+      (jid.endsWith('@lid') ? jid : 'No disponible')
 
-      const jid =
-        p.id ||
-        'N/A'
+    const phone = p.phoneNumber ||
+      (jid.endsWith('@s.whatsapp.net') ? jid : null)
 
-      const username =
-        '@' + normalizeNumber(jid)
+    const number = phone
+      ? normalizeNumber(phone)
+      : 'No disponible'
 
-      const estado =
-        p.admin === 'superadmin'
-          ? '👑 *Propietario*'
-          : p.admin === 'admin'
-            ? '🛡️ *Administrador*'
-            : '👤 *Miembro*'
+    const role = p.admin === 'superadmin'
+      ? '👑 Propietario'
+      : p.admin === 'admin'
+        ? '🛡️ Administrador'
+        : '👤 Miembro'
 
-      return [
-        `╭─✿ *Usuario ${index + 1}* ✿`,
-        `│ 👤 *Nombre:* ${username}`,
-        `│ 🆔 *JID:* ${jid}`,
-        `│ 🏷️ *Rol:* ${estado}`,
-        '╰───────────────✿'
-      ].join('\n')
-    }
-  )
+    return [
+      `╭─✿ *Usuario ${index + 1}* ✿`,
+      `│ 📞 *Número:* ${number}`,
+      `│ 🆔 *JID:* ${jid}`,
+      `│ 🪪 *LID:* ${lid}`,
+      `│ 🏷️ *Rol:* ${role}`,
+      '╰───────────────✿'
+    ].join('\n')
+  })
 
-
-  // ==========================================================
-  // 📝 CONTENIDO
-  // ==========================================================
-
-  const contenido =
+  const mensaje =
+    `╭━━❖ *LISTA DE PARTICIPANTES* ❖━━╮\n` +
+    `│ 🏢 *Grupo:* ${groupMetadata?.subject || 'Sin nombre'}\n` +
+    `│ 👥 *Total:* ${participants.length}\n` +
+    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
     tarjetas.join('\n\n')
 
+  // Dividir mensajes extensos para evitar exceder límites.
+  const maxLength = 3500
+  const chunks = []
+  let chunk = ''
 
-  // ==========================================================
-  // 📢 MENCIONES
-  // ==========================================================
+  for (const tarjeta of [mensaje]) {
+    if (tarjeta.length <= maxLength) {
+      chunks.push(tarjeta)
+    } else {
+      const lines = tarjeta.split('\n')
 
-  const mencionados =
-    participantes
-      .map(p => p.id)
-      .filter(Boolean)
+      for (const line of lines) {
+        if ((chunk + '\n' + line).length > maxLength) {
+          if (chunk) chunks.push(chunk)
+          chunk = line
+        } else {
+          chunk += (chunk ? '\n' : '') + line
+        }
+      }
 
-
-  // ==========================================================
-  // 📤 MENSAJE
-  // ==========================================================
-
-  const mensajeFinal = `
-╭━━━❖『 *LISTA DE PARTICIPANTES* 』❖━━━╮
-│
-│ 👥 *Grupo:* ${groupMetadata?.subject || 'Sin nombre'}
-│ 🔢 *Total:* ${participantes.length} miembros
-│
-╰━━━━━━━━━━━━━━━━━━━━━━╯
-
-${contenido}
-`.trim()
-
-  return conn.reply(
-    m.chat,
-    mensajeFinal,
-    m,
-    {
-      mentions: mencionados
+      if (chunk) {
+        chunks.push(chunk)
+        chunk = ''
+      }
     }
-  )
+  }
+
+  for (const part of chunks) {
+    await conn.reply(m.chat, part, m)
+  }
 }
 
-
 // ============================================================
-// ⚙️ CONFIGURACIÓN .ID
+// ⚙️ CONFIGURACIÓN
 // ============================================================
 
 handler.command = ['id']
-handler.help = ['id', 'id @user']
+handler.help = ['id', 'id @usuario']
 handler.tags = ['info']
 handler.rowner = true
-
-
-// ============================================================
-// ⚙️ CONFIGURACIÓN .LID
-// ============================================================
 
 handlerLid.command = ['lid']
 handlerLid.help = ['lid']
 handlerLid.tags = ['group']
 handlerLid.group = true
 handlerLid.rowner = true
-
 
 // ============================================================
 // 📤 EXPORTAR

@@ -1,13 +1,9 @@
-
-// 📂 plugins/promote.js
-// 👑 SISTEMA DE PROMOCIÓN A ADMINISTRADOR
-// 🛡️ Permisos | Validaciones | Historial | WhatsApp-Bot
+// 📂 plugins/grupo-promote.js
+// 👑 PROMOVER USUARIO A ADMINISTRADOR
+// 🛡️ Permisos + Historial + Compatibilidad
 // ============================================================
 
-const handler = async (
-  m,
-  { conn, isAdmin, isBotAdmin, isOwner }
-) => {
+let handler = async (m, { conn, isAdmin, isBotAdmin, isOwner }) => {
 
   // ==========================================================
   // 🏢 VALIDAR GRUPO
@@ -20,145 +16,100 @@ const handler = async (
   }
 
   // ==========================================================
-  // 🛡️ VALIDAR PERMISOS DEL EJECUTOR
+  // 🛡️ VALIDAR PERMISOS
   // ==========================================================
 
   if (!isAdmin && !isOwner) {
     return m.reply(
-      '╭━━━〔 🛡️ 〕━━━╮\n' +
-      '   *ACCESO DENEGADO*\n' +
-      '╰━━━━━━━━━━━━━━╯\n\n' +
-      '❌ Solo los administradores o propietarios del bot pueden usar este comando.'
+      '❌ Solo los administradores o propietarios pueden usar este comando.'
     )
   }
-
-  // ==========================================================
-  // 🤖 VALIDAR ADMINISTRADOR DEL BOT
-  // ==========================================================
 
   if (!isBotAdmin) {
     return m.reply(
-      '❌ Necesito ser administrador del grupo para promover usuarios.'
+      '❌ Necesito ser administrador para promover usuarios.'
     )
   }
 
   // ==========================================================
-  // 👤 IDENTIFICAR USUARIO OBJETIVO
+  // 👤 IDENTIFICAR USUARIO
   // ==========================================================
 
   const user =
-    m.mentionedJid?.[0] ||
-    m.quoted?.sender ||
-    m.quoted?.participant ||
-    null
+    (m.mentionedJid && m.mentionedJid[0]) ||
+    (m.quoted && m.quoted.sender)
 
   if (!user) {
     return m.reply(
-      '╭━━━〔 👑 〕━━━╮\n' +
-      '   *PROMOVER ADMINISTRADOR*\n' +
-      '╰━━━━━━━━━━━━━━╯\n\n' +
-      '📌 Mencioná a un usuario o respondé a uno de sus mensajes.\n\n' +
-      '💡 *Ejemplo:* .p @usuario'
+      '⚠️ Mencioná o respondé al usuario que deseas promover.'
     )
   }
 
-  // Normalizar sufijos de dispositivos sin cambiar el servidor JID/LID.
-  const target = String(user).replace(/:\d+(?=@)/g, '')
-  const botJid = String(conn.user?.id || '')
-    .replace(/:\d+(?=@)/g, '')
-
-  // ==========================================================
-  // 🔎 CONSULTAR ESTADO ACTUAL
-  // ==========================================================
-
   try {
+
+    // ========================================================
+    // 📡 OBTENER INFORMACIÓN DEL GRUPO
+    // ========================================================
+
     const metadata = await conn.groupMetadata(m.chat)
-    const participants = metadata?.participants || []
 
-    const findParticipant = jid => {
-      const normalized = String(jid).replace(/:\d+(?=@)/g, '')
+    const normalizeJid = jid =>
+      String(jid || '').replace(/:\d+(?=@)/g, '')
 
-      return participants.find(p => {
-        const ids = [
-          p.id,
-          p.jid,
-          p.lid
-        ].filter(Boolean).map(
-          value => String(value).replace(/:\d+(?=@)/g, '')
-        )
+    const target = normalizeJid(user)
 
-        return ids.includes(normalized)
-      })
-    }
+    const participant = (metadata.participants || []).find(p => {
+      const ids = [p.id, p.jid, p.lid].filter(Boolean)
+      return ids.some(id => normalizeJid(id) === target)
+    })
 
-    const targetParticipant = findParticipant(target)
-    const botParticipant = findParticipant(botJid)
-
-    if (!targetParticipant) {
+    if (!participant) {
       return m.reply(
-        '❌ No pude identificar al usuario entre los participantes del grupo.'
+        '❌ No pude encontrar al usuario entre los participantes del grupo.'
       )
     }
 
-    if (targetParticipant.admin) {
+    if (participant.admin) {
       return m.reply(
         'ℹ️ Este usuario ya es administrador del grupo.'
       )
     }
 
-    if (
-      botParticipant &&
-      [botParticipant.id, botParticipant.jid, botParticipant.lid]
-        .filter(Boolean)
-        .some(id =>
-          String(id).replace(/:\d+(?=@)/g, '') === target
-        )
-    ) {
-      return m.reply(
-        '⚠️ No podés utilizar este comando para promover al propio bot.'
-      )
-    }
-
     // ========================================================
-    // ⚙️ PROMOVER USUARIO
+    // 👑 PROMOVER USUARIO
     // ========================================================
 
-    const result = await conn.groupParticipantsUpdate(
+    await conn.groupParticipantsUpdate(
       m.chat,
-      [target],
+      [user],
       'promote'
     )
-
-    // Baileys puede devolver resultados individuales.
-    const operation = Array.isArray(result)
-      ? result.find(item => {
-          const id = item?.jid || item?.id
-          return !id || String(id).replace(/:\d+(?=@)/g, '') === target
-        }) || result[0]
-      : result
-
-    if (
-      operation?.status &&
-      !['200', 'ok'].includes(String(operation.status).toLowerCase())
-    ) {
-      throw new Error(
-        `WhatsApp rechazó la promoción (estado ${operation.status}).`
-      )
-    }
 
     // ========================================================
     // 📝 REGISTRAR HISTORIAL
     // ========================================================
 
     try {
-      if (global.db?.data) {
-        global.db.data.chats ||= {}
+      if (global.db && global.db.data) {
 
-        const chatData = global.db.data.chats[m.chat] ||= {}
+        // Inicializar la base de datos de chats
+        if (!global.db.data.chats) {
+          global.db.data.chats = {}
+        }
 
-        // Solo registrar si el historial está habilitado.
+        // Inicializar el grupo
+        if (!global.db.data.chats[m.chat]) {
+          global.db.data.chats[m.chat] = {}
+        }
+
+        const chatData = global.db.data.chats[m.chat]
+
+        // Respetar configuración del registro
         if (chatData.adminLog !== false) {
-          chatData.adminHistory ||= []
+
+          if (!Array.isArray(chatData.adminHistory)) {
+            chatData.adminHistory = []
+          }
 
           chatData.adminHistory.push({
             fecha: new Date().toLocaleString('es-UY', {
@@ -166,78 +117,63 @@ const handler = async (
               hour12: false
             }),
             actor: m.sender,
-            target,
-            action: 'promovió a administrador',
-            rango: isOwner ? '👑 OWNER' : '🛡️ ADMIN'
+            target: user,
+            action: 'promovió a admin (por comando)',
+            rango: isOwner ? '👑 DUEÑO' : '🛡️ ADMIN'
           })
 
+          // Mantener los últimos 20 registros
           if (chatData.adminHistory.length > 20) {
-            chatData.adminHistory.splice(
-              0,
-              chatData.adminHistory.length - 20
-            )
+            chatData.adminHistory =
+              chatData.adminHistory.slice(-20)
           }
         }
       }
+
     } catch (dbError) {
-      // Un error del historial no debe ocultar el resultado de WhatsApp.
-      console.error('[PROMOTE-HISTORY]', dbError)
+      console.error(
+        '[PROMOTE-HISTORY]',
+        dbError
+      )
     }
 
     // ========================================================
-    // 📢 CONFIRMAR PROMOCIÓN
+    // 📤 CONFIRMAR PROMOCIÓN
     // ========================================================
 
     let nombre = 'Usuario'
 
     try {
-      nombre = await conn.getName(target) || nombre
+      nombre = await conn.getName(user) || nombre
     } catch {}
-
-    const tag = target.includes('@lid')
-      ? null
-      : target
 
     const texto =
       '╭━━━〔 👑 〕━━━╮\n' +
       '   *NUEVO ADMINISTRADOR*\n' +
       '╰━━━━━━━━━━━━━━╯\n\n' +
       `👤 *Usuario:* ${nombre}\n` +
-      (tag ? `📌 *Mención:* @${tag.split('@')[0]}\n` : '') +
+      `📌 *Mención:* @${user.split('@')[0]}\n` +
       `🛡️ *Promovido por:* ${m.pushName || 'Administrador'}\n\n` +
-      '✅ La solicitud de promoción fue procesada.\n' +
-      '━━━━━━━━━━━━━━━━━━'
+      '✅ Usuario promovido correctamente.'
 
     return await conn.sendMessage(
       m.chat,
       {
         text: texto,
-        mentions: tag ? [tag] : []
+        mentions: [user]
       },
-      { quoted: m }
+      {
+        quoted: m
+      }
     )
 
-  } catch (error) {
-    console.error('[PROMOTE]', error)
+  } catch (e) {
 
-    const reason = String(
-      error?.message || error
-    ).toLowerCase()
+    console.error('[GRUPO-PROMOTE]', e)
 
-    let mensaje =
-      '❌ No se pudo completar la promoción. Intentá nuevamente.'
-
-    if (
-      reason.includes('not-authorized') ||
-      reason.includes('forbidden') ||
-      reason.includes('not admin') ||
-      reason.includes('not an admin')
-    ) {
-      mensaje =
-        '🛡️ WhatsApp rechazó la operación. Verificá los permisos de administrador del bot.'
-    }
-
-    return m.reply(mensaje)
+    return m.reply(
+      '❌ Error al intentar promover al usuario. Verificá los permisos del bot e intentá nuevamente.'
+    )
   }
 }
 
@@ -248,7 +184,6 @@ const handler = async (
 handler.help = ['p']
 handler.tags = ['group']
 handler.command = ['p']
-
 handler.group = true
 handler.admin = false
 handler.botAdmin = true

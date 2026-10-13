@@ -635,13 +635,13 @@ const handler = async (
 
         await sleep(500)
 
-        // 🔇 SIN MENSAJE EN LOS GRUPOS
+        // 🚫 CON AVISO EN CADA GRUPO DONDE SE EXPULSE
         await kickUser(
           conn,
           jid,
           userJid,
           reason,
-          false
+          true
         )
       }
 

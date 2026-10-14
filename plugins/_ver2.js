@@ -19,8 +19,7 @@ const RECOVERED_DB = './database/recovered-media.json'
 
 // Grupos A y B
 const RECOVERY_GROUPS = [
-    '120363410955044864@g.us',
-    '120363430366807750@g.us'
+    '120363410955044864@g.us'
 ]
 
 // Crear carpeta y JSON si no existen

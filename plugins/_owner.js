@@ -19,7 +19,7 @@ let handler = async (m, { conn }) => {
   }
 
   // Mostrar un máximo de 3 propietarios
-  const owners = global.owner.slice(0, 2)
+  const owners = global.owner.slice(0, 3)
 
   const mentions = []
   const tarjetas = []

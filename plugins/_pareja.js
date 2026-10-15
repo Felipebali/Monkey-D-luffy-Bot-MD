@@ -276,7 +276,7 @@ ${text}
 
     if (!targetRaw)
       return m.reply(
-        '💌 Menciona o responde a la persona a la que quieres proponerle.'
+        '💌 Para enviar una propuesta de noviazgo, menciona a la persona o responde a uno de sus mensajes.'
       )
 
 
@@ -285,7 +285,7 @@ ${text}
 
     if (sameUser(target, sender))
       return m.reply(
-        '😹 No puedes proponerte a ti mismo.'
+        '💭 Una historia de amor necesita dos personas. No puedes enviarte una propuesta a ti mismo.'
       )
 
 
@@ -302,11 +302,11 @@ ${text}
         m.chat,
 
         box(
-          '💞 YA TIENES PAREJA',
+          '💞 RELACIÓN ACTUAL',
 
           `${tag(sender)} ❤️ ${tag(user.pareja)}
 
-No puedes hacer una propuesta mientras estás en una relación.`
+Actualmente tienes una relación registrada. Para realizar una nueva propuesta, primero debes cerrar tu relación actual.`
         ),
 
         m,
@@ -328,12 +328,12 @@ No puedes hacer una propuesta mientras estás en una relación.`
         m.chat,
 
         box(
-          '💔 PERSONA OCUPADA',
+          '💞 ESTA PERSONA TIENE PAREJA',
 
           `${tag(target)} ❤️ ${tag(tu.pareja)}
 
-Esta persona ya está en una relación.
-Respeta su relación ❤️`
+Esta persona mantiene una relación actualmente.
+Por favor, respeta su vínculo y su decisión. ❤️`
         ),
 
         m,
@@ -362,24 +362,25 @@ Respeta su relación ❤️`
 
       box(
 
-        '💌 CARTA DE AMOR',
+        '💌 PROPUESTA DE NOVIAZGO',
 
         `💐 Para: ${tag(target)}
 
-Hay personas que llegan a nuestra vida
-y hacen que todo se sienta un poquito más lindo. ❤️
+A veces, una persona llega a nuestra vida
+y aporta momentos que merecen ser recordados. ❤️
 
-Hoy quiero hacerte una pregunta especial...
+Hoy ${tag(sender)} quiere hacerte una propuesta especial.
 
-💖 ${tag(sender)} quiere estar contigo.
+💖 ¿Te gustaría comenzar una relación juntos?
 
-¿Aceptas comenzar una historia juntos? 💕
+╭───────────────╮
+💌 RESPONDE A LA PROPUESTA
+╰───────────────╯
 
-✨ *.aceptar* — Aceptar
-💔 *.rechazar* — Rechazar
+✅ *.aceptar* — Aceptar la propuesta
+💔 *.rechazar* — Rechazar la propuesta
 
-🌹 Quizás este sea el comienzo
-de una hermosa historia.`
+🌹 Sea cual sea tu respuesta, que sea sincera y de corazón.`
       ),
 
       m,
@@ -406,7 +407,7 @@ de una hermosa historia.`
     if (!user.propuesta)
 
       return m.reply(
-        '💭 No tienes propuestas de amor pendientes.'
+        '💌 No tienes ninguna propuesta de noviazgo pendiente por responder.'
       )
 
 
@@ -424,7 +425,7 @@ de una hermosa historia.`
     )
 
       return m.reply(
-        '❌ Uno de los dos ya tiene pareja.'
+        '⚠️ No se puede confirmar la relación porque una de las dos personas ya tiene una pareja registrada.'
       )
 
 
@@ -460,25 +461,25 @@ de una hermosa historia.`
 
       box(
 
-        '💞 NUEVA PAREJA',
+        '💞 RELACIÓN CONFIRMADA',
 
         `💖 ${tag(sender)} ❤️ ${tag(proposer)}
 
-╭───────────────╮
-   💌 NOVIOS 💌
-╰───────────────╯
+╭────────────────────╮
+       💞 NOVIAZGO 💞
+╰────────────────────╯
 
-Desde este momento están oficialmente
-en una relación. 💑
+Desde ahora, ambos han decidido
+comenzar una relación. ❤️
 
-Cuídense, respétense y disfruten
-su historia juntos. ❤️
+Que esta etapa esté acompañada de
+confianza, respeto, comunicación
+y momentos felices. 💐
 
-⏳ Podrán casarse después de
-3 días de noviazgo.
+⏳ Después de 3 días de noviazgo
+podrán presentar una propuesta de matrimonio.
 
-💍 Cuando llegue el momento,
-usen *.casarse*`
+💍 Para hacerlo, utiliza *.casarse*.`
       ),
 
       m,
@@ -505,7 +506,7 @@ usen *.casarse*`
     if (!user.propuesta)
 
       return m.reply(
-        '❌ No tienes propuestas pendientes.'
+        '💌 No tienes ninguna propuesta de noviazgo pendiente por responder.'
       )
 
 
@@ -527,12 +528,13 @@ usen *.casarse*`
 
       box(
 
-        '💔 PROPUESTA RECHAZADA',
+        '💌 RESPUESTA A LA PROPUESTA',
 
-        `${tag(sender)} ha rechazado
+        `${tag(sender)} ha decidido no aceptar
 la propuesta de ${tag(proposer)}.
 
-💔 Tal vez no era el momento.`
+Cada persona tiene sus propios sentimientos y tiempos.
+Gracias por expresar tu decisión con sinceridad. 🤍`
       ),
 
       m,
@@ -559,7 +561,7 @@ la propuesta de ${tag(proposer)}.
     if (!user.pareja)
 
       return m.reply(
-        '💔 No tienes pareja actualmente.'
+        '💞 No tienes una relación registrada actualmente.'
       )
 
 
@@ -588,15 +590,15 @@ la propuesta de ${tag(proposer)}.
 
       box(
 
-        '💖 ESTADO DE RELACIÓN',
+        '💖 INFORMACIÓN DE LA RELACIÓN',
 
         `${tag(sender)} ❤️ ${tag(pareja)}
 
-Estado: ${estado}
+Estado actual: ${estado}
 
-Tiempo juntos: ${tiempoJuntos}
+Tiempo de relación: ${tiempoJuntos}
 
-Nivel de amor: ❤️ ${user.amor}`
+Puntos de amor acumulados: ❤️ ${user.amor}`
       ),
 
       m,
@@ -623,21 +625,21 @@ Nivel de amor: ❤️ ${user.amor}`
     if (!user.pareja)
 
       return m.reply(
-        '💔 No tienes pareja.'
+        '💞 Para utilizar esta opción, primero debes tener una pareja registrada.'
       )
 
 
     if (user.matrimonioFecha)
 
       return m.reply(
-        '💍 Ya están casados.'
+        '💍 El sistema ya registra un matrimonio entre ustedes.'
       )
 
 
     if (!user.relacionFecha)
 
       return m.reply(
-        '❌ No se encontró la fecha de inicio de la relación.'
+        '⚠️ No se encontró la fecha de inicio de la relación. No es posible verificar el tiempo de noviazgo.'
       )
 
 
@@ -684,20 +686,19 @@ Nivel de amor: ❤️ ${user.amor}`
 
         box(
 
-          '⏳ TODAVÍA NO',
+          '⏳ AÚN NO PUEDEN CASARSE',
 
           `${tag(sender)} ❤️ ${tag(user.pareja)}
 
-💑 Son novios desde hace:
-${tiempo(tiempoRelacion)}
+💑 Tiempo de relación: ${tiempo(tiempoRelacion)}
 
-💍 Para casarse deben cumplir
-3 días de noviazgo.
+Para presentar la propuesta de matrimonio,
+deben cumplir al menos 3 días de noviazgo.
 
-⏳ Falta:
-${faltan}
+⏳ Tiempo restante: ${faltan}
 
-❤️ Sigan construyendo su historia.`
+❤️ Disfruten esta etapa y sigan construyendo
+su relación con respeto y confianza.`
         ),
 
         m,
@@ -738,25 +739,27 @@ ${faltan}
 
       box(
 
-        '💒 CARTA DE MATRIMONIO',
+        '💒 PROPUESTA DE MATRIMONIO',
 
         `💐 Para: ${tag(user.pareja)}
 
-Han pasado momentos,
-risas, cariño y recuerdos juntos. ❤️
+Han compartido momentos, experiencias
+y recuerdos que forman parte de su historia. ❤️
 
-Y ahora quiero dar un paso más...
+Hoy ${tag(sender)} desea dar un paso importante
+y te propone comenzar una nueva etapa juntos.
 
-💍 ${tag(sender)} quiere casarse contigo.
+💍 ¿Aceptas casarte y continuar construyendo
+esta historia con compromiso y respeto?
 
-¿Quieres que nuestra historia
-continúe para siempre? 💖
+╭────────────────────╮
+💌 RESPONDE A LA PROPUESTA
+╰────────────────────╯
 
-💐 *.si* — Aceptar
-💔 *.no* — Rechazar
+✅ *.si* — Aceptar la propuesta
+💔 *.no* — Rechazar la propuesta
 
-❤️ Hoy puede comenzar
-una nueva etapa de su historia.`
+🤍 Tómate un momento y responde con sinceridad.`
       ),
 
       m,
@@ -783,7 +786,7 @@ una nueva etapa de su historia.`
     if (!user.propuestaMatrimonio)
 
       return m.reply(
-        '❌ No tienes propuestas de matrimonio.'
+        '💍 No tienes ninguna propuesta de matrimonio pendiente por responder.'
       )
 
 
@@ -806,7 +809,7 @@ una nueva etapa de su historia.`
     )
 
       return m.reply(
-        '❌ Ya no son pareja.'
+        '⚠️ La propuesta no puede confirmarse porque ya no figura una relación activa entre ustedes.'
       )
 
 
@@ -843,20 +846,21 @@ una nueva etapa de su historia.`
 
       box(
 
-        '💍 MATRIMONIO CONFIRMADO',
+        '💍 MATRIMONIO REGISTRADO',
 
         `${tag(sender)} 💍 ${tag(proposer)}
 
-╭────────────────╮
-    💍 CASADOS 💍
-╰────────────────╯
+╭────────────────────╮
+      💍 MATRIMONIO 💍
+╰────────────────────╯
 
-Ahora están oficialmente casados. ❤️
+Se ha registrado oficialmente su matrimonio. ❤️
 
-Que esta nueva etapa esté llena
-de buenos momentos, cariño y respeto. 💖
+Que esta nueva etapa esté marcada por
+la confianza, el compañerismo, el respeto
+y muchos momentos felices. 💐
 
-🎉 ¡Felicidades! 🎉`
+✨ ¡Felicidades a ambos por este nuevo comienzo! ✨`
       ),
 
       m,
@@ -883,7 +887,7 @@ de buenos momentos, cariño y respeto. 💖
     if (!user.propuestaMatrimonio)
 
       return m.reply(
-        '❌ No tienes propuestas de matrimonio.'
+        '💍 No tienes ninguna propuesta de matrimonio pendiente por responder.'
       )
 
 
@@ -939,14 +943,14 @@ casarse con ${tag(proposer)}.
     if (!user.pareja)
 
       return m.reply(
-        '❌ No tienes pareja.'
+        '💞 No tienes una pareja registrada para realizar esta acción.'
       )
 
 
     if (user.matrimonioFecha)
 
       return m.reply(
-        '❌ Están casados. Usa *.divorciar* para separarse.'
+        '💍 El sistema registra que están casados. Para cambiar su estado civil, utiliza *.divorciar*.'
       )
 
 
@@ -986,13 +990,14 @@ casarse con ${tag(proposer)}.
 
       box(
 
-        '💔 RELACIÓN TERMINADA',
+        '🤍 RELACIÓN FINALIZADA',
 
         `${tag(sender)} 💔 ${tag(exId)}
 
-La relación ha terminado.
+La relación ha sido finalizada y el registro se ha actualizado.
 
-Ahora ambos están solteros. 💔`
+Ambas personas vuelven a figurar como solteras.
+Les deseamos lo mejor en sus próximos caminos. 🤍`
       ),
 
       m,
@@ -1019,7 +1024,7 @@ Ahora ambos están solteros. 💔`
     if (!user.matrimonioFecha)
 
       return m.reply(
-        '❌ No estás casado.'
+        '💍 No tienes un matrimonio registrado actualmente.'
       )
 
 
@@ -1051,13 +1056,13 @@ Ahora ambos están solteros. 💔`
 
       box(
 
-        '💔 DIVORCIO',
+        '🤍 MATRIMONIO FINALIZADO',
 
         `${tag(sender)} 💔 ${tag(user.pareja)}
 
-El matrimonio ha terminado.
+El registro de matrimonio ha sido finalizado.
 
-💑 Siguen siendo novios.`
+El vínculo se mantiene como noviazgo en el sistema. 💞`
       ),
 
       m,
@@ -1109,7 +1114,9 @@ El matrimonio ha terminado.
     if (!targetRaw)
 
       return m.reply(
-        `💌 Menciona o responde a alguien para usar *.${command}*.`
+        `💌 Para utilizar esta acción, menciona a la persona o responde a uno de sus mensajes.
+
+Comando solicitado: *.${command}*`
       )
 
 
@@ -1125,7 +1132,7 @@ El matrimonio ha terminado.
     )
 
       return m.reply(
-        '😹 No puedes hacer esa acción contigo mismo.'
+        '💭 Esta acción requiere otra persona. No puedes realizarla contigo mismo.'
       )
 
 
@@ -1157,24 +1164,23 @@ El matrimonio ha terminado.
 
         box(
 
-          '🚨 PERSONA EN RELACIÓN',
+          '⚠️ RESPETO A UNA RELACIÓN REGISTRADA',
 
-          `${tag(sender)} intentó usar *.${command}*
-con ${tag(target)} 😾
+          `${tag(sender)} solicitó la acción *.${command}*
+con ${tag(target)}.
 
-❤️ ${tag(target)} está en pareja con
-${tag(parejaDelObjetivo)}.
+💞 La persona mencionada mantiene una relación
+registrada con ${tag(parejaDelObjetivo)}.
 
-💌 AVISO A LA PAREJA
+╭────────────────────╮
+       ACCIÓN NO REALIZADA
+╰────────────────────╯
 
-${tag(sender)} intentó interactuar
-románticamente con ${tag(target)}.
+Por respeto a la relación registrada,
+la solicitud ha sido cancelada.
 
-❌ La acción fue bloqueada.
-
-⚠️ ${tag(parejaDelObjetivo)}, tu pareja recibió
-un intento de interacción romántica
-por parte de ${tag(sender)}.`
+ℹ️ Este aviso informa que se intentó realizar
+una interacción romántica con ${tag(target)}.`
         ),
 
         m,
@@ -1217,24 +1223,22 @@ por parte de ${tag(sender)}.`
 
         box(
 
-          '🚨 INFIDELIDAD DETECTADA',
+          '⚠️ INTERACCIÓN NO PERMITIDA',
 
-          `${tag(sender)} intentó usar *.${command}*
-con ${tag(target)} 😾
+          `${tag(sender)} solicitó la acción *.${command}*
+con ${tag(target)}.
 
-❤️ Su pareja es
-${tag(parejaDelSender)}.
+💞 Tu pareja registrada es ${tag(parejaDelSender)}.
 
-💌 AVISO DE INFIDELIDAD
+╭────────────────────╮
+       ACCIÓN NO REALIZADA
+╰────────────────────╯
 
-${tag(sender)} intentó interactuar
-románticamente con otra persona.
+Esta acción solo está disponible cuando
+la interacción se realiza con tu pareja registrada.
 
-❌ La acción fue bloqueada.
-
-⚠️ ${tag(parejaDelSender)}, tu pareja
-intentó usar *.${command}* con
-${tag(target)}.`
+ℹ️ La solicitud ha sido cancelada y no se
+modificaron los datos de la relación.`
         ),
 
         m,
@@ -1264,17 +1268,18 @@ ${tag(target)}.`
 
       return m.reply(
 
-        `💔 No son pareja.
+        `💞 Esta acción está disponible únicamente
+entre personas que tienen una relación registrada.
 
-Para usar *.${command}*
-primero deben estar en una relación. ❤️`
+Para utilizar *.${command}*, primero deben
+figurar como pareja en el sistema. ❤️`
       )
     }
 
 
     // ========================================================
     // ❤️ PUNTOS DE AMOR
-    // ========================================================
+    // ============================================================
 
     let suma = 0
 
@@ -1329,16 +1334,15 @@ primero deben estar en una relación. ❤️`
 
       box(
 
-        '💞 MOMENTO ROMÁNTICO',
+        '💞 MOMENTO COMPARTIDO',
 
-        `${tag(sender)} 💕 ${tag(target)}
+        `${tag(sender)} 💞 ${tag(target)}
 
-Acción: ${command}
+✨ Acción realizada: ${{ amor: 'Declaración de amor', besar: 'Beso', abrazar: 'Abrazo', flores: 'Regalo de flores', regalo: 'Regalo especial', cita: 'Cita romántica' }[command] || command}
 
-❤️ +${suma} amor
+❤️ Puntos de amor obtenidos: +${suma}
 
-Nuevo nivel de amor:
-❤️ ${user.amor}`
+💗 Puntos de amor acumulados: ${user.amor}`
       ),
 
       m,
@@ -1369,7 +1373,7 @@ Nuevo nivel de amor:
     )
 
       return m.reply(
-        '❌ Solo el dueño puede utilizar este comando.'
+        '🔒 Acceso restringido. Este comando está disponible únicamente para el propietario del bot.'
       )
 
 
@@ -1434,7 +1438,7 @@ Nivel de amor: ❤️ ${user.amor}
     if (!texto)
 
       texto =
-        '😿 No hay parejas activas.'
+        '💞 Actualmente no hay parejas activas registradas en el sistema.'
 
 
     return conn.reply(
@@ -1442,7 +1446,7 @@ Nivel de amor: ❤️ ${user.amor}
       m.chat,
 
       box(
-        '💞 PAREJAS ACTIVAS',
+        '💞 REGISTRO DE PAREJAS ACTIVAS',
         texto.trim()
       ),
 
@@ -1471,7 +1475,7 @@ Nivel de amor: ❤️ ${user.amor}
     )
 
       return m.reply(
-        '❌ Solo el dueño puede utilizar este comando.'
+        '🔒 Acceso restringido. Este comando está disponible únicamente para el propietario del bot.'
       )
 
 
@@ -1507,7 +1511,7 @@ Nivel de amor: ❤️ ${user.amor}
 
 
     return m.reply(
-      '🧹 Todas las parejas fueron eliminadas correctamente.'
+      '🧹 La base de datos de parejas se ha limpiado correctamente. Todas las relaciones han sido restablecidas.'
     )
   }
 

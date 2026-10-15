@@ -1,6 +1,10 @@
 // ============================================================
-// 🤝 HERMANOS.JS — WHATSAPP-BOT 2026 PRO
-// Sistema de hermandad — MÁXIMO 3 HERMANOS
+// 📂 plugins/hermanos.js — whatsapp-bot 2026 PRO
+// 🤝 SISTEMA COMPLETO DE HERMANDAD
+// 🧬 Máximo 3 hermanos por usuario
+// 💾 Base de datos protegida
+// 🏆 Niveles, rangos, interacciones y rankings
+// 👑 Herramientas exclusivas para Owners
 // ============================================================
 
 import fs from 'fs'
@@ -11,88 +15,93 @@ import path from 'path'
 // ============================================================
 
 const MAX_HERMANOS = 3
-const TRES_DIAS = 3 * 24 * 60 * 60 * 1000
+const DURACION_PROPUESTA = 3 * 24 * 60 * 60 * 1000
 const COOLDOWN = 60 * 1000
+
 const DB_DIR = './database'
 const DB_FILE = path.join(DB_DIR, 'hermanos.json')
+const DB_TEMP = path.join(DB_DIR, 'hermanos.tmp.json')
 
 // ============================================================
-// 📁 CREAR BASE DE DATOS
+// 📁 PREPARAR ARCHIVOS
 // ============================================================
 
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true })
+function prepararDB() {
+  if (!fs.existsSync(DB_DIR)) {
+    fs.mkdirSync(DB_DIR, { recursive: true })
+  }
+
+  if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(DB_FILE, '{}', 'utf8')
+  }
 }
 
-if (!fs.existsSync(DB_FILE)) {
-  fs.writeFileSync(DB_FILE, '{}')
-}
-
 // ============================================================
-// 💾 BASE DE DATOS
+// 💾 CARGAR BASE DE DATOS
 // ============================================================
 
 function loadDB() {
   try {
-    const raw = fs.readFileSync(DB_FILE, 'utf8')
-    const data = JSON.parse(raw || '{}')
+    prepararDB()
 
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      return {}
+    const contenido = fs.readFileSync(DB_FILE, 'utf8')
+    const db = JSON.parse(contenido || '{}')
+
+    if (
+      !db ||
+      typeof db !== 'object' ||
+      Array.isArray(db)
+    ) {
+      throw new Error('Formato de base de datos inválido.')
     }
 
-    return data
-
-  } catch (e) {
-
-    console.error('❌ Error leyendo hermanos.json:', e)
-
-    return {}
+    return db
+  } catch (error) {
+    console.error('[HERMANOS] Error leyendo la base de datos:', error)
+    return null
   }
 }
+
+// ============================================================
+// 💾 GUARDAR DE FORMA SEGURA
+// ============================================================
 
 function saveDB(db) {
   try {
-    fs.writeFileSync(
-      DB_FILE,
-      JSON.stringify(db, null, 2)
-    )
-  } catch (e) {
-    console.error('❌ Error guardando hermanos.json:', e)
+    prepararDB()
+
+    const contenido = JSON.stringify(db, null, 2)
+
+    fs.writeFileSync(DB_TEMP, contenido, 'utf8')
+    fs.renameSync(DB_TEMP, DB_FILE)
+
+    return true
+  } catch (error) {
+    console.error('[HERMANOS] Error guardando la base de datos:', error)
+
+    try {
+      if (fs.existsSync(DB_TEMP)) {
+        fs.unlinkSync(DB_TEMP)
+      }
+    } catch {}
+
+    return false
   }
 }
 
 // ============================================================
-// 👑 OWNERS
+// 👤 USUARIO NUEVO
 // ============================================================
 
-function getOwnersJid() {
-
-  return (global.owner || [])
-    .map(v => {
-
-      if (Array.isArray(v)) {
-        v = v[0]
-      }
-
-      if (
-        typeof v !== 'string' &&
-        typeof v !== 'number'
-      ) {
-        return null
-      }
-
-      const number =
-        String(v).replace(/[^0-9]/g, '')
-
-      if (!number) {
-        return null
-      }
-
-      return `${number}@s.whatsapp.net`
-
-    })
-    .filter(Boolean)
+function defaultUser() {
+  return {
+    hermanos: [],
+    propuestas: [],
+    nivel: 0,
+    interacciones: 0,
+    cooldown: 0,
+    hermandadFecha: null
+  }
 }
 
 // ============================================================
@@ -100,48 +109,32 @@ function getOwnersJid() {
 // ============================================================
 
 function normalizeJid(jid, conn) {
-
-  if (!jid) {
-    return null
-  }
+  if (!jid) return null
 
   try {
-
     if (typeof conn?.decodeJid === 'function') {
       jid = conn.decodeJid(jid)
     }
-
   } catch {}
 
-  jid = String(jid)
+  jid = String(jid).trim()
 
-  if (
-    jid.includes('@g.us') ||
-    jid.includes('@broadcast')
-  ) {
-    return jid
-  }
+  if (!jid) return null
 
   if (jid.includes('@')) {
     return jid
   }
 
-  const digits =
-    jid.replace(/[^0-9]/g, '')
+  const numero = jid.replace(/[^0-9]/g, '')
 
-  if (!digits) {
-    return null
-  }
-
-  return `${digits}@s.whatsapp.net`
+  return numero ? `${numero}@s.whatsapp.net` : null
 }
 
 // ============================================================
-// 🔢 NÚMERO LIMPIO
+// 🔢 OBTENER NÚMERO
 // ============================================================
 
 function digits(jid = '') {
-
   return String(jid)
     .split(':')[0]
     .split('@')[0]
@@ -153,67 +146,44 @@ function digits(jid = '') {
 // ============================================================
 
 function sameUser(a, b, conn) {
-
-  if (!a || !b) {
-    return false
-  }
+  if (!a || !b) return false
 
   const A = normalizeJid(a, conn)
   const B = normalizeJid(b, conn)
 
-  if (!A || !B) {
+  if (!A || !B) return false
+  if (A === B) return true
+
+  // Comparar números solo entre identificadores telefónicos.
+  // Evita confundir números de un LID con números de teléfono.
+  const dominioA = A.split('@')[1]
+  const dominioB = B.split('@')[1]
+
+  if (
+    dominioA !== 's.whatsapp.net' ||
+    dominioB !== 's.whatsapp.net'
+  ) {
     return false
   }
 
-  if (A === B) {
-    return true
-  }
-
-  const da = digits(A)
-  const db = digits(B)
-
-  return Boolean(
-    da &&
-    db &&
-    da === db
-  )
+  return digits(A) === digits(B)
 }
 
 // ============================================================
-// 🔎 BUSCAR ID REAL EN DB
+// 🔎 BUSCAR ID EXISTENTE
 // ============================================================
 
 function findUserId(db, jid, conn) {
+  const normalized = normalizeJid(jid, conn)
 
-  if (!jid) {
-    return null
-  }
+  if (!normalized) return null
 
-  const normalized =
-    normalizeJid(jid, conn)
-
-  if (!normalized) {
-    return null
-  }
-
-  if (
-    Object.prototype.hasOwnProperty.call(
-      db,
-      normalized
-    )
-  ) {
+  if (Object.prototype.hasOwnProperty.call(db, normalized)) {
     return normalized
   }
 
   for (const id of Object.keys(db)) {
-
-    if (
-      sameUser(
-        id,
-        normalized,
-        conn
-      )
-    ) {
+    if (sameUser(id, normalized, conn)) {
       return id
     }
   }
@@ -222,177 +192,64 @@ function findUserId(db, jid, conn) {
 }
 
 // ============================================================
-// 👤 ESTRUCTURA NUEVA DE USUARIO
-// ============================================================
-
-function defaultUser() {
-
-  return {
-
-    // 🧬 Hasta 3 hermanos
-    hermanos: [],
-
-    // 📨 Propuestas recibidas
-    propuestas: [],
-
-    // 📊 Estadísticas
-    nivel: 0,
-    interacciones: 0,
-
-    // ⏳ Cooldown
-    cooldown: 0,
-
-    // 📅 Fecha de primera hermandad
-    hermandadFecha: null
-  }
-}
-
-// ============================================================
-// 🔄 MIGRACIÓN DE DATOS ANTIGUOS
+// 🔄 MIGRAR USUARIOS ANTIGUOS
 // ============================================================
 
 function migrateUser(user) {
-
-  if (
-    !user ||
-    typeof user !== 'object' ||
-    Array.isArray(user)
-  ) {
+  if (!user || typeof user !== 'object' || Array.isArray(user)) {
     return defaultUser()
   }
 
-  // ==========================================================
-  // 🧬 MIGRAR "hermano" ANTIGUO → "hermanos"
-  // ==========================================================
-
-  if (
-    !Array.isArray(user.hermanos)
-  ) {
-
-    let hermanos = []
-
-    if (
-      user.hermano &&
-      (
-        typeof user.hermano === 'string' ||
-        typeof user.hermano === 'number'
-      )
-    ) {
-      hermanos.push(
-        String(user.hermano)
-      )
-    }
-
-    user.hermanos = hermanos
+  if (!Array.isArray(user.hermanos)) {
+    user.hermanos = user.hermano
+      ? [String(user.hermano)]
+      : []
   }
 
-  // ==========================================================
-  // 📨 MIGRAR propuesta ANTIGUA
-  // ==========================================================
-
-  if (
-    !Array.isArray(user.propuestas)
-  ) {
-
+  if (!Array.isArray(user.propuestas)) {
     user.propuestas = []
 
     if (user.propuesta) {
-
       user.propuestas.push({
-
-        de:
-          String(user.propuesta),
-
-        fecha:
-          Number(
-            user.propuestaFecha ||
-            Date.now()
-          )
+        de: String(user.propuesta),
+        fecha: Number(user.propuestaFecha) || Date.now()
       })
     }
   }
 
-  // ==========================================================
-  // 🧹 LIMPIAR HERMANOS
-  // ==========================================================
+  user.hermanos = [
+    ...new Set(
+      user.hermanos
+        .filter(Boolean)
+        .map(String)
+    )
+  ].slice(0, MAX_HERMANOS)
 
-  user.hermanos =
-    user.hermanos
-      .filter(Boolean)
-      .map(v => String(v))
-
-  user.hermanos =
-    [...new Set(user.hermanos)]
-      .slice(0, MAX_HERMANOS)
-
-  // ==========================================================
-  // 🧹 LIMPIAR PROPUESTAS
-  // ==========================================================
-
-  user.propuestas =
-    user.propuestas
-      .filter(Boolean)
-      .map(p => {
-
-        if (
-          typeof p === 'string'
-        ) {
-
-          return {
-            de: p,
-            fecha: Date.now()
-          }
-        }
-
+  user.propuestas = user.propuestas
+    .filter(Boolean)
+    .map(p => {
+      if (typeof p === 'string') {
         return {
-          de:
-            p.de
-              ? String(p.de)
-              : null,
-
-          fecha:
-            Number(
-              p.fecha ||
-              Date.now()
-            )
+          de: p,
+          fecha: Date.now()
         }
-      })
-      .filter(p => p.de)
+      }
 
-  // ==========================================================
-  // 📊 CAMPOS
-  // ==========================================================
+      return {
+        de: p.de ? String(p.de) : null,
+        fecha: Number(p.fecha) || Date.now()
+      }
+    })
+    .filter(p => p.de)
 
-  if (
-    typeof user.nivel !== 'number'
-  ) {
-    user.nivel =
-      Number(user.nivel || 0)
-  }
+  user.nivel = Math.max(0, Number(user.nivel) || 0)
+  user.interacciones = Math.max(
+    0,
+    Number(user.interacciones) || 0
+  )
+  user.cooldown = Math.max(0, Number(user.cooldown) || 0)
 
-  if (
-    typeof user.interacciones !== 'number'
-  ) {
-    user.interacciones =
-      Number(user.interacciones || 0)
-  }
-
-  if (
-    typeof user.cooldown !== 'number'
-  ) {
-    user.cooldown =
-      Number(user.cooldown || 0)
-  }
-
-  if (
-    !user.hermandadFecha
-  ) {
-    user.hermandadFecha = null
-  }
-
-  // ==========================================================
-  // 🧹 ELIMINAR CAMPOS VIEJOS
-  // ==========================================================
+  user.hermandadFecha = user.hermandadFecha || null
 
   delete user.hermano
   delete user.propuesta
@@ -406,167 +263,110 @@ function migrateUser(user) {
 // ============================================================
 
 function getUser(db, jid, conn) {
+  const id = findUserId(db, jid, conn)
 
-  const id =
-    findUserId(
-      db,
-      jid,
-      conn
-    )
-
-  if (!id) {
-    return null
-  }
+  if (!id) return null
 
   if (!db[id]) {
     db[id] = defaultUser()
   }
 
-  db[id] =
-    migrateUser(db[id])
+  db[id] = migrateUser(db[id])
 
   return db[id]
 }
 
 // ============================================================
-// 🧬 OBTENER HERMANOS REALES
+// 🧬 OBTENER HERMANOS
 // ============================================================
 
 function getBrotherIds(user, db, conn) {
-
-  if (
-    !user ||
-    !Array.isArray(user.hermanos)
-  ) {
+  if (!user || !Array.isArray(user.hermanos)) {
     return []
   }
 
   const result = []
 
   for (const jid of user.hermanos) {
+    const id = findUserId(db, jid, conn)
 
-    const id =
-      findUserId(
-        db,
-        jid,
-        conn
-      )
+    if (!id || !db[id]) continue
 
-    if (!id) {
+    if (result.some(x => sameUser(x, id, conn))) {
       continue
     }
 
-    if (
-      !result.some(
-        x => sameUser(x, id, conn)
-      )
-    ) {
-      result.push(id)
-    }
+    result.push(id)
   }
 
   return result.slice(0, MAX_HERMANOS)
 }
 
 // ============================================================
-// ➕ AGREGAR HERMANO
+// ➕ CREAR HERMANDAD RECÍPROCA
 // ============================================================
 
-function addBrother(
-  db,
-  userId,
-  brotherId,
-  conn
-) {
-
-  const user =
-    getUser(
-      db,
-      userId,
-      conn
-    )
-
-  if (!user) {
+function addBrother(db, userId, brotherId, conn) {
+  if (sameUser(userId, brotherId, conn)) {
     return false
   }
 
-  if (
-    getBrotherIds(
-      user,
-      db,
-      conn
-    ).length >= MAX_HERMANOS
-  ) {
-    return false
-  }
+  const user = getUser(db, userId, conn)
+  const brother = getUser(db, brotherId, conn)
+
+  if (!user || !brother) return false
+
+  const myBrothers = getBrotherIds(user, db, conn)
+  const theirBrothers = getBrotherIds(brother, db, conn)
+
+  const alreadyRelated = myBrothers.some(
+    id => sameUser(id, brotherId, conn)
+  )
+
+  if (alreadyRelated) return true
 
   if (
-    getBrotherIds(
-      user,
-      db,
-      conn
-    ).some(
-      id =>
-        sameUser(
-          id,
-          brotherId,
-          conn
-        )
-    )
+    myBrothers.length >= MAX_HERMANOS ||
+    theirBrothers.length >= MAX_HERMANOS
   ) {
-    return true
+    return false
   }
 
   user.hermanos.push(
-    normalizeJid(
-      brotherId,
-      conn
-    )
+    normalizeJid(brotherId, conn)
   )
 
+  brother.hermanos.push(
+    normalizeJid(userId, conn)
+  )
+
+  const ahora = Date.now()
+
   if (!user.hermandadFecha) {
-    user.hermandadFecha =
-      Date.now()
+    user.hermandadFecha = ahora
+  }
+
+  if (!brother.hermandadFecha) {
+    brother.hermandadFecha = ahora
   }
 
   return true
 }
 
 // ============================================================
-// ➖ QUITAR HERMANO
+// ➖ ELIMINAR HERMANDAD
 // ============================================================
 
-function removeBrother(
-  db,
-  userId,
-  brotherId,
-  conn
-) {
+function removeBrother(db, userId, brotherId, conn) {
+  const user = getUser(db, userId, conn)
 
-  const user =
-    getUser(
-      db,
-      userId,
-      conn
-    )
+  if (!user) return false
 
-  if (!user) {
-    return false
-  }
+  user.hermanos = user.hermanos.filter(
+    id => !sameUser(id, brotherId, conn)
+  )
 
-  user.hermanos =
-    user.hermanos.filter(
-      id =>
-        !sameUser(
-          id,
-          brotherId,
-          conn
-        )
-    )
-
-  if (
-    user.hermanos.length === 0
-  ) {
+  if (user.hermanos.length === 0) {
     user.hermandadFecha = null
   }
 
@@ -574,544 +374,291 @@ function removeBrother(
 }
 
 // ============================================================
-// 🔎 BUSCAR PROPUESTA
+// 📨 PROPUESTAS
 // ============================================================
 
-function findProposal(
-  user,
-  sender,
-  conn
-) {
+function findProposal(user, sender, conn) {
+  return user?.propuestas?.find(
+    p => sameUser(p.de, sender, conn)
+  ) || null
+}
 
-  if (
-    !Array.isArray(user?.propuestas)
-  ) {
-    return null
-  }
+function removeProposal(user, sender, conn) {
+  if (!user) return
 
-  return user.propuestas.find(
-    p =>
-      sameUser(
-        p.de,
-        sender,
-        conn
-      )
+  user.propuestas = user.propuestas.filter(
+    p => !sameUser(p.de, sender, conn)
   )
 }
 
 // ============================================================
-// 🗑️ ELIMINAR PROPUESTA
+// 🧹 EXPIRAR PROPUESTAS
 // ============================================================
 
-function removeProposal(
-  user,
-  sender,
-  conn
-) {
+function cleanExpiredProposals(db, conn) {
+  let changed = false
+  const ahora = Date.now()
 
-  user.propuestas =
-    user.propuestas.filter(
-      p =>
-        !sameUser(
-          p.de,
-          sender,
-          conn
-        )
+  for (const id of Object.keys(db)) {
+    const user = getUser(db, id, conn)
+
+    if (!user) continue
+
+    const anteriores = user.propuestas.length
+
+    user.propuestas = user.propuestas.filter(
+      p => ahora - Number(p.fecha || 0) <= DURACION_PROPUESTA
     )
-}
 
-// ============================================================
-// 🧹 LIMPIAR PROPUESTAS EXPIRADAS
-// ============================================================
-
-function cleanExpiredProposals(
-  db,
-  conn
-) {
-
-  const ahora =
-    Date.now()
-
-  for (
-    const id of Object.keys(db)
-  ) {
-
-    const user =
-      getUser(
-        db,
-        id,
-        conn
-      )
-
-    if (!user) {
-      continue
+    if (user.propuestas.length !== anteriores) {
+      changed = true
     }
-
-    user.propuestas =
-      user.propuestas.filter(
-        p =>
-          ahora - Number(p.fecha || 0)
-          <= TRES_DIAS
-      )
   }
+
+  return changed
 }
 
 // ============================================================
-// 🎯 TARGET
+// 🎯 OBTENER PERSONA MENCIONADA O CITADA
 // ============================================================
 
 function getTarget(m, conn) {
-
-  if (
-    Array.isArray(m.mentionedJid) &&
-    m.mentionedJid.length
-  ) {
-
-    return normalizeJid(
-      m.mentionedJid[0],
-      conn
-    )
+  if (Array.isArray(m.mentionedJid) && m.mentionedJid.length) {
+    return normalizeJid(m.mentionedJid[0], conn)
   }
 
   if (m.quoted?.sender) {
-
-    return normalizeJid(
-      m.quoted.sender,
-      conn
-    )
+    return normalizeJid(m.quoted.sender, conn)
   }
 
   return null
 }
 
 // ============================================================
-// 🏷️ MENCIÓN
+// 🏷️ ETIQUETAS
 // ============================================================
 
 function tag(jid) {
+  if (!jid) return '@usuario'
 
-  if (!jid) {
-    return '@usuario'
-  }
-
-  return '@' +
-    String(jid)
-      .split('@')[0]
-      .split(':')[0]
+  return '@' + String(jid)
+    .split('@')[0]
+    .split(':')[0]
 }
 
 // ============================================================
-// 📅 FECHA
+// 📅 FECHAS
 // ============================================================
 
 function fechaBonita(ms) {
+  if (!ms) return 'Sin registrar'
 
-  if (!ms) {
-    return 'Desconocida'
+  const fecha = new Date(Number(ms))
+
+  if (Number.isNaN(fecha.getTime())) {
+    return 'Sin registrar'
   }
 
-  const d =
-    new Date(ms)
-
-  if (
-    Number.isNaN(
-      d.getTime()
-    )
-  ) {
-    return 'Desconocida'
-  }
-
-  return d.toLocaleDateString(
-    'es-ES',
-    {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }
-  )
+  return fecha.toLocaleDateString('es-UY', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
 }
 
-// ============================================================
-// ⏱️ DÍAS
-// ============================================================
-
 function diasDesde(ms) {
-
-  if (!ms) {
-    return 0
-  }
+  if (!ms) return 0
 
   return Math.max(
     0,
-    Math.floor(
-      (
-        Date.now() - ms
-      ) / 86400000
-    )
+    Math.floor((Date.now() - Number(ms)) / 86400000)
   )
 }
 
 // ============================================================
-// 🏅 RANGO
+// 🏅 RANGOS
 // ============================================================
 
 function rango(nivel) {
+  nivel = Number(nivel) || 0
 
-  nivel =
-    Number(
-      nivel || 0
-    )
-
-  if (nivel >= 300)
-    return '👑 Hermanos Supremos'
-
-  if (nivel >= 200)
-    return '🔥 Hermanos Legendarios'
-
-  if (nivel >= 120)
-    return '💪 Hermanos Fuertes'
-
-  if (nivel >= 60)
-    return '🤝 Hermanos Reales'
-
-  if (nivel >= 30)
-    return '🙂 Hermanos Cercanos'
+  if (nivel >= 300) return '👑 Hermanos Supremos'
+  if (nivel >= 200) return '🔥 Hermanos Legendarios'
+  if (nivel >= 120) return '💪 Hermanos Fuertes'
+  if (nivel >= 60) return '🤝 Hermanos Reales'
+  if (nivel >= 30) return '🙂 Hermanos Cercanos'
 
   return '👶 Hermanos Nuevos'
 }
 
 // ============================================================
-// ⏳ COOLDOWN
+// 👑 OWNERS
 // ============================================================
 
-function checkCooldown(user) {
+function getOwnersJid() {
+  return (global.owner || [])
+    .map(owner => {
+      if (Array.isArray(owner)) {
+        owner = owner[0]
+      }
 
-  const ahora =
-    Date.now()
+      if (
+        typeof owner !== 'string' &&
+        typeof owner !== 'number'
+      ) {
+        return null
+      }
 
-  if (
-    user.cooldown &&
-    ahora - user.cooldown <
-    COOLDOWN
-  ) {
+      const numero = String(owner).replace(/[^0-9]/g, '')
 
-    return Math.ceil(
-      (
-        COOLDOWN -
-        (
-          ahora -
-          user.cooldown
-        )
-      ) / 1000
-    )
-  }
+      return numero ? `${numero}@s.whatsapp.net` : null
+    })
+    .filter(Boolean)
+}
 
-  user.cooldown =
-    ahora
-
-  return 0
+function isOwner(sender, conn) {
+  return getOwnersJid().some(
+    owner => sameUser(owner, sender, conn)
+  )
 }
 
 // ============================================================
-// 👑 ES OWNER
+// 🤝 LISTA DE HERMANOS
 // ============================================================
 
-function isOwner(
-  sender,
-  conn
-) {
-
-  return getOwnersJid()
-    .some(
-      owner =>
-        sameUser(
-          owner,
-          sender,
-          conn
-        )
-    )
-}
-
-// ============================================================
-// 🤝 TEXTO DE HERMANOS
-// ============================================================
-
-function hermanosTexto(
-  user,
-  db,
-  conn
-) {
-
-  const hermanos =
-    getBrotherIds(
-      user,
-      db,
-      conn
-    )
+function hermanosTexto(user, db, conn) {
+  const hermanos = getBrotherIds(user, db, conn)
 
   if (!hermanos.length) {
-    return '😹 No tienes hermanos.'
+    return '😹 No tienes hermanos registrados.'
   }
 
   return hermanos
-    .map(
-      (id, i) =>
-        `${i + 1}. ${tag(id)}`
-    )
+    .map((id, i) => `${i + 1}. ${tag(id)}`)
     .join('\n')
 }
 
 // ============================================================
-// 🤝 HANDLER PRINCIPAL
+// ⏳ COMPROBAR COOLDOWN
 // ============================================================
 
-let handler = async (
-  m,
-  { conn, command }
-) => {
+function tiempoRestante(user) {
+  const transcurrido = Date.now() - Number(user.cooldown || 0)
 
+  if (transcurrido >= COOLDOWN) return 0
+
+  return Math.ceil((COOLDOWN - transcurrido) / 1000)
+}
+
+// ============================================================
+// 🧬 HANDLER PRINCIPAL
+// ============================================================
+
+let handler = async (m, { conn, command, text }) => {
   try {
+    const db = loadDB()
 
-    const db =
-      loadDB()
-
-    // ========================================================
-    // 🔄 MIGRAR TODA LA BASE
-    // ========================================================
-
-    for (
-      const id of Object.keys(db)
-    ) {
-
-      db[id] =
-        migrateUser(
-          db[id]
-        )
+    if (!db) {
+      return m.reply(
+        '❌ No pude leer `database/hermanos.json`.\n\n' +
+        '🛡️ No modifiqué el archivo para evitar perder tus datos.'
+      )
     }
 
-    cleanExpiredProposals(
-      db,
-      conn
-    )
+    const propuestasLimpiadas = cleanExpiredProposals(db, conn)
 
-    const sender =
-      normalizeJid(
-        m.sender,
-        conn
-      )
+    const sender = normalizeJid(m.sender, conn)
 
-    if (!sender) {
-      return
+    if (!sender) return
+
+    const userId = findUserId(db, sender, conn)
+    const user = getUser(db, userId, conn)
+
+    if (!user) return
+
+    if (propuestasLimpiadas && !saveDB(db)) {
+      return m.reply('❌ No pude guardar los cambios de la base de datos.')
     }
 
-    const userId =
-      findUserId(
-        db,
-        sender,
-        conn
-      )
-
-    const user =
-      getUser(
-        db,
-        userId,
-        conn
-      )
-
-    const ahora =
-      Date.now()
+    const targetRaw = getTarget(m, conn)
 
     // ========================================================
-    // 🤝 PROPONER HERMANO
+    // 🤝 PROPONER HERMANDAD
     // ========================================================
 
     if (command === 'hermano') {
-
-      const targetRaw =
-        getTarget(
-          m,
-          conn
-        )
-
       if (!targetRaw) {
-
         return m.reply(
           '🤝 *PROPUESTA DE HERMANDAD*\n\n' +
-          'Menciona a alguien o responde a su mensaje.\n\n' +
-          `👥 Máximo: ${MAX_HERMANOS} hermanos.`
+          'Menciona a una persona o responde a su mensaje.\n\n' +
+          `👥 Máximo: ${MAX_HERMANOS} hermanos por persona.\n` +
+          '💌 ¡Invita a alguien a formar parte de tu familia!'
         )
       }
 
-      const targetId =
-        findUserId(
-          db,
-          targetRaw,
-          conn
-        )
+      const targetId = findUserId(db, targetRaw, conn)
 
-      if (
-        sameUser(
-          targetId,
-          sender,
-          conn
-        )
-      ) {
+      if (sameUser(targetId, userId, conn)) {
+        return m.reply('😹 No puedes proponerte una hermandad a ti mismo.')
+      }
 
+      const target = getUser(db, targetId, conn)
+
+      if (!target) return m.reply('❌ No pude identificar a esa persona.')
+
+      const myBrothers = getBrotherIds(user, db, conn)
+      const theirBrothers = getBrotherIds(target, db, conn)
+
+      if (myBrothers.some(id => sameUser(id, targetId, conn))) {
+        return m.reply('🤝 ¡Ya son hermanos! Cuida esa amistad. 💙')
+      }
+
+      if (myBrothers.length >= MAX_HERMANOS) {
         return m.reply(
-          '😹 No puedes ser tu propio hermano.'
+          `🚫 Ya tienes el máximo de ${MAX_HERMANOS} hermanos.`
         )
       }
 
-      const target =
-        getUser(
-          db,
-          targetId,
-          conn
-        )
-
-      const myBrothers =
-        getBrotherIds(
-          user,
-          db,
-          conn
-        )
-
-      const targetBrothers =
-        getBrotherIds(
-          target,
-          db,
-          conn
-        )
-
-      // ======================================================
-      // 🚫 LÍMITE PROPIO
-      // ======================================================
-
-      if (
-        myBrothers.length >=
-        MAX_HERMANOS
-      ) {
-
+      if (theirBrothers.length >= MAX_HERMANOS) {
         return conn.reply(
           m.chat,
-
-          `🚫 *LÍMITE DE HERMANOS*\n\n` +
-          `Ya tienes ${MAX_HERMANOS} hermanos.\n` +
-          `No puedes tener más.`,
-
-          m
-        )
-      }
-
-      // ======================================================
-      // 🚫 LÍMITE TARGET
-      // ======================================================
-
-      if (
-        targetBrothers.length >=
-        MAX_HERMANOS
-      ) {
-
-        return conn.reply(
-          m.chat,
-
-          `😅 ${tag(targetId)} ya tiene ` +
-          `${MAX_HERMANOS} hermanos.\n\n` +
-          `No puede aceptar otra hermandad.`,
-
+          `😅 ${tag(targetId)} ya tiene ${MAX_HERMANOS} hermanos y no puede aceptar otra propuesta.`,
           m,
-          {
-            mentions: [
-              targetId
-            ]
-          }
+          { mentions: [targetId] }
         )
       }
 
-      // ======================================================
-      // YA SON HERMANOS
-      // ======================================================
-
-      if (
-        myBrothers.some(
-          id =>
-            sameUser(
-              id,
-              targetId,
-              conn
-            )
-        )
-      ) {
-
-        return conn.reply(
-          m.chat,
-
-          `😎 ${tag(targetId)} ya es tu hermano.`,
-
-          m,
-          {
-            mentions: [
-              targetId
-            ]
-          }
-        )
+      if (findProposal(target, userId, conn)) {
+        return m.reply('⏳ Ya tienes una propuesta pendiente con esa persona.')
       }
-
-      // ======================================================
-      // PROPUESTA EXISTENTE
-      // ======================================================
-
-      if (
-        findProposal(
-          target,
-          sender,
-          conn
-        )
-      ) {
-
-        return m.reply(
-          '⏳ Ya tienes una propuesta pendiente con esa persona.'
-        )
-      }
-
-      // ======================================================
-      // CREAR PROPUESTA
-      // ======================================================
 
       target.propuestas.push({
-
-        de:
-          sender,
-
-        fecha:
-          ahora
+        de: userId,
+        fecha: Date.now()
       })
 
-      saveDB(db)
+      if (!saveDB(db)) {
+        return m.reply('❌ No pude guardar la propuesta. Inténtalo nuevamente.')
+      }
 
       return conn.reply(
         m.chat,
-
-`🤝 *PROPUESTA DE HERMANDAD*
-
-${tag(sender)} quiere ser hermano de ${tag(targetId)} 🧬
-
-📨 ${tag(targetId)}, tienes una nueva propuesta.
-
-👉 *.aceptarhermano*
-👉 *.rechazarhermano*
-
-👥 Cada usuario puede tener hasta ${MAX_HERMANOS} hermanos.
-
-⏰ Esta propuesta dura 3 días.`,
-
+        `╭━━━〔 🤝 HERMANDAD 〕━━━⬣
+│
+│ 🧬 *¡NUEVA PROPUESTA!*
+│
+│ ${tag(userId)} quiere ser hermano de ${tag(targetId)}.
+│
+│ 💌 ¿Aceptas formar parte de su familia?
+│
+│ ✅ *.aceptarhermano*
+│ ❌ *.rechazarhermano*
+│
+│ 👥 Máximo: ${MAX_HERMANOS} hermanos.
+│ ⏳ La propuesta vence en 3 días.
+╰━━━━━━━━━━━━━━━━━━━━⬣`,
         m,
-        {
-          mentions: [
-            sender,
-            targetId
-          ]
-        }
+        { mentions: [userId, targetId] }
       )
     }
 
@@ -1123,409 +670,193 @@ ${tag(sender)} quiere ser hermano de ${tag(targetId)} 🧬
       command === 'verhermano' ||
       command === 'relacionhermano'
     ) {
+      const targetId = targetRaw
+        ? findUserId(db, targetRaw, conn)
+        : userId
 
-      const targetRaw =
-        getTarget(
-          m,
-          conn
-        )
-
-      const targetId =
-        targetRaw
-          ? findUserId(
-              db,
-              targetRaw,
-              conn
-            )
-          : userId
-
-      const target =
-        getUser(
-          db,
-          targetId,
-          conn
-        )
-
-      const brothers =
-        getBrotherIds(
-          target,
-          db,
-          conn
-        )
+      const target = getUser(db, targetId, conn)
+      const brothers = getBrotherIds(target, db, conn)
 
       if (!brothers.length) {
+        return conn.reply(
+          m.chat,
+          `😹 ${tag(targetId)} todavía no tiene hermanos registrados.`,
+          m,
+          { mentions: [targetId] }
+        )
+      }
+
+      const mentions = [targetId, ...brothers]
+
+      let texto =
+        `╭━━━〔 🧬 HERMANDAD 〕━━━⬣\n` +
+        `│\n` +
+        `│ 👤 ${tag(targetId)}\n` +
+        `│ 👥 Hermanos: ${brothers.length}/${MAX_HERMANOS}\n` +
+        `│\n`
+
+      brothers.forEach((id, i) => {
+        texto += `│ ${i + 1}. ${tag(id)}\n`
+      })
+
+      texto +=
+        `│\n` +
+        `│ 📅 Desde: ${fechaBonita(target.hermandadFecha)}\n` +
+        `│ 💪 Nivel: ${target.nivel}\n` +
+        `│ 🏅 Rango: ${rango(target.nivel)}\n` +
+        `│ 🎮 Interacciones: ${target.interacciones}\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━⬣`
+
+      return conn.reply(m.chat, texto, m, { mentions })
+    }
+
+    // ========================================================
+    // ✅ ACEPTAR PROPUESTA
+    // ========================================================
+
+    if (command === 'aceptarhermano') {
+      if (!user.propuestas.length) {
+        return m.reply('📭 No tienes propuestas de hermandad pendientes.')
+      }
+
+      let proposal = targetRaw
+        ? findProposal(user, targetRaw, conn)
+        : null
+
+      if (!proposal && user.propuestas.length === 1) {
+        proposal = user.propuestas[0]
+      }
+
+      if (!proposal) {
+        let texto = '📨 *TUS PROPUESTAS PENDIENTES*\n\n'
+
+        user.propuestas.forEach((p, i) => {
+          texto += `${i + 1}. ${tag(p.de)}\n📅 ${fechaBonita(p.fecha)}\n\n`
+        })
+
+        texto += '👉 Responde al mensaje de la persona que quieres aceptar.'
 
         return conn.reply(
           m.chat,
-
-          `😹 ${tag(targetId)} no tiene hermanos.`,
-
+          texto,
           m,
-          {
-            mentions: [
-              targetId
-            ]
-          }
+          { mentions: user.propuestas.map(p => p.de) }
         )
       }
 
-      const mentions = [
-        targetId,
-        ...brothers
-      ]
+      const proposerId = findUserId(db, proposal.de, conn)
+      const proposer = getUser(db, proposerId, conn)
 
-      let texto =
-`🧬 *HERMANDAD*
+      if (!proposer) {
+        removeProposal(user, proposal.de, conn)
+        saveDB(db)
 
-👤 ${tag(targetId)}
+        return m.reply('❌ No pude encontrar a la persona que envió la propuesta.')
+      }
 
-👥 *Hermanos (${brothers.length}/${MAX_HERMANOS})*
-`
+      if (sameUser(proposerId, userId, conn)) {
+        removeProposal(user, proposerId, conn)
+        saveDB(db)
 
-      brothers.forEach(
-        (id, i) => {
+        return m.reply('❌ No puedes aceptar una propuesta de ti mismo.')
+      }
 
-          texto +=
-`\n${i + 1}. ${tag(id)}`
-        }
-      )
+      if (getBrotherIds(user, db, conn).some(
+        id => sameUser(id, proposerId, conn)
+      )) {
+        removeProposal(user, proposerId, conn)
+        saveDB(db)
 
-      texto +=
+        return m.reply('🤝 ¡Ya son hermanos! La propuesta fue cerrada.')
+      }
 
-`\n\n📅 Primera hermandad: ${fechaBonita(target.hermandadFecha)}
+      if (getBrotherIds(user, db, conn).length >= MAX_HERMANOS) {
+        return m.reply(`🚫 Ya tienes ${MAX_HERMANOS} hermanos. No puedes aceptar otra propuesta.`)
+      }
 
-💪 Nivel: ${target.nivel}
-🏅 Rango: ${rango(target.nivel)}
-🎮 Interacciones: ${target.interacciones || 0}`
+      if (getBrotherIds(proposer, db, conn).length >= MAX_HERMANOS) {
+        removeProposal(user, proposerId, conn)
+        saveDB(db)
+
+        return m.reply(
+          `😅 ${tag(proposerId)} ya alcanzó el límite de hermanos. La propuesta fue cerrada.`
+        )
+      }
+
+      const agregado = addBrother(db, userId, proposerId, conn)
+
+      if (!agregado) {
+        return m.reply('❌ No pude crear la hermandad. Revisa los límites de ambos usuarios.')
+      }
+
+      removeProposal(user, proposerId, conn)
+      removeProposal(proposer, userId, conn)
+
+      if (!saveDB(db)) {
+        return m.reply('❌ No pude guardar la hermandad. Inténtalo nuevamente.')
+      }
 
       return conn.reply(
         m.chat,
-        texto,
+        `╭━━━〔 🧬 HERMANDAD 〕━━━⬣
+│
+│ 🎉 *¡AHORA SON HERMANOS!*
+│
+│ ${tag(userId)} 🤝 ${tag(proposerId)}
+│
+│ 💙 ¡Una nueva familia se ha formado!
+│
+│ 👥 ${tag(userId)}: ${getBrotherIds(user, db, conn).length}/${MAX_HERMANOS}
+│ 👥 ${tag(proposerId)}: ${getBrotherIds(proposer, db, conn).length}/${MAX_HERMANOS}
+│
+│ 📅 Desde: ${fechaBonita(Date.now())}
+│ 💪 Nivel de ${tag(userId)}: ${user.nivel}
+│ 🏅 ${rango(user.nivel)}
+╰━━━━━━━━━━━━━━━━━━━━⬣`,
         m,
-        {
-          mentions
-        }
+        { mentions: [userId, proposerId] }
       )
     }
 
     // ========================================================
-    // ✅ ACEPTAR HERMANO
+    // ❌ RECHAZAR PROPUESTA
     // ========================================================
 
-    if (
-      command === 'aceptarhermano'
-    ) {
-
-      if (
-        !user.propuestas.length
-      ) {
-
-        return m.reply(
-          '💭 No tienes ninguna propuesta de hermandad pendiente.'
-        )
+    if (command === 'rechazarhermano') {
+      if (!user.propuestas.length) {
+        return m.reply('📭 No tienes propuestas de hermandad pendientes.')
       }
 
-      // ======================================================
-      // 👤 ELEGIR PROPUESTA
-      // ======================================================
+      let proposal = targetRaw
+        ? findProposal(user, targetRaw, conn)
+        : null
 
-      let proposal = null
-
-      const targetRaw =
-        getTarget(
-          m,
-          conn
-        )
-
-      if (targetRaw) {
-
-        proposal =
-          user.propuestas.find(
-            p =>
-              sameUser(
-                p.de,
-                targetRaw,
-                conn
-              )
-          )
+      if (!proposal && user.propuestas.length === 1) {
+        proposal = user.propuestas[0]
       }
 
       if (!proposal) {
-
-        if (
-          user.propuestas.length === 1
-        ) {
-
-          proposal =
-            user.propuestas[0]
-
-        } else {
-
-          const mentions =
-            user.propuestas
-              .map(
-                p => p.de
-              )
-
-          let texto =
-`📨 *TIENES VARIAS PROPUESTAS*
-
-`
-
-          user.propuestas.forEach(
-            (p, i) => {
-
-              texto +=
-`${i + 1}. ${tag(p.de)}
-📅 ${fechaBonita(p.fecha)}
-
-`
-            }
-          )
-
-          texto +=
-`\n👉 Responde al mensaje de la persona que quieres aceptar.`
-
-          return conn.reply(
-            m.chat,
-            texto.trim(),
-            m,
-            {
-              mentions
-            }
-          )
-        }
-      }
-
-      // ======================================================
-      // ⌛ EXPIRACIÓN
-      // ======================================================
-
-      if (
-        ahora -
-        Number(proposal.fecha || 0)
-        > TRES_DIAS
-      ) {
-
-        removeProposal(
-          user,
-          proposal.de,
-          conn
-        )
-
-        saveDB(db)
-
-        return m.reply(
-          '⌛ Esa propuesta de hermandad ya expiró.'
-        )
-      }
-
-      const proposerId =
-        findUserId(
-          db,
-          proposal.de,
-          conn
-        )
-
-      const proposer =
-        getUser(
-          db,
-          proposerId,
-          conn
-        )
-
-      // ======================================================
-      // 🚫 COMPROBAR LÍMITES
-      // ======================================================
-
-      if (
-        getBrotherIds(
-          user,
-          db,
-          conn
-        ).length >= MAX_HERMANOS
-      ) {
-
-        return m.reply(
-          `🚫 Ya tienes ${MAX_HERMANOS} hermanos.`
-        )
-      }
-
-      if (
-        getBrotherIds(
-          proposer,
-          db,
-          conn
-        ).length >= MAX_HERMANOS
-      ) {
-
-        removeProposal(
-          user,
-          proposerId,
-          conn
-        )
-
-        saveDB(db)
-
-        return m.reply(
-          `😅 ${tag(proposerId)} ya alcanzó el máximo de ${MAX_HERMANOS} hermanos.` 
-        )
-      }
-
-      // ======================================================
-      // 🤝 CREAR HERMANDAD
-      // ======================================================
-
-      addBrother(
-        db,
-        userId,
-        proposerId,
-        conn
-      )
-
-      addBrother(
-        db,
-        proposerId,
-        userId,
-        conn
-      )
-
-      removeProposal(
-        user,
-        proposerId,
-        conn
-      )
-
-      // También eliminar propuestas cruzadas
-      removeProposal(
-        proposer,
-        userId,
-        conn
-      )
-
-      if (!user.hermandadFecha) {
-        user.hermandadFecha =
-          ahora
-      }
-
-      if (!proposer.hermandadFecha) {
-        proposer.hermandadFecha =
-          ahora
-      }
-
-      saveDB(db)
-
-      return conn.reply(
-        m.chat,
-
-`🧬 *¡HERMANDAD CONFIRMADA!*
-
-${tag(userId)} 🤝 ${tag(proposerId)}
-
-🎉 Ahora son hermanos oficiales.
-
-👥 ${tag(userId)} tiene ${getBrotherIds(user, db, conn).length}/${MAX_HERMANOS} hermanos.
-👥 ${tag(proposerId)} tiene ${getBrotherIds(proposer, db, conn).length}/${MAX_HERMANOS} hermanos.
-
-📅 Desde: ${fechaBonita(ahora)}
-
-💪 Nivel: ${user.nivel}
-🏅 Rango: ${rango(user.nivel)}`,
-
-        m,
-        {
-          mentions: [
-            userId,
-            proposerId
-          ]
-        }
-      )
-    }
-
-    // ========================================================
-    // ❌ RECHAZAR
-    // ========================================================
-
-    if (
-      command === 'rechazarhermano'
-    ) {
-
-      if (
-        !user.propuestas.length
-      ) {
-
-        return m.reply(
-          '💭 No tienes propuestas de hermandad.'
-        )
-      }
-
-      const targetRaw =
-        getTarget(
+        return conn.reply(
+          m.chat,
+          '📨 Tienes varias propuestas. Responde al mensaje de la persona cuya propuesta quieres rechazar.',
           m,
-          conn
+          { mentions: user.propuestas.map(p => p.de) }
         )
-
-      let proposal = null
-
-      if (targetRaw) {
-
-        proposal =
-          user.propuestas.find(
-            p =>
-              sameUser(
-                p.de,
-                targetRaw,
-                conn
-              )
-          )
       }
 
-      if (!proposal) {
+      const proposerId = findUserId(db, proposal.de, conn)
 
-        if (
-          user.propuestas.length === 1
-        ) {
+      removeProposal(user, proposerId, conn)
 
-          proposal =
-            user.propuestas[0]
-
-        } else {
-
-          return m.reply(
-            '📨 Tienes varias propuestas. Responde al mensaje de la persona cuya propuesta quieres rechazar.'
-          )
-        }
+      if (!saveDB(db)) {
+        return m.reply('❌ No pude guardar los cambios.')
       }
-
-      const proposerId =
-        findUserId(
-          db,
-          proposal.de,
-          conn
-        )
-
-      removeProposal(
-        user,
-        proposerId,
-        conn
-      )
-
-      saveDB(db)
 
       return conn.reply(
         m.chat,
-
-`😅 ${tag(userId)} rechazó la propuesta de hermandad de ${tag(proposerId)}.
-
-🧬 La hermandad no fue creada.`,
-
+        `💬 ${tag(userId)} rechazó la propuesta de hermandad de ${tag(proposerId)}.\n\n🧬 La hermandad no fue creada.`,
         m,
-        {
-          mentions: [
-            userId,
-            proposerId
-          ]
-        }
+        { mentions: [userId, proposerId] }
       )
     }
 
@@ -1533,232 +864,95 @@ ${tag(userId)} 🤝 ${tag(proposerId)}
     // 💔 ROMPER HERMANDAD
     // ========================================================
 
-    if (
-      command === 'romperhermandad'
-    ) {
-
-      const brothers =
-        getBrotherIds(
-          user,
-          db,
-          conn
-        )
+    if (command === 'romperhermandad') {
+      const brothers = getBrotherIds(user, db, conn)
 
       if (!brothers.length) {
-
-        return m.reply(
-          '😹 No tienes hermanos actualmente.'
-        )
+        return m.reply('😹 No tienes hermanos actualmente.')
       }
-
-      const targetRaw =
-        getTarget(
-          m,
-          conn
-        )
 
       let broId = null
 
       if (targetRaw) {
-
-        broId =
-          brothers.find(
-            id =>
-              sameUser(
-                id,
-                targetRaw,
-                conn
-              )
-          )
+        broId = brothers.find(
+          id => sameUser(id, targetRaw, conn)
+        )
 
         if (!broId) {
-
-          return m.reply(
-            '❌ La persona seleccionada no es tu hermano.'
-          )
+          return m.reply('❌ Esa persona no es uno de tus hermanos.')
         }
-
+      } else if (brothers.length === 1) {
+        broId = brothers[0]
       } else {
-
-        if (
-          brothers.length === 1
-        ) {
-
-          broId =
-            brothers[0]
-
-        } else {
-
-          return conn.reply(
-            m.chat,
-
-`💔 *TIENES VARIOS HERMANOS*
-
-${hermanosTexto(user, db, conn)}
-
-👉 Responde al mensaje del hermano con quien quieres terminar la hermandad.`,
-
-            m,
-            {
-              mentions: brothers
-            }
-          )
-        }
-      }
-
-      const brother =
-        getUser(
-          db,
-          broId,
-          conn
-        )
-
-      removeBrother(
-        db,
-        userId,
-        broId,
-        conn
-      )
-
-      if (brother) {
-
-        removeBrother(
-          db,
-          broId,
-          userId,
-          conn
+        return conn.reply(
+          m.chat,
+          `💔 *ELIGE A TU HERMANO*\n\n${hermanosTexto(user, db, conn)}\n\n👉 Responde al mensaje del hermano con quien quieres terminar la hermandad.`,
+          m,
+          { mentions: brothers }
         )
       }
 
-      saveDB(db)
+      removeBrother(db, userId, broId, conn)
+      removeBrother(db, broId, userId, conn)
+
+      if (!saveDB(db)) {
+        return m.reply('❌ No pude guardar los cambios.')
+      }
 
       return conn.reply(
         m.chat,
-
-`💔 *HERMANDAD TERMINADA*
-
-${tag(userId)} terminó su hermandad con ${tag(broId)}.
-
-🧬 La relación fue eliminada.
-📊 Las demás hermandades se mantienen intactas.`,
-
+        `💔 *HERMANDAD TERMINADA*\n\n${tag(userId)} terminó su hermandad con ${tag(broId)}.\n\n🧬 La relación fue eliminada.\n📊 Las demás hermandades se mantienen intactas.`,
         m,
-        {
-          mentions: [
-            userId,
-            broId
-          ]
-        }
+        { mentions: [userId, broId] }
       )
     }
 
     // ========================================================
-    // 🤜 INTERACCIONES
+    // 🤜 INTERACCIONES ENTRE HERMANOS
     // ========================================================
 
     const acciones = [
-
       'abrazohermano',
       'proteger',
       'chocarhermano',
       'entrenarhermano'
-
     ]
 
-    if (
-      acciones.includes(command)
-    ) {
-
-      const brothers =
-        getBrotherIds(
-          user,
-          db,
-          conn
-        )
+    if (acciones.includes(command)) {
+      const brothers = getBrotherIds(user, db, conn)
 
       if (!brothers.length) {
-
         return m.reply(
-          '😹 No tienes hermanos.\n\n' +
-          'Usa *.hermano @usuario* para proponer una hermandad.'
+          '😹 No tienes hermanos.\n\nUsa *.hermano @usuario* para proponer una hermandad.'
         )
       }
-
-      // ======================================================
-      // 🎯 ELEGIR HERMANO
-      // ======================================================
-
-      const targetRaw =
-        getTarget(
-          m,
-          conn
-        )
 
       let broId = null
 
       if (targetRaw) {
-
-        broId =
-          brothers.find(
-            id =>
-              sameUser(
-                id,
-                targetRaw,
-                conn
-              )
-          )
-
-        if (!broId) {
-
-          return m.reply(
-            '❌ Esa persona no es uno de tus hermanos.'
-          )
-        }
-
-      } else {
-
-        if (
-          brothers.length === 1
-        ) {
-
-          broId =
-            brothers[0]
-
-        } else {
-
-          return conn.reply(
-            m.chat,
-
-`🤝 *ELIGE A TU HERMANO*
-
-${hermanosTexto(user, db, conn)}
-
-👉 Responde al mensaje del hermano con quien quieres interactuar.`,
-
-            m,
-            {
-              mentions: brothers
-            }
-          )
-        }
-      }
-
-      const bro =
-        getUser(
-          db,
-          broId,
-          conn
+        broId = brothers.find(
+          id => sameUser(id, targetRaw, conn)
         )
 
-      // ======================================================
-      // ⏳ COOLDOWN
-      // ======================================================
+        if (!broId) {
+          return m.reply('❌ Esa persona no es uno de tus hermanos.')
+        }
+      } else if (brothers.length === 1) {
+        broId = brothers[0]
+      } else {
+        return conn.reply(
+          m.chat,
+          `🤝 *ELIGE A TU HERMANO*\n\n${hermanosTexto(user, db, conn)}\n\n👉 Responde al mensaje del hermano con quien quieres interactuar.`,
+          m,
+          { mentions: brothers }
+        )
+      }
 
-      const restante =
-        checkCooldown(user)
+      const bro = getUser(db, broId, conn)
 
-      if (restante) {
+      const restante = tiempoRestante(user)
 
+      if (restante > 0) {
         return m.reply(
           `⏳ Espera *${restante} segundos* para volver a interactuar.`
         )
@@ -1768,444 +962,246 @@ ${hermanosTexto(user, db, conn)}
       let accionTexto = ''
 
       switch (command) {
-
         case 'abrazohermano':
-
           puntos = 5
-          accionTexto =
-            '🤗 dio un abrazo a'
-
+          accionTexto = '🤗 abrazó a'
           break
 
         case 'proteger':
-
           puntos = 10
-          accionTexto =
-            '🛡️ protegió a'
-
+          accionTexto = '🛡️ protegió a'
           break
 
         case 'chocarhermano':
-
           puntos = 7
-          accionTexto =
-            '🤜 chocó el puño con'
-
+          accionTexto = '🤜 chocó el puño con'
           break
 
         case 'entrenarhermano':
-
           puntos = 15
-          accionTexto =
-            '🏋️ entrenó con'
-
+          accionTexto = '🏋️ entrenó con'
           break
       }
 
-      // ======================================================
-      // 📊 SUBIR ESTADÍSTICAS
-      // ======================================================
+      user.cooldown = Date.now()
+      user.nivel += puntos
+      user.interacciones += 1
 
-      user.nivel =
-        Number(user.nivel || 0) +
-        puntos
+      // El hermano recibe la mitad de los puntos.
+      bro.nivel += Math.floor(puntos / 2)
+      bro.interacciones += 1
 
-      user.interacciones =
-        Number(user.interacciones || 0) +
-        1
-
-      // El hermano recibe una pequeña parte
-      bro.nivel =
-        Number(bro.nivel || 0) +
-        Math.floor(
-          puntos / 2
-        )
-
-      bro.interacciones =
-        Number(bro.interacciones || 0) +
-        1
-
-      saveDB(db)
+      if (!saveDB(db)) {
+        return m.reply('❌ No pude guardar la interacción.')
+      }
 
       return conn.reply(
         m.chat,
-
-`🤝 *INTERACCIÓN DE HERMANOS*
-
-${tag(userId)} ${accionTexto} ${tag(broId)}.
-
-💪 +${puntos} puntos
-
-📊 Nivel de ${tag(userId)}: ${user.nivel}
-🏅 ${rango(user.nivel)}
-
-👥 Hermanos: ${getBrotherIds(user, db, conn).length}/${MAX_HERMANOS}
-🎮 Interacciones: ${user.interacciones}`,
-
+        `╭━━━〔 🤝 HERMANOS 〕━━━⬣
+│
+│ ${tag(userId)} ${accionTexto} ${tag(broId)}.
+│
+│ 💪 +${puntos} puntos para ti.
+│ 💙 +${Math.floor(puntos / 2)} puntos para tu hermano.
+│
+│ 📊 Tu nivel: ${user.nivel}
+│ 🏅 ${rango(user.nivel)}
+│ 🎮 Interacciones: ${user.interacciones}
+╰━━━━━━━━━━━━━━━━━━━━⬣`,
         m,
-        {
-          mentions: [
-            userId,
-            broId
-          ]
-        }
+        { mentions: [userId, broId] }
       )
     }
 
     // ========================================================
-    // 🏆 TOP HERMANOS
+    // 🏆 TOP HERMANOS — OWNERS
     // ========================================================
 
-    if (
-      command === 'tophermanos'
-    ) {
-
-      if (
-        !isOwner(
-          sender,
-          conn
-        )
-      ) {
-
-        return m.reply(
-          '❌ Este comando es exclusivo del dueño.'
-        )
+    if (command === 'tophermanos') {
+      if (!isOwner(sender, conn)) {
+        return m.reply('👑 Este comando es exclusivo de los Owners.')
       }
 
       const ranking = []
+      const procesados = new Set()
 
-      const procesados =
-        new Set()
+      for (const id of Object.keys(db)) {
+        const data = getUser(db, id, conn)
+        const brothers = getBrotherIds(data, db, conn)
 
-      for (
-        const id of Object.keys(db)
-      ) {
+        for (const broId of brothers) {
+          const ids = [id, broId].sort()
+          const key = ids.join('|')
 
-        const data =
-          getUser(
-            db,
-            id,
-            conn
-          )
-
-        const brothers =
-          getBrotherIds(
-            data,
-            db,
-            conn
-          )
-
-        for (
-          const broId of brothers
-        ) {
-
-          const key =
-            [
-              id,
-              broId
-            ]
-              .sort()
-              .join('|')
-
-          if (
-            procesados.has(key)
-          ) {
-            continue
-          }
-
+          if (procesados.has(key)) continue
           procesados.add(key)
 
+          const bro = getUser(db, broId, conn)
+
           ranking.push({
-
             id,
-
             broId,
-
-            nivel:
-              Number(
-                data.nivel || 0
-              ),
-
+            nivel1: Number(data.nivel) || 0,
+            nivel2: Number(bro.nivel) || 0,
+            nivelTotal:
+              (Number(data.nivel) || 0) +
+              (Number(bro.nivel) || 0),
             interacciones:
-              Number(
-                data.interacciones || 0
-              )
+              (Number(data.interacciones) || 0) +
+              (Number(bro.interacciones) || 0)
           })
         }
       }
 
-      ranking.sort(
-        (a, b) =>
-          b.nivel -
-          a.nivel
-      )
+      ranking.sort((a, b) => b.nivelTotal - a.nivelTotal)
 
-      const top =
-        ranking.slice(0, 10)
-
-      let texto =
-        '🏆 *TOP HERMANOS*\n\n'
-
-      const mentions = []
+      const top = ranking.slice(0, 10)
+      const medallas = ['🥇', '🥈', '🥉']
 
       if (!top.length) {
-
-        texto +=
-          '😹 No hay hermandades activas.'
-
-      } else {
-
-        const medallas = [
-          '🥇',
-          '🥈',
-          '🥉'
-        ]
-
-        top.forEach(
-          (item, i) => {
-
-            const medal =
-              medallas[i] ||
-              '🏅'
-
-            texto +=
-
-`${medal} *${i + 1}° Lugar*
-
-${tag(item.id)} 🤝 ${tag(item.broId)}
-
-💪 Nivel: ${item.nivel}
-🏅 ${rango(item.nivel)}
-🎮 Interacciones: ${item.interacciones}
-
-`
-
-            mentions.push(
-              item.id,
-              item.broId
-            )
-          }
-        )
+        return m.reply('😹 Todavía no hay hermandades para el ranking.')
       }
+
+      let texto = '╭━━━〔 🏆 TOP HERMANOS 〕━━━⬣\n│\n'
+      const mentions = []
+
+      top.forEach((p, i) => {
+        texto +=
+          `│ ${medallas[i] || '🏅'} *PUESTO ${i + 1}*\n` +
+          `│ ${tag(p.id)} 🤝 ${tag(p.broId)}\n` +
+          `│ 💪 Nivel conjunto: ${p.nivelTotal}\n` +
+          `│ 🎮 Interacciones: ${p.interacciones}\n│\n`
+
+        mentions.push(p.id, p.broId)
+      })
+
+      texto += '╰━━━━━━━━━━━━━━━━━━━━⬣'
 
       return conn.reply(
         m.chat,
-        texto.trim(),
+        texto,
         m,
-        {
-          mentions
-        }
+        { mentions: [...new Set(mentions)] }
       )
     }
 
     // ========================================================
-    // 📜 LISTA DE HERMANOS
+    // 📜 LISTA DE HERMANDADES — OWNERS
     // ========================================================
 
-    if (
-      command === 'listahermanos'
-    ) {
-
-      if (
-        !isOwner(
-          sender,
-          conn
-        )
-      ) {
-
-        return m.reply(
-          '❌ Este comando es exclusivo del dueño.'
-        )
+    if (command === 'listahermanos') {
+      if (!isOwner(sender, conn)) {
+        return m.reply('👑 Este comando es exclusivo de los Owners.')
       }
 
-      let texto =
-        '🧬 *HERMANDADES ACTIVAS*\n\n'
-
+      let texto = '╭━━━〔 🧬 HERMANDADES ACTIVAS 〕━━━⬣\n│\n'
+      const procesados = new Set()
       const mentions = []
-
-      const procesados =
-        new Set()
-
       let total = 0
 
-      for (
-        const id of Object.keys(db)
-      ) {
+      for (const id of Object.keys(db)) {
+        const data = getUser(db, id, conn)
+        const brothers = getBrotherIds(data, db, conn)
 
-        const data =
-          getUser(
-            db,
-            id,
-            conn
-          )
+        for (const broId of brothers) {
+          const key = [id, broId].sort().join('|')
 
-        const brothers =
-          getBrotherIds(
-            data,
-            db,
-            conn
-          )
-
-        for (
-          const broId of brothers
-        ) {
-
-          const key =
-            [
-              id,
-              broId
-            ]
-              .sort()
-              .join('|')
-
-          if (
-            procesados.has(key)
-          ) {
-            continue
-          }
-
+          if (procesados.has(key)) continue
           procesados.add(key)
 
+          const bro = getUser(db, broId, conn)
           total++
 
           texto +=
-`🤝 ${tag(id)} 🧬 ${tag(broId)}
+            `│ 🤝 ${tag(id)} 🧬 ${tag(broId)}\n` +
+            `│ 💪 Niveles: ${data.nivel} / ${bro.nivel}\n` +
+            `│ 🎮 Interacciones: ${data.interacciones + bro.interacciones}\n│\n`
 
-💪 Nivel: ${data.nivel || 0}
-🏅 ${rango(data.nivel || 0)}
-🎮 Interacciones: ${data.interacciones || 0}
-
-`
-
-          mentions.push(
-            id,
-            broId
-          )
+          mentions.push(id, broId)
         }
       }
 
-      if (!total) {
-
-        texto +=
-          '😹 No hay hermanos activos.'
-
-      } else {
-
-        texto +=
-          `\n📊 Total de hermandades: ${total}`
-      }
+      texto += `│ 📊 Total de hermandades: ${total}\n╰━━━━━━━━━━━━━━━━━━━━⬣`
 
       return conn.reply(
         m.chat,
-        texto.trim(),
+        texto,
         m,
-        {
-          mentions
-        }
+        { mentions: [...new Set(mentions)] }
       )
     }
 
     // ========================================================
-    // 🧹 LIMPIAR BASE
+    // 🧹 REINICIAR BASE — OWNER
+    // Uso: .clearbro confirmar
     // ========================================================
 
-    if (
-      command === 'clearbro'
-    ) {
+    if (command === 'clearbro') {
+      if (!isOwner(sender, conn)) {
+        return m.reply('👑 Este comando es exclusivo de los Owners.')
+      }
 
-      if (
-        !isOwner(
-          sender,
-          conn
-        )
-      ) {
-
+      if (String(text || '').trim().toLowerCase() !== 'confirmar') {
         return m.reply(
-          '❌ Este comando es exclusivo del dueño.'
+          '⚠️ *REINICIO DE HERMANDADES*\n\n' +
+          'Esta acción eliminará todas las hermandades, propuestas, niveles e interacciones.\n\n' +
+          'Para confirmar, escribe:\n' +
+          '*.clearbro confirmar*'
         )
       }
 
-      for (
-        const id of Object.keys(db)
-      ) {
-
-        db[id] =
-          defaultUser()
+      for (const id of Object.keys(db)) {
+        db[id] = defaultUser()
       }
 
-      saveDB(db)
+      if (!saveDB(db)) {
+        return m.reply('❌ No pude guardar el reinicio.')
+      }
 
       return m.reply(
-
-`🧹 *BASE DE HERMANDADES LIMPIADA*
-
-✅ Todas las hermandades fueron eliminadas.
-✅ Todas las propuestas fueron eliminadas.
-✅ Todos los niveles fueron reiniciados.
-✅ Todas las interacciones fueron reiniciadas.
-
-👥 Límite actual: ${MAX_HERMANOS} hermanos por usuario.`
-
+        `🧹 *BASE DE HERMANDADES REINICIADA*\n\n` +
+        `✅ Hermandades eliminadas.\n` +
+        `✅ Propuestas eliminadas.\n` +
+        `✅ Niveles e interacciones reiniciados.\n\n` +
+        `👥 Límite: ${MAX_HERMANOS} hermanos por usuario.`
       )
     }
 
     // ========================================================
-    // 📊 MIS HERMANOS
+    // 🧬 MIS HERMANOS
     // ========================================================
 
-    if (
-      command === 'mishermanos'
-    ) {
-
-      const brothers =
-        getBrotherIds(
-          user,
-          db,
-          conn
-        )
+    if (command === 'mishermanos') {
+      const brothers = getBrotherIds(user, db, conn)
 
       if (!brothers.length) {
-
         return m.reply(
-          '😹 No tienes hermanos actualmente.'
+          '😹 Todavía no tienes hermanos.\n\n' +
+          'Usa *.hermano @usuario* para enviar una propuesta.'
         )
       }
 
-      const mentions = [
-        userId,
-        ...brothers
-      ]
-
       let texto =
-`🧬 *MIS HERMANOS*
+        `╭━━━〔 🧬 MIS HERMANOS 〕━━━⬣\n` +
+        `│ 👤 ${tag(userId)}\n` +
+        `│ 👥 ${brothers.length}/${MAX_HERMANOS}\n│\n`
 
-👤 ${tag(userId)}
-
-👥 ${brothers.length}/${MAX_HERMANOS}
-
-`
-
-      brothers.forEach(
-        (id, i) => {
-
-          texto +=
-`${i + 1}. ${tag(id)}\n`
-        }
-      )
+      brothers.forEach((id, i) => {
+        texto += `│ ${i + 1}. ${tag(id)}\n`
+      })
 
       texto +=
-
-`\n💪 Nivel: ${user.nivel}
-🏅 Rango: ${rango(user.nivel)}
-🎮 Interacciones: ${user.interacciones || 0}`
+        `│\n` +
+        `│ 💪 Nivel: ${user.nivel}\n` +
+        `│ 🏅 Rango: ${rango(user.nivel)}\n` +
+        `│ 🎮 Interacciones: ${user.interacciones}\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━⬣`
 
       return conn.reply(
         m.chat,
-        texto.trim(),
+        texto,
         m,
-        {
-          mentions
-        }
+        { mentions: [userId, ...brothers] }
       )
     }
 
@@ -2213,61 +1209,36 @@ ${tag(item.id)} 🤝 ${tag(item.broId)}
     // 📨 MIS PROPUESTAS
     // ========================================================
 
-    if (
-      command === 'propuestashermano'
-    ) {
-
-      if (
-        !user.propuestas.length
-      ) {
-
-        return m.reply(
-          '📭 No tienes propuestas pendientes.'
-        )
+    if (command === 'propuestashermano') {
+      if (!user.propuestas.length) {
+        return m.reply('📭 No tienes propuestas pendientes.')
       }
 
-      const mentions =
-        user.propuestas.map(
-          p => p.de
-        )
+      let texto = '╭━━━〔 📨 PROPUESTAS 〕━━━⬣\n│\n'
 
-      let texto =
-        '📨 *PROPUESTAS PENDIENTES*\n\n'
-
-      user.propuestas.forEach(
-        (p, i) => {
-
-          texto +=
-
-`${i + 1}. ${tag(p.de)}
-📅 ${fechaBonita(p.fecha)}
-
-`
-        }
-      )
+      user.propuestas.forEach((p, i) => {
+        texto +=
+          `│ ${i + 1}. ${tag(p.de)}\n` +
+          `│ 📅 Recibida: ${fechaBonita(p.fecha)}\n│\n`
+      })
 
       texto +=
-        '\n⏰ Las propuestas duran 3 días.'
+        `│ ⏳ Las propuestas duran 3 días.\n` +
+        `╰━━━━━━━━━━━━━━━━━━━━⬣`
 
       return conn.reply(
         m.chat,
-        texto.trim(),
+        texto,
         m,
-        {
-          mentions
-        }
+        { mentions: user.propuestas.map(p => p.de) }
       )
     }
 
-  } catch (e) {
-
-    console.error(
-      '❌ Error en hermanos.js:',
-      e
-    )
+  } catch (error) {
+    console.error('[whatsapp-bot] Error en hermanos.js:', error)
 
     return m.reply(
-      '❌ Ocurrió un error interno en el sistema de hermanos.'
+      '❌ Ocurrió un error interno en el sistema de hermandad. Inténtalo nuevamente.'
     )
   }
 }
@@ -2277,43 +1248,37 @@ ${tag(item.id)} 🤝 ${tag(item.broId)}
 // ============================================================
 
 handler.command = [
-
-  // 🤝 Hermandad
   'hermano',
   'aceptarhermano',
   'rechazarhermano',
   'romperhermandad',
 
-  // 👀 Consultas
   'verhermano',
   'relacionhermano',
   'mishermanos',
   'propuestashermano',
 
-  // 🤜 Interacciones
   'abrazohermano',
   'proteger',
   'chocarhermano',
   'entrenarhermano',
 
-  // 👑 Owner
   'tophermanos',
   'listahermanos',
   'clearbro'
-
 ]
 
 // ============================================================
-// 🏷️ CONFIGURACIÓN
+// 🏷️ AYUDA
 // ============================================================
 
 handler.help = [
-
   'hermano @usuario',
   'aceptarhermano',
   'rechazarhermano',
   'romperhermandad',
   'verhermano',
+  'relacionhermano',
   'mishermanos',
   'propuestashermano',
   'abrazohermano',
@@ -2322,20 +1287,10 @@ handler.help = [
   'entrenarhermano',
   'tophermanos',
   'listahermanos',
-  'clearbro'
-
+  'clearbro confirmar'
 ]
 
-handler.tags = [
-  'fun',
-  'juegos',
-  'owner'
-]
-
+handler.tags = ['fun', 'juegos', 'owner']
 handler.group = true
-
-// ============================================================
-// 📤 EXPORTAR
-// ============================================================
 
 export default handler

@@ -1,7 +1,8 @@
 // 📂 plugins/media-admin.js
-// 🛡️ FELIXCAT BOT — SISTEMA COMPLETO DE MEDIOS
+// 🛡️ WHATSAPP-BOT — SISTEMA COMPLETO DE MEDIOS
 // 💾 Guardado automático + administrador + limpieza de DB
-// 📌 Recuperación silenciosa en un grupo central
+// 📌 Recuperación en el grupo donde se usa el comando
+// 📌 Grupo central conservado para otras funciones
 // ============================================================
 
 import fs from 'fs'
@@ -16,7 +17,7 @@ const MEDIA_DB_FILE = './database/media.json'
 const MEDIA_FOLDER = './media'
 
 // ============================================================
-// 📌 GRUPO CENTRAL
+// 📌 GRUPO CENTRAL ORIGINAL
 // ============================================================
 
 const MEDIA_GROUP = '120363410955044864@g.us'
@@ -78,8 +79,6 @@ function isOwner(m, conn) {
 
         if (owner === sender) return true
 
-        // Comparación por número para owners configurados
-        // como número, JID normal o LID.
         const ownerNumber = getNumber(owner)
 
         return Boolean(
@@ -108,7 +107,7 @@ function loadMediaDB() {
         return Array.isArray(data) ? data : []
     } catch (error) {
         console.error('[MEDIA] Error leyendo media.json:', error)
-        return []
+        return null
     }
 }
 
@@ -118,11 +117,15 @@ function loadMediaDB() {
 
 function saveMediaDB(list) {
     try {
+        const tempFile = `${MEDIA_DB_FILE}.tmp`
+
         fs.writeFileSync(
-            MEDIA_DB_FILE,
+            tempFile,
             JSON.stringify(list, null, 2),
             'utf8'
         )
+
+        fs.renameSync(tempFile, MEDIA_DB_FILE)
 
         return true
     } catch (error) {
@@ -140,12 +143,10 @@ function getFilePath(item) {
 
     const root = path.resolve(MEDIA_FOLDER)
 
-    // Primero comprobar la ruta registrada.
     if (item.path) {
         const registeredPath = path.resolve(item.path)
         const relative = path.relative(root, registeredPath)
 
-        // Solo permitir archivos dentro de ./media.
         if (
             relative &&
             !relative.startsWith('..') &&
@@ -157,7 +158,6 @@ function getFilePath(item) {
         }
     }
 
-    // Alternativa usando el nombre del archivo.
     if (item.filename) {
         const filename = String(item.filename)
 
@@ -188,11 +188,12 @@ function getFilePath(item) {
 
 function syncMediaDB() {
     try {
-        let list = loadMediaDB()
+        const list = loadMediaDB()
 
-        const valid = list.filter(item => {
-            return Boolean(getFilePath(item))
-        })
+        // No sobrescribir la base si no se pudo leer.
+        if (!list) return null
+
+        const valid = list.filter(item => Boolean(getFilePath(item)))
 
         const normalized = valid.map((item, index) => ({
             ...item,
@@ -203,7 +204,7 @@ function syncMediaDB() {
             normalized.length !== list.length ||
             normalized.some((item, index) => item.id !== list[index]?.id)
         ) {
-            saveMediaDB(normalized)
+            if (!saveMediaDB(normalized)) return null
         }
 
         if (!global.db) global.db = {}
@@ -214,7 +215,7 @@ function syncMediaDB() {
         return normalized
     } catch (error) {
         console.error('[MEDIA] Error sincronizando:', error)
-        return []
+        return null
     }
 }
 
@@ -252,6 +253,9 @@ async function saveIncomingMedia(m, conn) {
         if (!buffer || !buffer.length) return
 
         const list = syncMediaDB()
+
+        if (!list) return
+
         const uniqueName =
             `${Date.now()}_${Math.floor(Math.random() * 999999)}`
 
@@ -331,7 +335,7 @@ async function saveIncomingMedia(m, conn) {
 }
 
 // ============================================================
-// 📤 ENVIAR ARCHIVO AL GRUPO CENTRAL
+// 📤 ENVIAR ARCHIVO A UN GRUPO
 // ============================================================
 
 async function sendMediaToGroup(conn, groupId, item, filepath) {
@@ -389,7 +393,14 @@ const handler = async (m, { conn, args, text }) => {
 
         let list = syncMediaDB()
 
-        // Obtener argumentos sin depender de una sola propiedad.
+        if (!list) {
+            return conn.reply(
+                m.chat,
+                '❌ No pude leer la base de datos de medios.',
+                m
+            )
+        }
+
         let commandArgs = Array.isArray(args) ? [...args] : []
 
         if (!commandArgs.length && text) {
@@ -418,7 +429,6 @@ const handler = async (m, { conn, args, text }) => {
                 )
             }
 
-            // Mostrar hasta 800 medios.
             const max = Math.min(list.length, 800)
 
             const lines = list.slice(0, max).map(item => (
@@ -440,7 +450,7 @@ const handler = async (m, { conn, args, text }) => {
         }
 
         // --------------------------------------------------------
-        // 🧹 LIMPIAR TODOS LOS MEDIOS REGISTRADOS
+        // 🧹 LIMPIAR TODOS LOS MEDIOS
         // --------------------------------------------------------
 
         if (
@@ -463,7 +473,13 @@ const handler = async (m, { conn, args, text }) => {
                 }
             }
 
-            saveMediaDB([])
+            if (!saveMediaDB([])) {
+                return conn.reply(
+                    m.chat,
+                    '❌ No pude actualizar la base de datos.',
+                    m
+                )
+            }
 
             if (global.db?.data) {
                 global.db.data.mediaList = []
@@ -486,13 +502,30 @@ const handler = async (m, { conn, args, text }) => {
         if (
             ['sync', 'sincronizar', 'repair', 'fix'].includes(cmd)
         ) {
-            const before = loadMediaDB().length
+            const before = loadMediaDB()
+
+            if (!before) {
+                return conn.reply(
+                    m.chat,
+                    '❌ No pude leer la base de datos.',
+                    m
+                )
+            }
+
             list = syncMediaDB()
+
+            if (!list) {
+                return conn.reply(
+                    m.chat,
+                    '❌ No pude sincronizar la base de datos.',
+                    m
+                )
+            }
 
             return conn.reply(
                 m.chat,
                 `🔄 *MEDIA SINCRONIZADO*\n\n` +
-                `📂 Registros anteriores: *${before}*\n` +
+                `📂 Registros anteriores: *${before.length}*\n` +
                 `📁 Registros actuales: *${list.length}*`,
                 m
             )
@@ -552,7 +585,13 @@ const handler = async (m, { conn, args, text }) => {
                 id: index + 1
             }))
 
-            saveMediaDB(list)
+            if (!saveMediaDB(list)) {
+                return conn.reply(
+                    m.chat,
+                    '❌ No pude guardar los cambios de la base de datos.',
+                    m
+                )
+            }
 
             if (global.db?.data) {
                 global.db.data.mediaList = list
@@ -569,11 +608,13 @@ const handler = async (m, { conn, args, text }) => {
 
         // --------------------------------------------------------
         // 📤 RECUPERAR MEDIO POR ID
-        // .media 1
-        // .medias 1
         //
-        // 🚫 SOLO ENVÍA AL GRUPO TERMINADO EN 864
-        // 🚫 SIN CONFIRMACIÓN EN EL CHAT DE ORIGEN
+        // .media 1
+        // .media 100
+        //
+        // 📌 ENVÍA AL GRUPO DONDE SE EJECUTA EL COMANDO
+        // 📌 Si se usa en privado, envía al chat privado
+        // 📌 No responde con confirmación adicional
         // --------------------------------------------------------
 
         if (/^\d+$/.test(cmd)) {
@@ -603,9 +644,7 @@ const handler = async (m, { conn, args, text }) => {
                     id: index + 1
                 }))
 
-                saveMediaDB(list)
-
-                if (global.db?.data) {
+                if (saveMediaDB(list) && global.db?.data) {
                     global.db.data.mediaList = list
                 }
 
@@ -616,23 +655,24 @@ const handler = async (m, { conn, args, text }) => {
                 )
             }
 
-            // Enviar únicamente al grupo central terminado en 864.
-            // Sin citar el comando y sin responder en el chat de origen.
+            // Enviar al mismo chat donde se ejecutó .media.
+            // En un grupo: al grupo actual.
+            // En privado: al chat privado actual.
             try {
                 await sendMediaToGroup(
                     conn,
-                    MEDIA_GROUP,
+                    m.chat,
                     item,
                     filepath
                 )
             } catch (error) {
                 console.error(
-                    `[MEDIA] Falló el envío del ID ${id} al grupo ${MEDIA_GROUP}:`,
+                    `[MEDIA] Falló el envío del ID ${id} al chat ${m.chat}:`,
                     error
                 )
             }
 
-            // No enviar confirmación al chat de origen.
+            // Sin confirmación adicional.
             return
         }
 
@@ -647,9 +687,6 @@ const handler = async (m, { conn, args, text }) => {
         )
     } catch (error) {
         console.error('[MEDIA] Error en el comando:', error)
-
-        // No enviar una confirmación ni un mensaje de éxito.
-        // Los errores quedan registrados en la terminal.
         return
     }
 }

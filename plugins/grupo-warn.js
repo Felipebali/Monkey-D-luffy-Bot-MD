@@ -1,169 +1,616 @@
-// plugins/grupo-warn.js
+
 import fs from 'fs'
 import path from 'path'
 
-// ── RUTA DEL ARCHIVO DE ADVERTENCIAS ──
-const DATA_PATH = path.join(process.cwd(), 'data')
-if (!fs.existsSync(DATA_PATH)) fs.mkdirSync(DATA_PATH)
+// ============================================================
+// ⚠️ WHATSAPP-BOT — SISTEMA DE ADVERTENCIAS
+// ============================================================
 
-const warnsFile = path.join(DATA_PATH, 'warns.json')
+const DATA_PATH = path.join(process.cwd(), 'data')
+const WARNS_FILE = path.join(DATA_PATH, 'warns.json')
+
+const WARN_LIMIT = 3
+const AUTO_REMOVE = true
+const MAX_HISTORY = 50
+
+// ============================================================
+// 📁 BASE DE DATOS
+// ============================================================
+
+if (!fs.existsSync(DATA_PATH)) {
+  fs.mkdirSync(DATA_PATH, { recursive: true })
+}
 
 function loadWarns() {
-  if (!fs.existsSync(warnsFile)) return {}
-  try { return JSON.parse(fs.readFileSync(warnsFile)) } catch { return {} }
+  if (!fs.existsSync(WARNS_FILE)) return {}
+
+  try {
+    const data = fs.readFileSync(WARNS_FILE, 'utf8')
+    const parsed = JSON.parse(data)
+
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed
+      : {}
+  } catch (error) {
+    console.error('[WARN] Error leyendo la base:', error)
+    return {}
+  }
 }
 
-function saveWarns(warns) {
-  fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2))
+function saveWarns(data) {
+  const tempFile = `${WARNS_FILE}.tmp`
+
+  try {
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf8')
+    fs.renameSync(tempFile, WARNS_FILE)
+    return true
+  } catch (error) {
+    console.error('[WARN] Error guardando la base:', error)
+
+    try {
+      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile)
+    } catch {}
+
+    return false
+  }
 }
+
+// ============================================================
+// 🔧 UTILIDADES
+// ============================================================
 
 function normalizeJid(jid) {
   if (!jid) return null
-  return jid.replace(/@c\.us$/, '@s.whatsapp.net').replace(/@s\.whatsapp\.net$/, '@s.whatsapp.net')
+
+  return String(jid)
+    .trim()
+    .replace(/:\d+(?=@)/g, '')
+    .replace(/@c\.us$/, '@s.whatsapp.net')
 }
 
-const handler = async (m, { conn, text, usedPrefix, command, isAdmin, isBotAdmin, isROwner }) => {
-  if (!m.isGroup) return m.reply('🚫 Este comando solo se puede usar en grupos.')
+function getTag(jid) {
+  return `@${String(jid).split('@')[0]}`
+}
 
-  const warnsDB = loadWarns()
-  if (!warnsDB[m.chat]) warnsDB[m.chat] = {}
-  const warns = warnsDB[m.chat]
+function getDate() {
+  return new Date().toLocaleString('es-UY', {
+    timeZone: 'America/Montevideo'
+  })
+}
 
-  // ---------- ⚠️ DAR ADVERTENCIA ----------
-  if (['advertencia','ad','daradvertencia','advertir','warn'].includes(command)) {
-    if (!isAdmin) return m.reply('❌ Solo los administradores pueden advertir.')
-    if (!isBotAdmin) return m.reply('🤖 Necesito ser administrador para poder eliminar usuarios.')
+function getGroupWarns(db, group) {
+  if (!db[group]) db[group] = {}
+  return db[group]
+}
 
-    const userRaw = m.mentionedJid?.[0] || m.quoted?.sender
-    const user = normalizeJid(userRaw)
-    if (!user) return m.reply(`⚠️ Debes mencionar o responder a alguien.\n📌 Ejemplo: ${usedPrefix}${command} @usuario [motivo]`)
-
-    let motivo = text?.trim()
-      .replace(new RegExp(`^@${user.split('@')[0]}`, 'gi'), '')
-      .replace(new RegExp(`^${usedPrefix}${command}`, 'gi'), '')
-      .trim()
-    if (!motivo) motivo = 'Sin especificar 💤'
-
-    const fecha = new Date().toLocaleString('es-UY', { timeZone: 'America/Montevideo' })
-
-    if (!warns[user]) warns[user] = { count: 0, motivos: [] }
-    if (!Array.isArray(warns[user].motivos)) warns[user].motivos = []
-
-    warns[user].count += 1
-    warns[user].motivos.push({ motivo, fecha })
-    const count = warns[user].count
-    saveWarns(warnsDB)
-
-    await conn.sendMessage(m.chat, { react: { text: '⚠️', key: m.key } })
-
-    if (count >= 3) {
-      const msg = `🚫 *El usuario @${user.split('@')[0]} fue eliminado por acumular 3 advertencias.*\n🧹 Adiós 👋`
-      try {
-        await conn.sendMessage(m.chat, { text: msg, mentions: [user], quoted: m })
-        await conn.groupParticipantsUpdate(m.chat, [user], 'remove')
-        delete warns[user]
-        saveWarns(warnsDB)
-      } catch (e) {
-        console.error(e)
-        return m.reply('❌ No se pudo eliminar al usuario. Verifica los permisos del bot.')
-      }
-    } else {
-      const restantes = 3 - count
-      await conn.sendMessage(m.chat, {
-        text: `⚠️ *Advertencia para:* @${user.split('@')[0]}\n🧾 *Motivo:* ${motivo}\n📅 *Fecha:* ${fecha}\n\n📋 *Advertencias:* ${count}/3\n🕒 Restan *${restantes}* antes de ser expulsado.`,
-        mentions: [user],
-        quoted: m
-      })
+function getUserWarn(warns, jid) {
+  if (!warns[jid]) {
+    warns[jid] = {
+      count: 0,
+      motivos: []
     }
   }
 
-  // ---------- 🟢 QUITAR ADVERTENCIA ----------
-  else if (['unwarn','quitarwarn','sacarwarn'].includes(command)) {
-    if (!isAdmin && !isROwner) return m.reply('⚠️ Solo los administradores o el dueño pueden quitar advertencias.')
+  if (!Array.isArray(warns[jid].motivos)) {
+    warns[jid].motivos = []
+  }
 
-    const targetRaw = m.quoted?.sender || m.mentionedJid?.[0]
-    const target = normalizeJid(targetRaw)
-    if (!target) return m.reply('❌ Debes mencionar o responder al mensaje del usuario para quitarle una advertencia.')
+  return warns[jid]
+}
+
+function getTarget(m) {
+  return normalizeJid(
+    m.mentionedJid?.[0] ||
+    m.quoted?.sender ||
+    null
+  )
+}
+
+function getReason(text, jid) {
+  let reason = String(text || '').trim()
+
+  // Quitar menciones escritas en el texto.
+  if (jid) {
+    const number = jid.split('@')[0]
+    reason = reason.replace(
+      new RegExp(`@${number}\\b`, 'g'),
+      ''
+    )
+  }
+
+  return reason.trim() || 'No se especificó un motivo.'
+}
+
+function getCount(warn) {
+  return Math.max(0, Number(warn?.count) || 0)
+}
+
+function getFooter() {
+  return '\n\n╰━━━━━━━━━━━━━━━━━━╯\n      ⚙️ *WHATSAPP-BOT*'
+}
+
+function getHeader(title) {
+  return (
+    '╭━━━〔 ⚠️ 〕━━━╮\n' +
+    `   *${title}*\n` +
+    '╰━━━━━━━━━━━━━━╯\n\n'
+  )
+}
+
+async function react(conn, m, emoji) {
+  try {
+    await conn.sendMessage(m.chat, {
+      react: { text: emoji, key: m.key }
+    })
+  } catch {}
+}
+
+async function send(conn, m, text, mentions = []) {
+  return conn.sendMessage(
+    m.chat,
+    {
+      text: text + getFooter(),
+      mentions: [...new Set(mentions.filter(Boolean))]
+    },
+    { quoted: m }
+  )
+}
+
+// ============================================================
+// 🛡️ COMPROBACIÓN DE PARTICIPANTES
+// ============================================================
+
+async function getParticipants(conn, chat) {
+  try {
+    const metadata = await conn.groupMetadata(chat)
+    return metadata?.participants || []
+  } catch (error) {
+    console.error('[WARN] No se pudo consultar el grupo:', error)
+    return null
+  }
+}
+
+function findParticipant(participants, jid) {
+  const normalized = normalizeJid(jid)
+
+  return participants?.find(p => {
+    const ids = [p.id, p.jid, p.lid, p.phoneNumber]
+      .filter(Boolean)
+      .map(normalizeJid)
+
+    return ids.includes(normalized)
+  })
+}
+
+// ============================================================
+// ⚠️ HANDLER PRINCIPAL
+// ============================================================
+
+const handler = async (
+  m,
+  {
+    conn,
+    text,
+    usedPrefix,
+    command,
+    isAdmin,
+    isBotAdmin,
+    isROwner
+  }
+) => {
+  if (!m.isGroup) {
+    return m.reply('🚫 Este comando solo está disponible en grupos.')
+  }
+
+  const db = loadWarns()
+  const warns = getGroupWarns(db, m.chat)
+
+  const cmd = String(command || '').toLowerCase()
+
+  // ==========================================================
+  // ⚠️ DAR ADVERTENCIA
+  // ==========================================================
+
+  if ([
+    'advertencia',
+    'ad',
+    'daradvertencia',
+    'advertir',
+    'warn'
+  ].includes(cmd)) {
+    if (!isAdmin && !isROwner) {
+      return m.reply('🛡️ Solo los administradores pueden dar advertencias.')
+    }
+
+    const user = getTarget(m)
+
+    if (!user) {
+      return m.reply(
+        `⚠️ *FALTA EL USUARIO*\n\n` +
+        `Mencioná a una persona o respondé a su mensaje.\n\n` +
+        `📌 *Ejemplo:*\n${usedPrefix}${cmd} @usuario spam`
+      )
+    }
+
+    const botJid = normalizeJid(conn.user?.id)
+
+    if (user === botJid) {
+      return m.reply('🤖 No podés advertir al propio bot.')
+    }
+
+    const participants = await getParticipants(conn, m.chat)
+
+    if (!participants) {
+      return m.reply('❌ No pude verificar los participantes del grupo.')
+    }
+
+    const targetParticipant = findParticipant(participants, user)
+
+    if (!targetParticipant) {
+      return m.reply('❌ Ese usuario no figura como participante del grupo.')
+    }
+
+    if (targetParticipant.admin === 'admin' ||
+        targetParticipant.admin === 'superadmin') {
+      return m.reply('🛡️ No se puede advertir a un administrador del grupo.')
+    }
+
+    if (AUTO_REMOVE && !isBotAdmin) {
+      return m.reply(
+        '🤖 Necesito ser administrador para poder ejecutar expulsiones automáticas.'
+      )
+    }
+
+    const motivo = getReason(text, user)
+    const fecha = getDate()
+
+    const userWarn = getUserWarn(warns, user)
+
+    const oldCount = getCount(userWarn)
+    const newCount = oldCount + 1
+
+    userWarn.count = newCount
+    userWarn.motivos.push({
+      motivo,
+      fecha,
+      admin: normalizeJid(m.sender) || 'desconocido'
+    })
+
+    if (userWarn.motivos.length > MAX_HISTORY) {
+      userWarn.motivos = userWarn.motivos.slice(-MAX_HISTORY)
+    }
+
+    if (!saveWarns(db)) {
+      return m.reply('❌ No se pudo guardar la advertencia. No se aplicó la sanción.')
+    }
+
+    await react(conn, m, '⚠️')
+
+    // --------------------------------------------------------
+    // 🚫 LÍMITE ALCANZADO
+    // --------------------------------------------------------
+
+    if (newCount >= WARN_LIMIT && AUTO_REMOVE) {
+      const warningMessage =
+        getHeader('LÍMITE DE ADVERTENCIAS') +
+        `👤 *Usuario:* ${getTag(user)}\n` +
+        `📋 *Advertencias:* ${newCount}/${WARN_LIMIT}\n` +
+        `📝 *Último motivo:* ${motivo}\n\n` +
+        '🚫 Se alcanzó el límite establecido.\n' +
+        '🧹 Se intentará retirar al usuario del grupo.'
+
+      try {
+        // Avisar antes de intentar la expulsión.
+        await send(conn, m, warningMessage, [user])
+
+        await conn.groupParticipantsUpdate(
+          m.chat,
+          [user],
+          'remove'
+        )
+
+        // Borrar el registro solo después de una expulsión exitosa.
+        delete warns[user]
+
+        if (!saveWarns(db)) {
+          console.error('[WARN] No se pudo guardar el borrado posterior a la expulsión.')
+        }
+
+        return
+      } catch (error) {
+        console.error('[WARN] Error al expulsar:', error)
+
+        // Se conservan las advertencias si falla la expulsión.
+        return send(
+          conn,
+          m,
+          getHeader('EXPULSIÓN NO REALIZADA') +
+          `👤 *Usuario:* ${getTag(user)}\n` +
+          `📋 *Advertencias:* ${newCount}/${WARN_LIMIT}\n\n` +
+          '❌ No se pudo expulsar al usuario.\n' +
+          '⚠️ Las advertencias se conservaron.\n' +
+          '🛡️ Revisá los permisos del bot.',
+          [user]
+        )
+      }
+    }
+
+    // --------------------------------------------------------
+    // 📣 AVISO NORMAL
+    // --------------------------------------------------------
+
+    const restantes = Math.max(0, WARN_LIMIT - newCount)
+
+    const mensaje =
+      getHeader('ADVERTENCIA REGISTRADA') +
+      `👤 *Usuario:* ${getTag(user)}\n` +
+      `🛡️ *Aplicada por:* ${getTag(m.sender)}\n` +
+      `📝 *Motivo:* ${motivo}\n` +
+      `📅 *Fecha:* ${fecha}\n\n` +
+      `📊 *Advertencias:* ${newCount}/${WARN_LIMIT}\n` +
+      `⚠️ *Restantes hasta el límite:* ${restantes}\n\n` +
+      (restantes > 0
+        ? '📌 Respetá las reglas del grupo para evitar nuevas sanciones.'
+        : '⚠️ Se alcanzó el límite, pero la expulsión automática está desactivada.')
+
+    return send(conn, m, mensaje, [user, m.sender])
+  }
+
+  // ==========================================================
+  // 🟢 RETIRAR UNA ADVERTENCIA
+  // ==========================================================
+
+  else if ([
+    'unwarn',
+    'quitarwarn',
+    'sacarwarn'
+  ].includes(cmd)) {
+    if (!isAdmin && !isROwner) {
+      return m.reply('🛡️ Solo los administradores o el dueño pueden retirar advertencias.')
+    }
+
+    const target = getTarget(m)
+
+    if (!target) {
+      return m.reply('⚠️ Mencioná al usuario o respondé a uno de sus mensajes.')
+    }
 
     const userWarn = warns[target]
 
-    if (!userWarn || !userWarn.count)
-      return conn.sendMessage(m.chat, { text: `✅ @${target.split('@')[0]} no tiene advertencias.`, mentions: [target], quoted: m })
-
-    userWarn.count = Math.max(0, userWarn.count - 1)
-    userWarn.motivos?.pop()
-    if (userWarn.count === 0 && (!userWarn.motivos || userWarn.motivos.length === 0)) delete warns[target]
-    saveWarns(warnsDB)
-
-    await conn.sendMessage(m.chat, { react: { text: '🟢', key: m.key } })
-    await conn.sendMessage(m.chat, {
-      text: `🟢 *Advertencia retirada a:* @${target.split('@')[0]}\n📋 Ahora tiene *${userWarn?.count || 0}/3* advertencias.`,
-      mentions: [target],
-      quoted: m
-    })
-  }
-
-  // ---------- 📜 LISTA DE ADVERTENCIAS ORDENADA ----------
-  else if (['warnlist','advertencias','listaad'].includes(command)) {
-
-    const entries = Object.entries(warns)
-      .filter(([_, w]) => w.count && w.count > 0)
-      .sort((a,b) => b[1].count - a[1].count)
-
-    if (entries.length === 0) return m.reply('✅ No hay usuarios con advertencias en este grupo.')
-
-    let textList = '⚠️ *LISTA DE ADVERTENCIAS*\n'
-    textList += '━━━━━━━━━━━━━━━\n\n'
-
-    let mentions = []
-    let i = 1
-
-    for (const [jid, w] of entries) {
-
-      const ultimo = w.motivos?.length ? w.motivos[w.motivos.length - 1] : null
-      const motivo = ultimo?.motivo || 'Sin motivo'
-      const fecha = ultimo?.fecha || 'Desconocida'
-
-      textList += `*${i}.* 👤 @${jid.split('@')[0]}\n`
-      textList += `⚠️ Advertencias: *${w.count}/3*\n`
-      textList += `📝 Motivo: ${motivo}\n`
-      textList += `📅 Fecha: ${fecha}\n`
-      textList += `━━━━━━━━━━━━━━━\n\n`
-
-      mentions.push(jid)
-      i++
+    if (!userWarn || getCount(userWarn) === 0) {
+      return send(
+        conn,
+        m,
+        getHeader('SIN ADVERTENCIAS') +
+        `✅ ${getTag(target)} no tiene advertencias registradas.`,
+        [target]
+      )
     }
 
-    textList += `👮 Usuarios advertidos: *${entries.length}*`
+    userWarn.count = Math.max(0, getCount(userWarn) - 1)
 
-    await conn.sendMessage(m.chat, {
-      text: textList.trim(),
-      mentions,
-      quoted: m
-    })
+    if (Array.isArray(userWarn.motivos) && userWarn.motivos.length) {
+      userWarn.motivos.pop()
+    }
+
+    const count = userWarn.count
+
+    if (count === 0) {
+      delete warns[target]
+    }
+
+    if (!saveWarns(db)) {
+      return m.reply('❌ No se pudo guardar el cambio en las advertencias.')
+    }
+
+    await react(conn, m, '🟢')
+
+    return send(
+      conn,
+      m,
+      getHeader('ADVERTENCIA RETIRADA') +
+      `👤 *Usuario:* ${getTag(target)}\n` +
+      `🛡️ *Gestionado por:* ${getTag(m.sender)}\n\n` +
+      `📊 *Advertencias actuales:* ${count}/${WARN_LIMIT}\n` +
+      '✅ La modificación fue guardada correctamente.',
+      [target, m.sender]
+    )
   }
 
-  // ---------- 🧹 LIMPIAR TODAS LAS ADVERTENCIAS ----------
-  else if (['clearwarn','limpiarwarn'].includes(command)) {
-    if (!isROwner) return m.reply('⚠️ Solo el dueño del bot puede limpiar todas las advertencias.')
+  // ==========================================================
+  // 🔎 INFORMACIÓN DE UN USUARIO
+  // ==========================================================
 
-    Object.keys(warns).forEach(k => delete warns[k])
-    saveWarns(warnsDB)
+  else if (['warninfo', 'infowarn'].includes(cmd)) {
+    const target = getTarget(m)
 
-    await conn.sendMessage(m.chat, { text: '🧹 Todas las advertencias del grupo han sido eliminadas.' })
+    if (!target) {
+      return m.reply('⚠️ Mencioná a un usuario o respondé a su mensaje.')
+    }
+
+    const userWarn = warns[target]
+
+    if (!userWarn || getCount(userWarn) === 0) {
+      return send(
+        conn,
+        m,
+        getHeader('INFORMACIÓN DE ADVERTENCIAS') +
+        `👤 *Usuario:* ${getTag(target)}\n\n` +
+        '✅ No tiene advertencias registradas.',
+        [target]
+      )
+    }
+
+    const history = (userWarn.motivos || [])
+      .slice(-10)
+      .map((item, index) =>
+        `${index + 1}. *Motivo:* ${item.motivo || 'Sin motivo'}\n` +
+        `   📅 ${item.fecha || 'Fecha desconocida'}`
+      )
+      .join('\n\n')
+
+    return send(
+      conn,
+      m,
+      getHeader('INFORMACIÓN DE ADVERTENCIAS') +
+      `👤 *Usuario:* ${getTag(target)}\n` +
+      `📊 *Total:* ${getCount(userWarn)}/${WARN_LIMIT}\n\n` +
+      `📜 *Últimos registros:*\n${history}`,
+      [target]
+    )
+  }
+
+  // ==========================================================
+  // 📜 LISTA DE ADVERTENCIAS
+  // ==========================================================
+
+  else if ([
+    'warnlist',
+    'advertencias',
+    'listaad'
+  ].includes(cmd)) {
+    const entries = Object.entries(warns)
+      .filter(([_, w]) => getCount(w) > 0)
+      .sort((a, b) => getCount(b[1]) - getCount(a[1]))
+
+    if (!entries.length) {
+      return m.reply('✅ No hay usuarios con advertencias en este grupo.')
+    }
+
+    let output = getHeader('LISTA DE ADVERTENCIAS')
+    const mentions = []
+
+    for (const [jid, warning] of entries.slice(0, 30)) {
+      const last = warning.motivos?.at(-1)
+
+      output +=
+        `👤 ${getTag(jid)}\n` +
+        `📊 *Advertencias:* ${getCount(warning)}/${WARN_LIMIT}\n` +
+        `📝 *Último motivo:* ${last?.motivo || 'Sin motivo'}\n` +
+        `📅 *Fecha:* ${last?.fecha || 'Desconocida'}\n` +
+        '━━━━━━━━━━━━━━━━━━\n\n'
+
+      mentions.push(jid)
+    }
+
+    output += `👥 *Usuarios registrados:* ${entries.length}`
+
+    if (entries.length > 30) {
+      output += '\n📌 Se muestran los primeros 30 registros.'
+    }
+
+    return send(conn, m, output, mentions)
+  }
+
+  // ==========================================================
+  // 🧹 LIMPIAR ADVERTENCIAS DE UN USUARIO
+  // ==========================================================
+
+  else if (['warnclear', 'limpiarwarnuser'].includes(cmd)) {
+    if (!isAdmin && !isROwner) {
+      return m.reply('🛡️ Solo los administradores o el dueño pueden realizar esta acción.')
+    }
+
+    const target = getTarget(m)
+
+    if (!target) {
+      return m.reply('⚠️ Mencioná a un usuario o respondé a su mensaje.')
+    }
+
+    if (!warns[target]) {
+      return m.reply('✅ Ese usuario no tiene advertencias registradas.')
+    }
+
+    delete warns[target]
+
+    if (!saveWarns(db)) {
+      return m.reply('❌ No se pudo guardar la modificación.')
+    }
+
+    return send(
+      conn,
+      m,
+      getHeader('REGISTRO LIMPIADO') +
+      `👤 *Usuario:* ${getTag(target)}\n` +
+      `🛡️ *Gestionado por:* ${getTag(m.sender)}\n\n` +
+      '🧹 Se eliminaron todas sus advertencias.',
+      [target, m.sender]
+    )
+  }
+
+  // ==========================================================
+  // 🧹 LIMPIAR ADVERTENCIAS DEL GRUPO
+  // ==========================================================
+
+  else if (['clearwarn', 'limpiarwarn'].includes(cmd)) {
+    if (!isROwner) {
+      return m.reply('🔐 Solo el dueño principal del bot puede limpiar todas las advertencias.')
+    }
+
+    const total = Object.keys(warns).length
+
+    db[m.chat] = {}
+
+    if (!saveWarns(db)) {
+      return m.reply('❌ No se pudo guardar la limpieza de la base de datos.')
+    }
+
+    return send(
+      conn,
+      m,
+      getHeader('ADVERTENCIAS ELIMINADAS') +
+      `🧹 *Grupo:* ${m.chat}\n` +
+      `📊 *Registros eliminados:* ${total}\n\n` +
+      '✅ Se limpió el registro de advertencias de este grupo.'
+    )
+  }
+
+  // ==========================================================
+  // ⚙️ CONFIGURACIÓN
+  // ==========================================================
+
+  else if (['warnconfig', 'configwarn'].includes(cmd)) {
+    return send(
+      conn,
+      m,
+      getHeader('CONFIGURACIÓN DE ADVERTENCIAS') +
+      `📊 *Límite:* ${WARN_LIMIT} advertencias\n` +
+      `🚫 *Expulsión automática:* ${AUTO_REMOVE ? 'Activada' : 'Desactivada'}\n` +
+      `📜 *Historial máximo por usuario:* ${MAX_HISTORY}\n\n` +
+      '⚙️ Para cambiar estos valores, editá las constantes al inicio del plugin.'
+    )
   }
 }
 
+// ============================================================
+// 📌 COMANDOS
+// ============================================================
+
 handler.command = [
-  'advertencia','ad','daradvertencia','advertir','warn',
-  'unwarn','quitarwarn','sacarwarn',
-  'warnlist','advertencias','listaad',
-  'clearwarn','limpiarwarn'
+  'advertencia',
+  'ad',
+  'daradvertencia',
+  'advertir',
+  'warn',
+  'unwarn',
+  'quitarwarn',
+  'sacarwarn',
+  'warninfo',
+  'infowarn',
+  'warnlist',
+  'advertencias',
+  'listaad',
+  'warnclear',
+  'limpiarwarnuser',
+  'clearwarn',
+  'limpiarwarn',
+  'warnconfig',
+  'configwarn'
 ]
 
 handler.tags = ['grupo']
 handler.group = true
-handler.admin = true
-handler.botAdmin = true
+handler.admin = false
+handler.botAdmin = false
 
 export default handler

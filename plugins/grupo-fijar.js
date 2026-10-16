@@ -6,10 +6,13 @@
  * 📌 .pin / .fijar       → Fijar mensaje citado
  * 📍 .unpin / .desfijar  → Desfijar mensaje citado
  *
- * 👑 Administradores + Owners
- * 🤖 El bot debe ser administrador
+ * 👑 Owners y administradores del grupo
  * 🔐 Protección contra operaciones simultáneas
  * 📝 Historial de actividad en memoria
+ *
+ * IMPORTANTE:
+ * No se bloquea el comando por una comprobación
+ * automática de isBotAdmin que pueda dar falsos negativos.
  */
 
 // ============================================================
@@ -19,7 +22,7 @@
 const activeGroups = new Set()
 
 // ============================================================
-// 📝 HISTORIAL DE ACTIVIDAD EN MEMORIA
+// 📝 HISTORIAL DE ACTIVIDAD
 // ============================================================
 
 const history = new Map()
@@ -69,6 +72,12 @@ function esOwner(m, conn, isOwner) {
     }
 
     const sender = decodeJid(conn, m.sender || '')
+
+    // No tratar un LID como si fuera un número telefónico.
+    if (String(sender).includes('@lid')) {
+        return false
+    }
+
     const numeroSender = String(sender)
         .split('@')[0]
         .replace(/\D/g, '')
@@ -91,66 +100,31 @@ function esOwner(m, conn, isOwner) {
 }
 
 // ============================================================
-// 🛡️ VERIFICAR ADMINISTRADOR DEL GRUPO
+// 🛡️ VERIFICAR ADMINISTRADOR DEL USUARIO
 // ============================================================
 
-async function obtenerPermisos(m, conn) {
-    const metadata = await conn.groupMetadata(m.chat)
-    const participantes = metadata?.participants || []
+async function esAdministrador(m, conn) {
+    try {
+        const metadata = await conn.groupMetadata(m.chat)
+        const participantes = metadata?.participants || []
 
-    const sender = decodeJid(conn, m.sender || '')
+        const sender = decodeJid(conn, m.sender || '')
 
-    const participante = participantes.find(p => {
-        const jid = decodeJid(conn, p.id || p.jid || '')
+        const participante = participantes.find(p => {
+            const jid = decodeJid(conn, p.id || p.jid || '')
 
-        return jid === sender ||
-            p.id === m.sender ||
-            p.jid === m.sender
-    })
+            return jid === sender ||
+                p.id === m.sender ||
+                p.jid === m.sender
+        })
 
-    const esAdmin = Boolean(
-        participante?.admin === 'admin' ||
-        participante?.admin === 'superadmin'
-    )
-
-    // Obtener el JID del bot.
-    const botJid = decodeJid(
-        conn,
-        conn.user?.id || conn.user?.jid || ''
-    )
-
-    const numeroBot = String(botJid)
-        .split('@')[0]
-        .replace(/\D/g, '')
-
-    const bot = participantes.find(p => {
-        const jid = decodeJid(conn, p.id || p.jid || '')
-
-        if (jid === botJid) return true
-
-        // Comparación telefónica cuando ambos JID
-        // representan números de teléfono.
-        const numeroParticipante = String(jid)
-            .split('@')[0]
-            .replace(/\D/g, '')
-
-        return (
-            !String(jid).includes('@lid') &&
-            !String(botJid).includes('@lid') &&
-            numeroBot !== '' &&
-            numeroParticipante === numeroBot
+        return Boolean(
+            participante?.admin === 'admin' ||
+            participante?.admin === 'superadmin'
         )
-    })
-
-    const botAdmin = Boolean(
-        bot?.admin === 'admin' ||
-        bot?.admin === 'superadmin'
-    )
-
-    return {
-        metadata,
-        esAdmin,
-        botAdmin
+    } catch (error) {
+        console.error('[FIJAR] Error verificando administrador:', error)
+        return false
     }
 }
 
@@ -180,7 +154,7 @@ function obtenerCitado(m) {
 }
 
 // ============================================================
-// 🔑 CONSTRUIR CLAVE DEL MENSAJE
+// 🔑 CONSTRUIR CLAVE DEL MENSAJE CITADO
 // ============================================================
 
 function construirKey(m, conn, citado) {
@@ -203,7 +177,7 @@ function construirKey(m, conn, citado) {
 
 const handler = async (
     m,
-    { conn, command, isAdmin, isOwner, isBotAdmin }
+    { conn, command, isAdmin, isOwner }
 ) => {
     // ========================================================
     // 🏢 VALIDAR GRUPO
@@ -227,15 +201,8 @@ const handler = async (
 
     let admin = isAdmin === true
 
-    // Consultar los participantes si el contexto
-    // no confirma que el usuario sea administrador.
     if (!admin && !owner) {
-        try {
-            const permisos = await obtenerPermisos(m, conn)
-            admin = permisos.esAdmin
-        } catch (error) {
-            console.error('[FIJAR] Error verificando administrador:', error)
-        }
+        admin = await esAdministrador(m, conn)
     }
 
     if (!admin && !owner) {
@@ -253,37 +220,6 @@ const handler = async (
     }
 
     // ========================================================
-    // 🤖 VALIDAR ADMINISTRADOR DEL BOT
-    // ========================================================
-
-    let botAdmin = isBotAdmin === true
-
-    // Si el contexto no lo confirma, consultar los metadatos.
-    if (!botAdmin) {
-        try {
-            const permisos = await obtenerPermisos(m, conn)
-            botAdmin = permisos.botAdmin
-        } catch (error) {
-            console.error('[FIJAR] Error verificando al bot:', error)
-        }
-    }
-
-    if (!botAdmin) {
-        return conn.sendMessage(
-            m.chat,
-            {
-                text:
-                    '╭━━━〔 🤖 〕━━━╮\n' +
-                    '   *EL BOT NO ES ADMINISTRADOR*\n' +
-                    '╰━━━━━━━━━━━━━━╯\n\n' +
-                    'No pude verificar que el bot sea administrador del grupo.\n\n' +
-                    '👑 Comprobá sus permisos y volvé a intentarlo.'
-            },
-            { quoted: m }
-        )
-    }
-
-    // ========================================================
     // 🔐 EVITAR OPERACIONES SIMULTÁNEAS
     // ========================================================
 
@@ -292,7 +228,7 @@ const handler = async (
             m.chat,
             {
                 text:
-                    '⏳ Ya hay una operación de fijado en curso. Esperá un momento.'
+                    '⏳ Ya hay una operación en curso. Esperá un momento.'
             },
             { quoted: m }
         )
@@ -326,7 +262,7 @@ const handler = async (
         }
 
         // ====================================================
-        // 🔑 CONSTRUIR CLAVE DEL MENSAJE
+        // 🔑 PREPARAR CLAVE DEL MENSAJE
         // ====================================================
 
         const key = construirKey(m, conn, citado)
@@ -338,7 +274,7 @@ const handler = async (
         const fijar = /^(pin|fijar)$/i.test(command)
 
         // ====================================================
-        // 📡 ENVIAR SOLICITUD DE FIJADO
+        // 📡 EJECUTAR OPERACIÓN DE WHATSAPP MEDIANTE BAILEYS
         // ====================================================
 
         if (fijar) {
@@ -400,12 +336,14 @@ ${fijar ? '⏳ Duración solicitada: 30 días.' : ''}
         )
 
     } catch (error) {
-        console.error('[FIJAR]', error)
+        console.error('[FIJAR] Error completo:', error)
 
-        const err = String(error?.message || error).toLowerCase()
+        const err = String(
+            error?.message || error
+        ).toLowerCase()
 
         let detalle =
-            'No se pudo completar la operación. Verificá la compatibilidad de tu versión de Baileys.'
+            'No se pudo completar la operación. Revisá el error de Baileys en la terminal.'
 
         if (
             err.includes('not-authorized') ||
@@ -414,7 +352,7 @@ ${fijar ? '⏳ Duración solicitada: 30 días.' : ''}
             err.includes('not an admin')
         ) {
             detalle =
-                'WhatsApp rechazó la operación. Comprobá los permisos del bot y del grupo.'
+                'WhatsApp rechazó la operación por permisos insuficientes.'
         }
 
         return await conn.sendMessage(
@@ -449,6 +387,8 @@ handler.tags = ['grupo']
 handler.command = /^(pin|fijar|unpin|desfijar)$/i
 
 handler.group = true
+
+// Los permisos se verifican dentro del handler.
 handler.admin = false
 handler.botAdmin = false
 handler.rowner = false

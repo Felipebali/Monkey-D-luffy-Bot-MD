@@ -1,33 +1,20 @@
 // 📂 plugins/propietario-listanegra.js
-// 🛡️ whatsapp-bot — BLACKLIST SYSTEM
+// 🛡️ whatsapp-bot — BLACKLIST MANAGER
 // ======================================================
-// .ln @usuario motivo  → Agregar a lista negra
-// .unln @usuario       → Liberar usuario
-// .unln 2              → Liberar por número de lista
-// .vln                 → Ver lista negra
-// .clrn                → Vaciar lista negra
-//
-// Funciones:
-// • Expulsión global de los grupos.
-// • Aviso en cada grupo donde se logra expulsar.
-// • Resumen de grupos revisados, expulsiones y errores.
-// • Autoexpulsión al hablar o entrar al grupo.
-// • Detección de usuarios citados.
-// • Base de datos JSON con guardado seguro.
+// .ln @usuario [motivo] → Agregar a la lista negra
+// .unln @usuario        → Liberar usuario
+// .unln <número>        → Liberar por posición
+// .vln                  → Ver lista negra
+// .clrn                 → Limpiar lista negra
 // ======================================================
 
 import fs from 'fs'
 import path from 'path'
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ⚙️ CONFIGURACIÓN
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 const DATABASE_DIR = path.resolve('./database')
 const BLACKLIST_FILE = path.join(DATABASE_DIR, 'blacklist.json')
 const MAX_CONCURRENT_KICKS = 5
-const MAX_LIST_ITEMS = 25
-
+const MAX_LIST_ITEMS = 20
 const activeKicks = new Set()
 
 if (!fs.existsSync(DATABASE_DIR)) {
@@ -48,7 +35,6 @@ function normalizeJid(value = '') {
   const jid = String(value).trim().replace(/^\+/, '')
 
   if (!jid) return null
-
   if (jid.endsWith('@c.us')) {
     return jid.replace('@c.us', '@s.whatsapp.net')
   }
@@ -56,7 +42,6 @@ function normalizeJid(value = '') {
   if (jid.includes('@')) return jid
 
   const digits = jid.replace(/\D/g, '')
-
   return digits ? `${digits}@s.whatsapp.net` : null
 }
 
@@ -65,7 +50,7 @@ function digitsOnly(value = '') {
 }
 
 function safeText(value = '', max = 100) {
-  return String(value || '')
+  return String(value || 'Sin especificar')
     .replace(/[\r\n]+/g, ' ')
     .replace(/[\u0000-\u001F]/g, '')
     .trim()
@@ -84,11 +69,7 @@ function readBlacklist() {
       ? data
       : {}
   } catch (error) {
-    console.error(
-      '[whatsapp-bot] Error leyendo blacklist:',
-      error?.message || error
-    )
-
+    console.error('[whatsapp-bot] Error leyendo blacklist:', error)
     return {}
   }
 }
@@ -104,18 +85,12 @@ function writeBlacklist(data) {
     )
 
     fs.renameSync(tempFile, BLACKLIST_FILE)
-
     return true
   } catch (error) {
-    console.error(
-      '[whatsapp-bot] Error guardando blacklist:',
-      error?.message || error
-    )
+    console.error('[whatsapp-bot] Error guardando blacklist:', error)
 
     try {
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile)
-      }
+      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile)
     } catch {}
 
     return false
@@ -134,38 +109,31 @@ function getBannedList(db) {
 
 function findBanned(db, jid) {
   const normalized = normalizeJid(jid)
-
   if (!normalized) return null
 
   if (db[normalized]?.banned === true) {
     return { jid: normalized, data: db[normalized] }
   }
 
-  // Comparar por teléfono cuando esté disponible.
-  // No se comparan los dígitos de identificadores LID.
+  // No comparar identificadores LID como si fueran teléfonos.
   if (normalized.includes('@lid')) return null
 
   const digits = digitsOnly(normalized)
-
   if (!digits) return null
 
-  const match = Object.entries(db).find(([savedJid, data]) => {
-    if (data?.banned !== true) return false
-    if (String(savedJid).includes('@lid')) return false
+  const match = Object.entries(db).find(([savedJid, data]) =>
+    data?.banned === true &&
+    !String(savedJid).includes('@lid') &&
+    digitsOnly(savedJid) === digits
+  )
 
-    return digitsOnly(savedJid) === digits
-  })
-
-  return match
-    ? { jid: match[0], data: match[1] }
-    : null
+  return match ? { jid: match[0], data: match[1] } : null
 }
 
 function participantMatches(participant, targetJid) {
   if (!participant || !targetJid) return false
 
   const target = normalizeJid(targetJid)
-
   const ids = [
     participant.id,
     participant.jid,
@@ -174,10 +142,7 @@ function participantMatches(participant, targetJid) {
     participant.phone
   ].filter(Boolean)
 
-  if (
-    target &&
-    ids.some(id => normalizeJid(id) === target)
-  ) {
+  if (target && ids.some(id => normalizeJid(id) === target)) {
     return true
   }
 
@@ -188,11 +153,9 @@ function participantMatches(participant, targetJid) {
   return ids.some(id => {
     const normalized = normalizeJid(id)
 
-    if (!normalized || normalized.includes('@lid')) {
-      return false
-    }
-
-    return digitsOnly(normalized) === targetDigits
+    return normalized &&
+      !normalized.includes('@lid') &&
+      digitsOnly(normalized) === targetDigits
   })
 }
 
@@ -206,17 +169,9 @@ function getParticipantJid(participant) {
   )
 }
 
-function getReason(text = '') {
-  return String(text)
-    .replace(/@\S+/g, '')
-    .trim() || 'Sin motivo especificado'
-}
-
 function getTargetFromMessage(m, text = '') {
   if (m.quoted?.sender || m.quoted?.participant) {
-    return normalizeJid(
-      m.quoted.sender || m.quoted.participant
-    )
+    return normalizeJid(m.quoted.sender || m.quoted.participant)
   }
 
   if (m.mentionedJid?.length) {
@@ -224,14 +179,17 @@ function getTargetFromMessage(m, text = '') {
   }
 
   const digits = digitsOnly(text)
+  return digits.length >= 5 ? normalizeJid(digits) : null
+}
 
-  return digits.length >= 5
-    ? normalizeJid(digits)
-    : null
+function getReason(text = '') {
+  return String(text)
+    .replace(/@\S+/g, '')
+    .trim() || 'Sin motivo especificado'
 }
 
 function formatDate(timestamp) {
-  if (!timestamp) return 'Fecha desconocida'
+  if (!timestamp) return 'Sin fecha'
 
   try {
     return new Date(timestamp).toLocaleDateString('es-UY', {
@@ -240,12 +198,12 @@ function formatDate(timestamp) {
       year: 'numeric'
     })
   } catch {
-    return 'Fecha desconocida'
+    return 'Sin fecha'
   }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 🚫 EXPULSIÓN DE UN USUARIO
+// 🚫 EXPULSIÓN Y AVISO
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async function kickUser(
@@ -256,7 +214,6 @@ async function kickUser(
   notify = true
 ) {
   const lockKey = `${groupJid}:${targetJid}`
-
   if (activeKicks.has(lockKey)) {
     return { ok: false, reason: 'En proceso' }
   }
@@ -279,10 +236,7 @@ async function kickUser(
       }
     }
 
-    const botJid = normalizeJid(
-      conn.user?.id || conn.user?.jid
-    )
-
+    const botJid = normalizeJid(conn.user?.id || conn.user?.jid)
     const botParticipant = participants.find(
       p => participantMatches(p, botJid)
     )
@@ -296,11 +250,10 @@ async function kickUser(
     }
 
     const removalJid = getParticipantJid(participant)
-
     if (!removalJid) {
       return {
         ok: false,
-        reason: 'No se pudo identificar al participante',
+        reason: 'No se pudo identificar al usuario',
         groupName: metadata?.subject || groupJid
       }
     }
@@ -311,17 +264,15 @@ async function kickUser(
       'remove'
     )
 
-    const groupName = metadata?.subject || groupJid
-
     if (notify) {
       await conn.sendMessage(groupJid, {
         text:
 `╭━━〔 *whatsapp-bot* 〕━━⬣
 ┃
-┃ 🚫 *USUARIO ELIMINADO*
+┃ ⛔ *USUARIO ELIMINADO*
 ┃
 ┃ 👤 @${removalJid.split('@')[0]}
-┃ 📝 *Motivo:* ${safeText(reason, 150)}
+┃ 📝 *Motivo:* ${safeText(reason, 120)}
 ┃ 🛡️ *Sistema:* Lista negra global
 ┃
 ╰━━━━━━━━━━━━━━━━━━⬣`,
@@ -331,7 +282,7 @@ async function kickUser(
 
     return {
       ok: true,
-      groupName
+      groupName: metadata?.subject || groupJid
     }
   } catch (error) {
     console.error(
@@ -349,10 +300,6 @@ async function kickUser(
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ⚡ PROCESAMIENTO PARALELO
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 async function runWithConcurrency(items, limit, task) {
   let cursor = 0
 
@@ -365,10 +312,7 @@ async function runWithConcurrency(items, limit, task) {
         try {
           await task(items[index], index)
         } catch (error) {
-          console.error(
-            '[whatsapp-bot] Error en tarea:',
-            error?.message || error
-          )
+          console.error('[whatsapp-bot] Error en tarea:', error)
         }
       }
     }
@@ -378,7 +322,7 @@ async function runWithConcurrency(items, limit, task) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📦 HANDLER PRINCIPAL
+// 📦 HANDLER
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const handler = async (m, { conn, command, text = '' }) => {
@@ -387,47 +331,33 @@ const handler = async (m, { conn, command, text = '' }) => {
     .replace(/^\./, '')
     .trim()
 
-  if (!['ln', 'unln', 'vln', 'clrn'].includes(cmd)) {
-    return
-  }
+  if (!['ln', 'unln', 'vln', 'clrn'].includes(cmd)) return
 
   const db = readBlacklist()
   const list = getBannedList(db)
-  const SEP = '━━━━━━━━━━━━━━━━━━━━'
 
   try {
     await m.react(
-      ({
-        ln: '🚫',
-        unln: '🕊️',
-        vln: '📋',
-        clrn: '🧹'
-      })[cmd]
+      ({ ln: '🚫', unln: '🕊️', vln: '📋', clrn: '🧹' })[cmd]
     )
   } catch {}
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📋 LISTA NEGRA — DISEÑO RENOVADO
+  // 📋 LISTA NEGRA — FORMATO TIPO DIRECTORIO
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   if (cmd === 'vln') {
     if (!list.length) {
       return conn.reply(
         m.chat,
-`╭━━〔 *whatsapp-bot* 〕━━⬣
-┃
-┃ 📋 *CENTRO DE SEGURIDAD*
-┃
-┃ ┌──────────────────
-┃ │ 🛡️ Lista negra
-┃ │
-┃ │ ✅ Estado: sin registros
-┃ │ 👥 Usuarios activos: 0
-┃ └──────────────────
-┃
-┃ _No hay usuarios bloqueados._
-┃
-╰━━━━━━━━━━━━━━━━━━⬣`,
+`╭─「 *whatsapp-bot / seguridad* 」
+│
+│ 🛡️ *DIRECTORIO DE BLOQUEOS*
+│
+│ Estado: 🟢 Sin registros activos
+│ Total: 0 usuarios
+│
+╰────────────────────`,
         m
       )
     }
@@ -436,19 +366,14 @@ const handler = async (m, { conn, command, text = '' }) => {
     const mentions = []
 
     let msg =
-`╭━━〔 *whatsapp-bot* 〕━━⬣
-┃
-┃ 🛡️ *CENTRO DE SEGURIDAD*
-┃ 📋 *LISTA NEGRA GLOBAL*
-┃
-┃ ┌──────────────────
-┃ │ 👥 Registrados: *${list.length}*
-┃ │ 📑 Mostrando: *${shown.length}*
-┃ │ 🔒 Estado: *ACTIVA*
-┃ └──────────────────
-┃
-${SEP}
-┃`
+`╭─「 *whatsapp-bot / seguridad* 」
+│
+│ 🛡️ *DIRECTORIO DE BLOQUEOS*
+│ 📂 Categoría: Lista negra global
+│ 👥 Usuarios activos: *${list.length}*
+│
+├────────────────────
+`
 
     shown.forEach(([jid, data], index) => {
       const display = String(jid).split('@')[0]
@@ -456,36 +381,35 @@ ${SEP}
       const date = formatDate(data?.addedAt)
 
       msg +=
-`┃
-┃ 〔 *${String(index + 1).padStart(2, '0')}* 〕 👤 @${display}
-┃      ├ 📝 ${reason}
-┃      └ 📅 ${date}
+`│
+│ ┌─ *REGISTRO ${String(index + 1).padStart(2, '0')}*
+│ │ 👤 @${display}
+│ │ 📝 ${reason}
+│ │ 📅 ${date}
+│ └──────────────────
 `
 
       mentions.push(jid)
     })
 
-    msg +=
-`┃
-${SEP}
-┃`
-
     if (list.length > MAX_LIST_ITEMS) {
       msg +=
-`┃ ℹ️ Hay ${list.length - MAX_LIST_ITEMS} registro(s) más.
-┃ Usá *.unln número* para liberar por posición.
-┃
+`│
+│ ℹ️ Se muestran ${MAX_LIST_ITEMS} de ${list.length}.
+│ Usá *.unln número* para liberar por posición.
 `
     }
 
     msg +=
-`┃ ⚙️ *COMANDOS*
-┃
-┃ • *.ln @usuario motivo*
-┃ • *.unln número*
-┃ • *.clrn*
-┃
-╰━━⬣ *whatsapp-bot*`
+`│
+├────────────────────
+│ ⚙️ *ACCIONES DISPONIBLES*
+│
+│ • *.ln @usuario motivo*
+│ • *.unln número*
+│ • *.clrn*
+│
+╰─「 *whatsapp-bot* 」`
 
     return conn.sendMessage(m.chat, {
       text: msg,
@@ -494,14 +418,14 @@ ${SEP}
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 🧹 VACIAR LISTA NEGRA
+  // 🧹 LIMPIAR LISTA
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   if (cmd === 'clrn') {
     if (!list.length) {
       return conn.reply(
         m.chat,
-        '📋 *whatsapp-bot* · La lista negra ya está vacía.',
+        '📋 *whatsapp-bot:* la lista negra ya está vacía.',
         m
       )
     }
@@ -511,21 +435,17 @@ ${SEP}
     }
 
     if (!writeBlacklist(db)) {
-      return conn.reply(
-        m.chat,
-        '❌ No se pudo guardar el cambio en la base de datos.',
-        m
-      )
+      return conn.reply(m.chat, '❌ No se pudo guardar el cambio.', m)
     }
 
     return conn.reply(
       m.chat,
-`╭━━〔 *whatsapp-bot* 〕━━⬣
-┃ 🧹 *LISTA NEGRA LIMPIADA*
-┃
-┃ ✅ Registros desactivados: *${list.length}*
-┃ 💾 Base de datos actualizada.
-╰━━━━━━━━━━━━━━━━━━⬣`,
+`╭─「 *whatsapp-bot* 」
+│ 🧹 *LISTA LIMPIADA*
+│
+│ ✅ Registros desactivados: ${list.length}
+│ 💾 Base de datos actualizada
+╰────────────────────`,
       m
     )
   }
@@ -543,11 +463,7 @@ ${SEP}
     if (!list[index]) {
       return conn.reply(
         m.chat,
-`╭━━〔 *whatsapp-bot* 〕━━⬣
-┃ ⚠️ *POSICIÓN NO VÁLIDA*
-┃
-┃ Elegí un número entre *1* y *${list.length}*.
-╰━━━━━━━━━━━━━━━━━━⬣`,
+        `⚠️ Posición inválida. Elegí un número entre 1 y ${list.length}.`,
         m
       )
     }
@@ -560,23 +476,19 @@ ${SEP}
   if (!targetJid) {
     return conn.reply(
       m.chat,
-`╭━━〔 *whatsapp-bot* 〕━━⬣
-┃ ⚠️ *FALTA EL USUARIO*
-┃
-┃ Respondé al mensaje de la persona
-┃ o mencioná su perfil.
-┃
-┃ Ejemplo: *.ln @usuario spam*
-╰━━━━━━━━━━━━━━━━━━⬣`,
+`╭─「 *whatsapp-bot* 」
+│ ⚠️ *Falta indicar el usuario*
+│
+│ Respondé a su mensaje o mencioná
+│ su perfil.
+│
+│ Ejemplo: *.ln @usuario spam*
+╰────────────────────`,
       m
     )
   }
 
-  if (
-    cmd === 'ln' &&
-    !m.quoted &&
-    !(m.mentionedJid || []).length
-  ) {
+  if (cmd === 'ln' && !m.quoted && !(m.mentionedJid || []).length) {
     return conn.reply(
       m.chat,
       '⚠️ Para agregar a alguien, respondé a su mensaje o mencioná su perfil.',
@@ -585,7 +497,7 @@ ${SEP}
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 🚫 AGREGAR A LA LISTA NEGRA
+  // 🚫 AGREGAR A LISTA NEGRA
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   if (cmd === 'ln') {
@@ -615,88 +527,76 @@ ${SEP}
       const participating = await conn.groupFetchAllParticipating()
       groups = Object.keys(participating || {})
     } catch (error) {
-      console.error(
-        '[whatsapp-bot] Error obteniendo grupos:',
-        error?.message || error
-      )
+      console.error('[whatsapp-bot] Error obteniendo grupos:', error)
     }
 
     let kicked = 0
     let failed = 0
-    let notPresent = 0
+    let absent = 0
     const failedGroups = []
 
-    await runWithConcurrency(
-      groups,
-      MAX_CONCURRENT_KICKS,
-      async groupJid => {
-        const result = await kickUser(
-          conn,
-          groupJid,
-          storedJid,
-          reason,
-          true
-        )
+    await runWithConcurrency(groups, MAX_CONCURRENT_KICKS, async groupJid => {
+      const result = await kickUser(
+        conn,
+        groupJid,
+        storedJid,
+        reason,
+        true
+      )
 
-        if (result.ok) {
-          kicked++
-        } else if (result.reason === 'No estaba en el grupo') {
-          notPresent++
-        } else {
-          failed++
-          failedGroups.push({
-            name: result.groupName || groupJid,
-            reason: result.reason || 'Error desconocido'
-          })
-        }
+      if (result.ok) {
+        kicked++
+      } else if (result.reason === 'No estaba en el grupo') {
+        absent++
+      } else {
+        failed++
+        failedGroups.push({
+          name: result.groupName || groupJid,
+          reason: result.reason || 'Error desconocido'
+        })
       }
-    )
+    })
 
     let report =
-`╭━━〔 *whatsapp-bot* 〕━━⬣
-┃
-┃ 🚫 *USUARIO REGISTRADO*
-┃
-┃ 👤 @${storedJid.split('@')[0]}
-┃ 📝 *Motivo:* ${safeText(reason, 150)}
-┃
-┃ ━━〔 📊 RESULTADOS 〕━━
-┃
-┃ 🌐 Grupos revisados: *${groups.length}*
-┃ ✅ Expulsiones realizadas: *${kicked}*
-┃ 👤 No estaba presente: *${notPresent}*
-┃ ⚠️ Errores: *${failed}*
-┃
-┃ 💾 Lista negra: *ACTUALIZADA*
-┃ 🛡️ Protección automática: *ACTIVA*
-┃`
+`╭─「 *whatsapp-bot / seguridad* 」
+│
+│ 🚫 *USUARIO REGISTRADO*
+│
+│ 👤 @${storedJid.split('@')[0]}
+│ 📝 Motivo: ${safeText(reason, 120)}
+│
+├────────────────────
+│ 📊 *RESULTADO GLOBAL*
+│
+│ 🌐 Grupos revisados: ${groups.length}
+│ ✅ Expulsiones realizadas: ${kicked}
+│ 👤 No estaba presente: ${absent}
+│ ⚠️ Operaciones fallidas: ${failed}
+│
+│ 💾 Registro: guardado
+│ 🛡️ Protección: activa
+`
 
     if (failedGroups.length) {
       report +=
+`│
+├────────────────────
+│ ⚠️ *GRUPOS CON ERRORES*
 `
-┃
-┃ ━━〔 ⚠️ ERRORES 〕━━
-┃`
 
-      failedGroups.slice(0, 8).forEach((group, i) => {
+      failedGroups.slice(0, 6).forEach((group, index) => {
         report +=
-`
-┃ ${i + 1}. ${safeText(group.name, 55)}
-┃    └ ${safeText(group.reason, 80)}
+`│ ${index + 1}. ${safeText(group.name, 50)}
+│    └ ${safeText(group.reason, 65)}
 `
       })
 
-      if (failedGroups.length > 8) {
-        report +=
-`
-┃ … y ${failedGroups.length - 8} error(es) más.
-`
+      if (failedGroups.length > 6) {
+        report += `│ … y ${failedGroups.length - 6} más.\n`
       }
     }
 
-    report +=
-`
-╰━━⬣ *whatsapp-bot*`
+    report += `╰─「 *whatsapp-bot* 」`
 
     return conn.sendMessage(m.chat, {
       text: report,
@@ -714,12 +614,7 @@ ${SEP}
     if (!found) {
       return conn.reply(
         m.chat,
-`╭━━〔 *whatsapp-bot* 〕━━⬣
-┃ ℹ️ *USUARIO NO REGISTRADO*
-┃
-┃ La persona no figura activa
-┃ en la lista negra.
-╰━━━━━━━━━━━━━━━━━━⬣`,
+        'ℹ️ Esa persona no figura activa en la lista negra.',
         m
       )
     }
@@ -732,31 +627,25 @@ ${SEP}
     }
 
     if (!writeBlacklist(db)) {
-      return conn.reply(
-        m.chat,
-        '❌ No se pudo guardar el cambio en la base de datos.',
-        m
-      )
+      return conn.reply(m.chat, '❌ No se pudo guardar el cambio.', m)
     }
 
     return conn.sendMessage(m.chat, {
       text:
-`╭━━〔 *whatsapp-bot* 〕━━⬣
-┃
-┃ 🕊️ *USUARIO LIBERADO*
-┃
-┃ 👤 @${found.jid.split('@')[0]}
-┃ ✅ Ya no está bloqueado.
-┃ 💾 Registro actualizado.
-┃
-╰━━━━━━━━━━━━━━━━━━⬣`,
+`╭─「 *whatsapp-bot* 」
+│ 🕊️ *USUARIO LIBERADO*
+│
+│ 👤 @${found.jid.split('@')[0]}
+│ ✅ Ya no está bloqueado.
+│ 💾 Registro actualizado.
+╰────────────────────`,
       mentions: [found.jid]
     })
   }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 🚫 AUTOEXPULSIÓN CUANDO HABLA O CITA A UN BLOQUEADO
+// 🚫 AUTOEXPULSIÓN AL HABLAR O CITAR
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 handler.all = async function (m) {
@@ -794,32 +683,24 @@ handler.all = async function (m) {
       }
     }
   } catch (error) {
-    console.error(
-      '[whatsapp-bot] Error en autoexpulsión:',
-      error?.message || error
-    )
+    console.error('[whatsapp-bot] Error en autoexpulsión:', error)
   }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 🚨 AUTOEXPULSIÓN AL ENTRAR AL GRUPO
+// 🚨 AUTOEXPULSIÓN AL ENTRAR
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 handler.before = async function (m) {
   try {
-    if (
-      !m?.isGroup ||
-      ![27, 31].includes(m.messageStubType)
-    ) {
+    if (!m?.isGroup || ![27, 31].includes(m.messageStubType)) {
       return
     }
 
     const db = readBlacklist()
-    const users = m.messageStubParameters || []
 
-    for (const user of users) {
+    for (const user of m.messageStubParameters || []) {
       const match = findBanned(db, user)
-
       if (!match) continue
 
       await kickUser(
@@ -831,19 +712,15 @@ handler.before = async function (m) {
       )
     }
   } catch (error) {
-    console.error(
-      '[whatsapp-bot] Error al revisar ingresos:',
-      error?.message || error
-    )
+    console.error('[whatsapp-bot] Error al revisar ingresos:', error)
   }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ⚙️ CONFIGURACIÓN DEL PLUGIN
+// ⚙️ CONFIGURACIÓN
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 handler.command = /^(ln|unln|vln|clrn)$/i
-
 handler.help = [
   'ln @usuario [motivo]',
   'unln @usuario',
@@ -851,7 +728,6 @@ handler.help = [
   'vln',
   'clrn'
 ]
-
 handler.tags = ['owner']
 handler.rowner = true
 

@@ -6,23 +6,30 @@
  * 📌 .pin / .fijar       → Fijar mensaje citado
  * 📍 .unpin / .desfijar  → Desfijar mensaje citado
  *
- * 👑 Owners y administradores
+ * 👑 Administradores + Owners
  * 🤖 El bot debe ser administrador
  * 🔐 Protección contra operaciones simultáneas
  * 📝 Historial de actividad en memoria
  */
 
+// ============================================================
+// 🔐 PROTECCIÓN CONTRA EJECUCIONES SIMULTÁNEAS
+// ============================================================
+
 const activeGroups = new Set()
+
+// ============================================================
+// 📝 HISTORIAL DE ACTIVIDAD EN MEMORIA
+// ============================================================
+
 const history = new Map()
 const MAX_HISTORY = 50
 const TIEMPO_PIN = 2592000 // 30 días
 
-// ============================================================
-// 📝 HISTORIAL
-// ============================================================
-
 function saveHistory(chat, entry) {
-    if (!history.has(chat)) history.set(chat, [])
+    if (!history.has(chat)) {
+        history.set(chat, [])
+    }
 
     const records = history.get(chat)
 
@@ -37,13 +44,31 @@ function saveHistory(chat, entry) {
 }
 
 // ============================================================
+// 🔧 NORMALIZAR JID
+// ============================================================
+
+function decodeJid(conn, jid = '') {
+    try {
+        if (typeof conn.decodeJid === 'function') {
+            return conn.decodeJid(jid) || jid
+        }
+    } catch (error) {
+        console.error('[FIJAR] Error normalizando JID:', error)
+    }
+
+    return jid
+}
+
+// ============================================================
 // 👑 VERIFICAR OWNER
 // ============================================================
 
 function esOwner(m, conn, isOwner) {
-    if (isOwner === true || m.isOwner === true) return true
+    if (isOwner === true || m.isOwner === true) {
+        return true
+    }
 
-    const sender = conn.decodeJid?.(m.sender || '') || m.sender || ''
+    const sender = decodeJid(conn, m.sender || '')
     const numeroSender = String(sender)
         .split('@')[0]
         .replace(/\D/g, '')
@@ -53,11 +78,80 @@ function esOwner(m, conn, isOwner) {
         : []
 
     return owners.some(owner => {
-        const valor = Array.isArray(owner) ? owner[0] : owner
-        const numeroOwner = String(valor || '').replace(/\D/g, '')
+        const valor = Array.isArray(owner)
+            ? owner[0]
+            : owner
 
-        return numeroOwner !== '' && numeroOwner === numeroSender
+        const numeroOwner = String(valor || '')
+            .replace(/\D/g, '')
+
+        return numeroOwner !== '' &&
+            numeroOwner === numeroSender
     })
+}
+
+// ============================================================
+// 🛡️ VERIFICAR ADMINISTRADOR DEL GRUPO
+// ============================================================
+
+async function obtenerPermisos(m, conn) {
+    const metadata = await conn.groupMetadata(m.chat)
+    const participantes = metadata?.participants || []
+
+    const sender = decodeJid(conn, m.sender || '')
+
+    const participante = participantes.find(p => {
+        const jid = decodeJid(conn, p.id || p.jid || '')
+
+        return jid === sender ||
+            p.id === m.sender ||
+            p.jid === m.sender
+    })
+
+    const esAdmin = Boolean(
+        participante?.admin === 'admin' ||
+        participante?.admin === 'superadmin'
+    )
+
+    // Obtener el JID del bot.
+    const botJid = decodeJid(
+        conn,
+        conn.user?.id || conn.user?.jid || ''
+    )
+
+    const numeroBot = String(botJid)
+        .split('@')[0]
+        .replace(/\D/g, '')
+
+    const bot = participantes.find(p => {
+        const jid = decodeJid(conn, p.id || p.jid || '')
+
+        if (jid === botJid) return true
+
+        // Comparación telefónica cuando ambos JID
+        // representan números de teléfono.
+        const numeroParticipante = String(jid)
+            .split('@')[0]
+            .replace(/\D/g, '')
+
+        return (
+            !String(jid).includes('@lid') &&
+            !String(botJid).includes('@lid') &&
+            numeroBot !== '' &&
+            numeroParticipante === numeroBot
+        )
+    })
+
+    const botAdmin = Boolean(
+        bot?.admin === 'admin' ||
+        bot?.admin === 'superadmin'
+    )
+
+    return {
+        metadata,
+        esAdmin,
+        botAdmin
+    }
 }
 
 // ============================================================
@@ -65,20 +159,42 @@ function esOwner(m, conn, isOwner) {
 // ============================================================
 
 function obtenerCitado(m) {
-    if (m.quoted?.id) return m.quoted
+    if (m.quoted?.id) {
+        return m.quoted
+    }
 
     const contexto =
         m.message?.extendedTextMessage?.contextInfo ||
         m.msg?.contextInfo ||
         {}
 
-    if (!contexto.stanzaId) return null
+    if (!contexto.stanzaId) {
+        return null
+    }
 
     return {
         id: contexto.stanzaId,
         sender: contexto.participant || '',
         fromMe: false
     }
+}
+
+// ============================================================
+// 🔑 CONSTRUIR CLAVE DEL MENSAJE
+// ============================================================
+
+function construirKey(m, conn, citado) {
+    const key = {
+        remoteJid: m.chat,
+        fromMe: Boolean(citado.fromMe),
+        id: citado.id
+    }
+
+    if (citado.sender) {
+        key.participant = decodeJid(conn, citado.sender)
+    }
+
+    return key
 }
 
 // ============================================================
@@ -96,7 +212,9 @@ const handler = async (
     if (!m.isGroup) {
         return conn.sendMessage(
             m.chat,
-            { text: '❌ Este comando solo funciona en grupos.' },
+            {
+                text: '❌ Este comando solo funciona en grupos.'
+            },
             { quoted: m }
         )
     }
@@ -107,7 +225,20 @@ const handler = async (
 
     const owner = esOwner(m, conn, isOwner)
 
-    if (!isAdmin && !owner) {
+    let admin = isAdmin === true
+
+    // Consultar los participantes si el contexto
+    // no confirma que el usuario sea administrador.
+    if (!admin && !owner) {
+        try {
+            const permisos = await obtenerPermisos(m, conn)
+            admin = permisos.esAdmin
+        } catch (error) {
+            console.error('[FIJAR] Error verificando administrador:', error)
+        }
+    }
+
+    if (!admin && !owner) {
         return conn.sendMessage(
             m.chat,
             {
@@ -125,7 +256,19 @@ const handler = async (
     // 🤖 VALIDAR ADMINISTRADOR DEL BOT
     // ========================================================
 
-    if (!isBotAdmin) {
+    let botAdmin = isBotAdmin === true
+
+    // Si el contexto no lo confirma, consultar los metadatos.
+    if (!botAdmin) {
+        try {
+            const permisos = await obtenerPermisos(m, conn)
+            botAdmin = permisos.botAdmin
+        } catch (error) {
+            console.error('[FIJAR] Error verificando al bot:', error)
+        }
+    }
+
+    if (!botAdmin) {
         return conn.sendMessage(
             m.chat,
             {
@@ -133,8 +276,8 @@ const handler = async (
                     '╭━━━〔 🤖 〕━━━╮\n' +
                     '   *EL BOT NO ES ADMINISTRADOR*\n' +
                     '╰━━━━━━━━━━━━━━╯\n\n' +
-                    'Necesito ser administrador del grupo para fijar o desfijar mensajes.\n\n' +
-                    '👑 Hacé administrador al bot y volvé a intentarlo.'
+                    'No pude verificar que el bot sea administrador del grupo.\n\n' +
+                    '👑 Comprobá sus permisos y volvé a intentarlo.'
             },
             { quoted: m }
         )
@@ -148,7 +291,8 @@ const handler = async (
         return conn.sendMessage(
             m.chat,
             {
-                text: '⏳ Ya hay una operación de fijado en curso. Esperá un momento.'
+                text:
+                    '⏳ Ya hay una operación de fijado en curso. Esperá un momento.'
             },
             { quoted: m }
         )
@@ -185,22 +329,17 @@ const handler = async (
         // 🔑 CONSTRUIR CLAVE DEL MENSAJE
         // ====================================================
 
-        const key = {
-            remoteJid: m.chat,
-            fromMe: Boolean(citado.fromMe),
-            id: citado.id
-        }
-
-        if (citado.sender) {
-            key.participant =
-                conn.decodeJid?.(citado.sender) || citado.sender
-        }
+        const key = construirKey(m, conn, citado)
 
         // ====================================================
-        // ⚙️ EJECUTAR OPERACIÓN
+        // ⚙️ DETERMINAR OPERACIÓN
         // ====================================================
 
         const fijar = /^(pin|fijar)$/i.test(command)
+
+        // ====================================================
+        // 📡 ENVIAR SOLICITUD DE FIJADO
+        // ====================================================
 
         if (fijar) {
             await conn.sendMessage(m.chat, {
@@ -239,12 +378,12 @@ const handler = async (
 
         const mensaje = `
 ╭━━━〔 ${fijar ? '📌' : '📍'} 〕━━━╮
-   *${fijar ? 'FIJAR MENSAJE' : 'DESFIJAR MENSAJE'}*
+   *${fijar ? 'SOLICITUD DE FIJADO ENVIADA' : 'SOLICITUD DE DESFIJADO ENVIADA'}*
 ╰━━━━━━━━━━━━━━━━━━╯
 
-✅ Solicitud enviada correctamente.
+✅ Baileys aceptó el envío de la solicitud.
 
-📌 *Operación:* ${fijar ? 'Fijar mensaje' : 'Desfijar mensaje'}
+📌 *Operación:* ${fijar ? 'Fijar mensaje citado' : 'Desfijar mensaje citado'}
 👤 *Ejecutado por:* ${actor}
 🛡️ *Permiso:* ${owner ? 'Owner' : 'Administrador'}
 
@@ -275,7 +414,7 @@ ${fijar ? '⏳ Duración solicitada: 30 días.' : ''}
             err.includes('not an admin')
         ) {
             detalle =
-                'WhatsApp rechazó la operación. Comprobá que el bot sea administrador del grupo.'
+                'WhatsApp rechazó la operación. Comprobá los permisos del bot y del grupo.'
         }
 
         return await conn.sendMessage(
@@ -311,7 +450,7 @@ handler.command = /^(pin|fijar|unpin|desfijar)$/i
 
 handler.group = true
 handler.admin = false
-handler.botAdmin = true
+handler.botAdmin = false
 handler.rowner = false
 
 export default handler

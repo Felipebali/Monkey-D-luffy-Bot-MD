@@ -1,3 +1,4 @@
+
 /**
  * 📂 plugins/fijar.js
  * 🤖 whatsapp-bot — Sistema avanzado de mensajes fijados
@@ -5,29 +6,23 @@
  * 📌 .pin / .fijar       → Fijar mensaje citado
  * 📍 .unpin / .desfijar  → Desfijar mensaje citado
  *
- * 🛡️ Administradores + Owners
- * 🤖 El bot debe ser administrador del grupo
- * 🔐 Protección contra ejecuciones simultáneas
+ * 👑 Owners y administradores
+ * 🤖 El bot debe ser administrador
+ * 🔐 Protección contra operaciones simultáneas
  * 📝 Historial de actividad en memoria
  */
 
-// ============================================================
-// 🔐 PROTECCIÓN CONTRA EJECUCIONES SIMULTÁNEAS
-// ============================================================
-
 const activeGroups = new Set()
-
-// ============================================================
-// 📝 HISTORIAL DE ACTIVIDAD EN MEMORIA
-// ============================================================
-
 const history = new Map()
 const MAX_HISTORY = 50
+const TIEMPO_PIN = 2592000 // 30 días
+
+// ============================================================
+// 📝 HISTORIAL
+// ============================================================
 
 function saveHistory(chat, entry) {
-    if (!history.has(chat)) {
-        history.set(chat, [])
-    }
+    if (!history.has(chat)) history.set(chat, [])
 
     const records = history.get(chat)
 
@@ -42,101 +37,27 @@ function saveHistory(chat, entry) {
 }
 
 // ============================================================
-// 🔧 UTILIDADES
-// ============================================================
-
-function decodeJid(conn, jid = '') {
-    try {
-        if (typeof conn.decodeJid === 'function') {
-            return conn.decodeJid(jid) || jid
-        }
-    } catch (error) {
-        console.error('[FIJAR] Error normalizando JID:', error)
-    }
-
-    return jid
-}
-
-function getNumber(jid = '') {
-    const value = String(jid || '')
-
-    // Los LID no representan necesariamente números telefónicos.
-    if (value.includes('@lid')) return ''
-
-    return value.split('@')[0].replace(/\D/g, '')
-}
-
-// ============================================================
 // 👑 VERIFICAR OWNER
 // ============================================================
 
 function esOwner(m, conn, isOwner) {
-    if (isOwner === true || m.isOwner === true) {
-        return true
-    }
+    if (isOwner === true || m.isOwner === true) return true
 
-    const sender = decodeJid(conn, m.sender || '')
-    const numeroSender = getNumber(sender)
+    const sender = conn.decodeJid?.(m.sender || '') || m.sender || ''
+    const numeroSender = String(sender)
+        .split('@')[0]
+        .replace(/\D/g, '')
 
     const owners = Array.isArray(global.owner)
         ? global.owner
         : []
 
     return owners.some(owner => {
-        const value = Array.isArray(owner)
-            ? owner[0]
-            : owner
+        const valor = Array.isArray(owner) ? owner[0] : owner
+        const numeroOwner = String(valor || '').replace(/\D/g, '')
 
-        const numeroOwner = String(value || '')
-            .replace(/\D/g, '')
-
-        return numeroOwner !== '' &&
-            numeroOwner === numeroSender
+        return numeroOwner !== '' && numeroOwner === numeroSender
     })
-}
-
-// ============================================================
-// 🛡️ OBTENER PERMISOS DEL GRUPO
-// ============================================================
-
-async function obtenerPermisos(m, conn) {
-    const metadata = await conn.groupMetadata(m.chat)
-    const participantes = metadata?.participants || []
-
-    const sender = decodeJid(conn, m.sender || '')
-
-    const participante = participantes.find(p => {
-        const jid = decodeJid(conn, p.id || p.jid || '')
-        return jid === sender ||
-            p.id === m.sender ||
-            p.jid === m.sender
-    })
-
-    const esAdmin = Boolean(
-        participante?.admin === 'admin' ||
-        participante?.admin === 'superadmin'
-    )
-
-    const botJid = decodeJid(
-        conn,
-        conn.user?.id || conn.user?.jid || ''
-    )
-
-    const bot = participantes.find(p => {
-        const jid = decodeJid(conn, p.id || p.jid || '')
-        return jid === botJid
-    })
-
-    const botAdmin = Boolean(
-        bot?.admin === 'admin' ||
-        bot?.admin === 'superadmin'
-    )
-
-    return {
-        metadata,
-        esAdmin,
-        botAdmin
-    }
 }
 
 // ============================================================
@@ -144,42 +65,20 @@ async function obtenerPermisos(m, conn) {
 // ============================================================
 
 function obtenerCitado(m) {
-    if (m.quoted?.id) {
-        return m.quoted
-    }
+    if (m.quoted?.id) return m.quoted
 
     const contexto =
         m.message?.extendedTextMessage?.contextInfo ||
         m.msg?.contextInfo ||
         {}
 
-    if (!contexto.stanzaId) {
-        return null
-    }
+    if (!contexto.stanzaId) return null
 
     return {
         id: contexto.stanzaId,
         sender: contexto.participant || '',
         fromMe: false
     }
-}
-
-// ============================================================
-// 🔑 CONSTRUIR CLAVE DEL MENSAJE CITADO
-// ============================================================
-
-function construirKey(m, conn, citado) {
-    const key = {
-        remoteJid: m.chat,
-        fromMe: Boolean(citado.fromMe),
-        id: citado.id
-    }
-
-    if (citado.sender) {
-        key.participant = decodeJid(conn, citado.sender)
-    }
-
-    return key
 }
 
 // ============================================================
@@ -197,9 +96,7 @@ const handler = async (
     if (!m.isGroup) {
         return conn.sendMessage(
             m.chat,
-            {
-                text: '❌ Este comando solo funciona en grupos.'
-            },
+            { text: '❌ Este comando solo funciona en grupos.' },
             { quoted: m }
         )
     }
@@ -210,20 +107,7 @@ const handler = async (
 
     const owner = esOwner(m, conn, isOwner)
 
-    let admin = isAdmin === true
-
-    // Si el contexto no confirma que sea admin,
-    // consultar los participantes del grupo.
-    if (!admin && !owner) {
-        try {
-            const permisos = await obtenerPermisos(m, conn)
-            admin = permisos.esAdmin
-        } catch (error) {
-            console.error('[FIJAR] Error verificando permisos:', error)
-        }
-    }
-
-    if (!admin && !owner) {
+    if (!isAdmin && !owner) {
         return conn.sendMessage(
             m.chat,
             {
@@ -241,41 +125,30 @@ const handler = async (
     // 🤖 VALIDAR ADMINISTRADOR DEL BOT
     // ========================================================
 
-    let botAdmin = isBotAdmin === true
-
-    if (!botAdmin) {
-        try {
-            const permisos = await obtenerPermisos(m, conn)
-            botAdmin = permisos.botAdmin
-        } catch (error) {
-            console.error('[FIJAR] Error verificando al bot:', error)
-        }
-    }
-
-    if (!botAdmin) {
+    if (!isBotAdmin) {
         return conn.sendMessage(
             m.chat,
             {
                 text:
                     '╭━━━〔 🤖 〕━━━╮\n' +
-                    '   *PERMISOS INSUFICIENTES*\n' +
+                    '   *EL BOT NO ES ADMINISTRADOR*\n' +
                     '╰━━━━━━━━━━━━━━╯\n\n' +
-                    'Necesito ser administrador del grupo para fijar o desfijar mensajes.'
+                    'Necesito ser administrador del grupo para fijar o desfijar mensajes.\n\n' +
+                    '👑 Hacé administrador al bot y volvé a intentarlo.'
             },
             { quoted: m }
         )
     }
 
     // ========================================================
-    // 🔐 EVITAR EJECUCIONES SIMULTÁNEAS
+    // 🔐 EVITAR OPERACIONES SIMULTÁNEAS
     // ========================================================
 
     if (activeGroups.has(m.chat)) {
         return conn.sendMessage(
             m.chat,
             {
-                text:
-                    '⏳ Ya hay una operación de fijado en curso. Esperá un momento.'
+                text: '⏳ Ya hay una operación de fijado en curso. Esperá un momento.'
             },
             { quoted: m }
         )
@@ -309,28 +182,31 @@ const handler = async (
         }
 
         // ====================================================
-        // 🔑 PREPARAR CLAVE DEL MENSAJE
+        // 🔑 CONSTRUIR CLAVE DEL MENSAJE
         // ====================================================
 
-        const key = construirKey(m, conn, citado)
+        const key = {
+            remoteJid: m.chat,
+            fromMe: Boolean(citado.fromMe),
+            id: citado.id
+        }
+
+        if (citado.sender) {
+            key.participant =
+                conn.decodeJid?.(citado.sender) || citado.sender
+        }
 
         // ====================================================
-        // ⚙️ DETERMINAR OPERACIÓN
+        // ⚙️ EJECUTAR OPERACIÓN
         // ====================================================
 
-        const accion = /^(pin|fijar)$/i.test(command)
-            ? 'FIJADO'
-            : 'DESFIJADO'
+        const fijar = /^(pin|fijar)$/i.test(command)
 
-        // ====================================================
-        // 📡 SOLICITAR OPERACIÓN A WHATSAPP
-        // ====================================================
-
-        if (accion === 'FIJADO') {
+        if (fijar) {
             await conn.sendMessage(m.chat, {
                 pin: {
                     type: 1,
-                    time: 2592000,
+                    time: TIEMPO_PIN,
                     key
                 }
             })
@@ -348,15 +224,11 @@ const handler = async (
         // 📝 REGISTRAR ACTIVIDAD
         // ====================================================
 
-        const actor =
-            m.pushName ||
-            m.sender ||
-            'Desconocido'
+        const actor = m.pushName || m.sender || 'Desconocido'
 
         saveHistory(m.chat, {
             actor,
-            action: accion,
-            group: m.chat,
+            action: fijar ? 'FIJADO' : 'DESFIJADO',
             sender: m.sender || null,
             messageId: citado.id
         })
@@ -365,21 +237,18 @@ const handler = async (
         // 🎨 CONFIRMACIÓN
         // ====================================================
 
-        const esFijado = accion === 'FIJADO'
-
         const mensaje = `
-╭━━━〔 ${esFijado ? '📌' : '📍'} 〕━━━╮
-   *${esFijado ? 'MENSAJE FIJADO' : 'MENSAJE DESFIJADO'}*
+╭━━━〔 ${fijar ? '📌' : '📍'} 〕━━━╮
+   *${fijar ? 'FIJAR MENSAJE' : 'DESFIJAR MENSAJE'}*
 ╰━━━━━━━━━━━━━━━━━━╯
 
-${esFijado
-    ? '✅ Se envió la solicitud para fijar el mensaje citado.'
-    : '✅ Se envió la solicitud para desfijar el mensaje citado.'}
+✅ Solicitud enviada correctamente.
 
+📌 *Operación:* ${fijar ? 'Fijar mensaje' : 'Desfijar mensaje'}
 👤 *Ejecutado por:* ${actor}
 🛡️ *Permiso:* ${owner ? 'Owner' : 'Administrador'}
 
-${esFijado ? '⏳ Duración solicitada: 30 días.' : ''}
+${fijar ? '⏳ Duración solicitada: 30 días.' : ''}
 
 ━━━━━━━━━━━━━━━━━━
 🤖 *whatsapp-bot*
@@ -394,12 +263,10 @@ ${esFijado ? '⏳ Duración solicitada: 30 días.' : ''}
     } catch (error) {
         console.error('[FIJAR]', error)
 
-        const err = String(
-            error?.message || error
-        ).toLowerCase()
+        const err = String(error?.message || error).toLowerCase()
 
-        let detail =
-            'No se pudo completar la operación. Intentá nuevamente.'
+        let detalle =
+            'No se pudo completar la operación. Verificá la compatibilidad de tu versión de Baileys.'
 
         if (
             err.includes('not-authorized') ||
@@ -407,8 +274,8 @@ ${esFijado ? '⏳ Duración solicitada: 30 días.' : ''}
             err.includes('not admin') ||
             err.includes('not an admin')
         ) {
-            detail =
-                'WhatsApp rechazó la operación. Verificá que el bot siga siendo administrador.'
+            detalle =
+                'WhatsApp rechazó la operación. Comprobá que el bot sea administrador del grupo.'
         }
 
         return await conn.sendMessage(
@@ -416,21 +283,20 @@ ${esFijado ? '⏳ Duración solicitada: 30 días.' : ''}
             {
                 text:
                     '╭━━━〔 ❌ 〕━━━╮\n' +
-                    '   *ERROR DE CONFIGURACIÓN*\n' +
+                    '   *ERROR AL MODIFICAR EL FIJADO*\n' +
                     '╰━━━━━━━━━━━━━━╯\n\n' +
-                    detail
+                    detalle
             },
             { quoted: m }
         )
 
     } finally {
-        // Liberar el bloqueo siempre.
         activeGroups.delete(m.chat)
     }
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN DEL COMANDO
+// ⚙️ CONFIGURACIÓN DEL PLUGIN
 // ============================================================
 
 handler.help = [
@@ -441,7 +307,6 @@ handler.help = [
 ]
 
 handler.tags = ['grupo']
-
 handler.command = /^(pin|fijar|unpin|desfijar)$/i
 
 handler.group = true

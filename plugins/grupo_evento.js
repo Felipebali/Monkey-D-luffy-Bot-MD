@@ -1,13 +1,13 @@
 
 /**
  * 📂 plugins/evento.js
- * ✨ DETECTOR DE EVENTOS DE GRUPO
+ * ✨ FELIXCAT-BOT — DETECTOR DE EVENTOS DE GRUPO
  * ⚙️ Activar/desactivar | LID/JID | Avisos premium
  *
  * Detecta:
  * • Cambio de nombre, foto, enlace y descripción
  * • Cambios en los permisos del grupo
- * • Grupo cerrado/abierto para mensajes
+ * • Grupo cerrado/abierto para mensajes (tipo 26)
  * • Promociones y degradaciones
  */
 
@@ -117,7 +117,7 @@ async function resolveUserId(id, conn, chat) {
             }
         }
 
-        // Intentar el mapeo LID → número disponible en Baileys.
+        // Intentar resolver LID mediante el mapeo disponible en Baileys.
         const mapping = conn.signalRepository?.lidMapping
 
         if (typeof mapping?.getPNForLID === 'function') {
@@ -133,7 +133,7 @@ async function resolveUserId(id, conn, chat) {
         console.error('[EVENTO-LID]', error)
     }
 
-    // Conservar el LID si no se puede resolver.
+    // Conservar el LID si no se pudo resolver.
     return input
 }
 
@@ -235,6 +235,15 @@ handler.before = async function (m, { conn }) {
     const type = Number(m.messageStubType)
     const params = m.messageStubParameters || []
 
+    // Registro temporal para verificar los parámetros reales de Baileys.
+    if (type === 26) {
+        console.log('[EVENTO-26]', {
+            tipo: type,
+            parametros: params,
+            grupo: m.chat
+        })
+    }
+
     const targetRaw = params.find(value =>
         typeof value === 'string' &&
         (value.includes('@') || /^\d{5,20}$/.test(value))
@@ -326,8 +335,7 @@ handler.before = async function (m, { conn }) {
     }
 
     // ========================================================
-    // ⚙️ 25 — CONFIGURACIÓN DE INFORMACIÓN DEL GRUPO
-    // No confundir con el permiso para enviar mensajes.
+    // ⚙️ 25 — PERMISOS PARA EDITAR INFORMACIÓN
     // ========================================================
 
     else if (type === 25) {
@@ -352,25 +360,23 @@ handler.before = async function (m, { conn }) {
     }
 
     // ========================================================
-    // 🔒 17 — CIERRE / APERTURA PARA MENSAJES
+    // 🔒 26 — CERRAR / ABRIR EL GRUPO PARA MENSAJES
     // ========================================================
 
-    else if (type === 17) {
-        const setting = String(params[0] || '').toLowerCase()
+    else if (type === 26) {
+        // Los valores habituales de Baileys para este cambio son on/off.
+        // Se revisan todos los parámetros por si el valor no está en params[0].
+        const values = params.map(value =>
+            String(value ?? '').trim().toLowerCase()
+        )
 
-        const cerrado = [
-            'on',
-            'true',
-            'announcement',
-            'locked'
-        ].includes(setting)
+        const cerrado = values.some(value =>
+            ['on', 'true', 'announcement', 'locked'].includes(value)
+        )
 
-        const abierto = [
-            'off',
-            'false',
-            'not_announcement',
-            'unlocked'
-        ].includes(setting)
+        const abierto = values.some(value =>
+            ['off', 'false', 'not_announcement', 'unlocked'].includes(value)
+        )
 
         if (cerrado) {
             message =
@@ -384,6 +390,13 @@ handler.before = async function (m, { conn }) {
                 '🔓 *GRUPO ABIERTO PARA MENSAJES*\n\n' +
                 `👤 *Realizado por:* ${actorTag}\n\n` +
                 '💬 Todos los participantes pueden enviar mensajes.'
+        } else {
+            // Si Baileys devuelve otro valor, lo deja registrado en consola.
+            console.log(
+                '[EVENTO-26] No se reconoció el estado:',
+                values
+            )
+            return
         }
     }
 

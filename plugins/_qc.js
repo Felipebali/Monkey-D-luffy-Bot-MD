@@ -1,340 +1,307 @@
 // 📂 plugins/_qc.js
-// 💬 Generador de stickers de citas
+// 💬 whatsapp-bot — Generador de stickers QC
+// ============================================================
+// .qc <texto>  → Sticker con el texto escrito
+// .qc          → Sticker con el mensaje de texto citado
+// ============================================================
 
-import { sticker } from "../lib/sticker.js"
-import axios from "axios"
+import { sticker } from '../lib/sticker.js'
+import axios from 'axios'
 
-const API_URL = "https://bot.lyo.su/quote/generate"
+const API_URL = 'https://bot.lyo.su/quote/generate'
+const DEFAULT_AVATAR = 'https://i.ibb.co/dyk5QdQ/1212121212121212.png'
+const MAX_LENGTH = 310
 
 let handler = async (m, { conn, text }) => {
-  try {
+    try {
+        let quoteText = ''
+        let quoteSender = ''
+        let quoteName = ''
 
-    // ============================================================
-    // 📝 OBTENER TEXTO
-    // ============================================================
+        // ====================================================
+        // 📝 OBTENER TEXTO CITADO O ESCRITO
+        // ====================================================
 
-    let quoteText = ""
-    let quoteSender = ""
-    let quoteName = ""
+        if (m.quoted) {
+            quoteText =
+                m.quoted.text ||
+                m.quoted.caption ||
+                m.quoted.msg?.text ||
+                m.quoted.msg?.caption ||
+                ''
 
-    if (m.quoted?.text) {
-      quoteText = m.quoted.text.trim()
-      quoteSender = conn.decodeJid(m.quoted.sender)
-      quoteName =
-        m.quoted.pushName ||
-        m.quoted.name ||
-        quoteSender.split("@")[0]
+            quoteText = String(quoteText).trim()
 
-    } else if (text?.trim()) {
-      quoteText = text.trim()
-      quoteSender = conn.decodeJid(m.sender)
-      quoteName =
-        m.pushName ||
-        m.name ||
-        quoteSender.split("@")[0]
+            quoteSender = conn.decodeJid(
+                m.quoted.sender || m.sender
+            )
 
-    } else {
+            quoteName =
+                m.quoted.pushName ||
+                m.quoted.name ||
+                quoteSender.split('@')[0]
 
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
+            // Si el mensaje citado no tiene texto,
+            // usar el texto escrito después de .qc.
+            if (!quoteText && text?.trim()) {
+                quoteText = text.trim()
+                quoteSender = conn.decodeJid(m.sender)
+                quoteName =
+                    m.pushName ||
+                    m.name ||
+                    quoteSender.split('@')[0]
+            }
+        } else if (text?.trim()) {
+            quoteText = text.trim()
+            quoteSender = conn.decodeJid(m.sender)
+
+            quoteName =
+                m.pushName ||
+                m.name ||
+                quoteSender.split('@')[0]
+        }
+
+        if (!quoteText) {
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
 `╭━━━〔 💬 *STICKER QC* 〕━━━╮
 ┃
-┃ ❌ *Falta el texto.*
+┃ ❌ Falta el texto.
 ┃
-┃ 📌 Escribe:
-┃ • .qc <texto>
+┃ 📝 Escribe:
+┃ • .qc Hola mundo
 ┃
-┃ 📌 O responde a un mensaje:
+┃ 💬 O responde a un mensaje:
 ┃ • .qc
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━╯`
-        },
-        { quoted: m }
-      )
-    }
+                },
+                { quoted: m }
+            )
+        }
 
-    // ============================================================
-    // 📏 LÍMITE
-    // ============================================================
-
-    if (quoteText.length > 310) {
-
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
+        if (quoteText.length > MAX_LENGTH) {
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
 `⚠️ *Texto demasiado largo.*
 
-📏 Máximo permitido: *310 caracteres*
+📏 Máximo: *${MAX_LENGTH} caracteres*
 📝 Tu texto: *${quoteText.length} caracteres*`
-        },
-        { quoted: m }
-      )
-    }
-
-    await m.react("💬")
-
-    // ============================================================
-    // 🖼️ FOTO DE PERFIL
-    // ============================================================
-
-    const pp = await conn
-      .profilePictureUrl(quoteSender, "image")
-      .catch(() =>
-        "https://i.ibb.co/dyk5QdQ/1212121212121212.png"
-      )
-
-    // ============================================================
-    // 🎨 DATOS PARA LA API
-    // ============================================================
-
-    const data = {
-      type: "quote",
-      format: "png",
-      backgroundColor: "#000000",
-      width: 512,
-      height: 768,
-      scale: 2,
-
-      messages: [
-        {
-          entities: [],
-
-          avatar: true,
-
-          from: {
-            id: 1,
-            name: quoteName,
-            photo: {
-              url: pp
-            }
-          },
-
-          text: quoteText,
-
-          replyMessage: {}
+                },
+                { quoted: m }
+            )
         }
-      ]
-    }
 
-    // ============================================================
-    // 🚀 GENERAR QUOTE
-    // ============================================================
+        await m.react('💬')
 
-    let response
+        // ====================================================
+        // 🖼️ FOTO DE PERFIL
+        // ====================================================
 
-    try {
+        let pp = DEFAULT_AVATAR
 
-      response = await axios.post(
-        API_URL,
-        data,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "User-Agent": "FelixCat-Bot/1.0"
-          },
+        try {
+            pp = await conn.profilePictureUrl(
+                quoteSender,
+                'image'
+            ) || DEFAULT_AVATAR
+        } catch {}
 
-          timeout: 30000,
+        // ====================================================
+        // 🎨 DATOS PARA LA API
+        // ====================================================
 
-          validateStatus: () => true
+        const data = {
+            type: 'quote',
+            format: 'png',
+            backgroundColor: '#000000',
+            width: 512,
+            height: 768,
+            scale: 2,
+            messages: [
+                {
+                    entities: [],
+                    avatar: true,
+                    from: {
+                        id: 1,
+                        name: quoteName,
+                        photo: {
+                            url: pp
+                        }
+                    },
+                    text: quoteText,
+                    replyMessage: {}
+                }
+            ]
         }
-      )
 
-    } catch (error) {
+        // ====================================================
+        // 🚀 GENERAR IMAGEN QC
+        // ====================================================
 
-      console.error(
-        "❌ Error conectando con API QC:",
-        error.message
-      )
+        let response
 
-      await m.react("⚠️")
+        try {
+            response = await axios.post(
+                API_URL,
+                data,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'whatsapp-bot/1.0'
+                    },
+                    timeout: 30000,
+                    validateStatus: () => true
+                }
+            )
+        } catch (error) {
+            console.error(
+                '[QC] Error de conexión:',
+                error.message
+            )
 
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
+            await m.react('⚠️')
+
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
 `⚠️ *No se pudo conectar con el generador QC.*
 
-🌐 La API no respondió correctamente.
+🌐 La API no respondió.
+🔄 Inténtalo nuevamente en unos segundos.`
+                },
+                { quoted: m }
+            )
+        }
 
-🔄 Intenta nuevamente en unos segundos.`
-        },
-        { quoted: m }
-      )
-    }
+        if (response.status !== 200) {
+            console.error(
+                `[QC] HTTP ${response.status}:`,
+                response.data
+            )
 
-    // ============================================================
-    // 🚨 ERROR 502 / 5XX
-    // ============================================================
+            await m.react('⚠️')
 
-    if (response.status >= 500) {
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
+`❌ *No se pudo generar el sticker QC.*
 
-      console.error(
-        `❌ API QC respondió HTTP ${response.status}`
-      )
+📡 Código HTTP: *${response.status}*
+🔄 Inténtalo nuevamente más tarde.`
+                },
+                { quoted: m }
+            )
+        }
 
-      await m.react("⚠️")
+        // ====================================================
+        // 🧩 VALIDAR IMAGEN RECIBIDA
+        // ====================================================
 
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-`⚠️ *El generador de stickers está temporalmente fuera de servicio.*
+        const imageBase64 = response.data?.result?.image
 
-🌐 Servidor: *bot.lyo.su*
-📡 Estado: *HTTP ${response.status}*
+        if (
+            typeof imageBase64 !== 'string' ||
+            !imageBase64.length
+        ) {
+            console.error(
+                '[QC] La API no devolvió una imagen:',
+                response.data
+            )
 
-🔄 Espera unos segundos y vuelve a intentarlo.`
-        },
-        { quoted: m }
-      )
-    }
+            await m.react('⚠️')
 
-    // ============================================================
-    // ❌ OTROS ERRORES
-    // ============================================================
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
+`❌ *El generador no devolvió la imagen.*
 
-    if (response.status !== 200) {
+🔄 Inténtalo nuevamente.`
+                },
+                { quoted: m }
+            )
+        }
 
-      console.error(
-        "❌ Respuesta inesperada:",
-        response.status,
-        response.data
-      )
+        const buffer = Buffer.from(
+            imageBase64,
+            'base64'
+        )
 
-      await m.react("⚠️")
+        if (!buffer.length) {
+            throw new Error('La imagen recibida está vacía.')
+        }
 
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-`❌ *No se pudo generar el sticker.*
+        // ====================================================
+        // 🎨 CONVERTIR A STICKER
+        // ====================================================
 
-📡 Código HTTP: *${response.status}*`
-        },
-        { quoted: m }
-      )
-    }
+        const stiker = await sticker(
+            buffer,
+            false,
+            global.packname || 'whatsapp-bot',
+            global.author || ''
+        )
 
-    // ============================================================
-    // 🧩 COMPROBAR RESPUESTA
-    // ============================================================
+        if (!stiker) {
+            throw new Error(
+                'No se pudo convertir la imagen en sticker.'
+            )
+        }
 
-    const imageBase64 =
-      response.data?.result?.image
+        // ====================================================
+        // 📤 ENVIAR STICKER
+        // ====================================================
 
-    if (!imageBase64) {
+        await conn.sendMessage(
+            m.chat,
+            {
+                sticker: stiker
+            },
+            {
+                quoted: m
+            }
+        )
 
-      console.error(
-        "❌ La API no devolvió la imagen:",
-        response.data
-      )
+        await m.react('✅')
 
-      await m.react("⚠️")
+    } catch (error) {
+        console.error('[QC] Error:', error)
 
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-`❌ *La API respondió, pero no devolvió la imagen.*
+        try {
+            await m.react('❌')
+        } catch {}
 
-🔄 Intenta nuevamente.`
-        },
-        { quoted: m }
-      )
-    }
-
-    // ============================================================
-    // 🖼️ BASE64 → BUFFER
-    // ============================================================
-
-    const buffer = Buffer.from(
-      imageBase64,
-      "base64"
-    )
-
-    if (!buffer.length) {
-      throw new Error(
-        "La imagen recibida está vacía."
-      )
-    }
-
-    // ============================================================
-    // 🎨 CONVERTIR A STICKER
-    // ============================================================
-
-    const stiker = await sticker(
-      buffer,
-      false
-    )
-
-    if (!stiker) {
-      throw new Error(
-        "No se pudo convertir la imagen en sticker."
-      )
-    }
-
-    // ============================================================
-    // 📤 ENVIAR
-    // ============================================================
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        sticker: stiker
-      },
-      {
-        quoted: m
-      }
-    )
-
-    await m.react("✅")
-
-  } catch (error) {
-
-    console.error(
-      "❌ Error en .qc:",
-      error
-    )
-
-    try {
-      await m.react("❌")
-    } catch {}
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        text:
+        return conn.sendMessage(
+            m.chat,
+            {
+                text:
 `❌ *Ocurrió un error generando el sticker QC.*
 
-🔄 Intenta nuevamente más tarde.`
-      },
-      {
-        quoted: m
-      }
-    )
-  }
+🔄 Inténtalo nuevamente más tarde.`
+            },
+            { quoted: m }
+        )
+    }
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN
+// ⚙️ CONFIGURACIÓN DEL COMANDO
 // ============================================================
 
 handler.help = [
-  "qc <texto>",
-  "qc respondiendo mensaje"
+    'qc <texto>',
+    'qc respondiendo a un mensaje'
 ]
 
-handler.tags = [
-  "sticker"
-]
-
-handler.command = [
-  "qc"
-]
-
+handler.tags = ['sticker']
+handler.command = ['qc']
 handler.limit = false
 
 export default handler

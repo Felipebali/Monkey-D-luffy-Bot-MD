@@ -1,10 +1,10 @@
-
 // 📂 plugins/mejorbro.js
 // 🤖 whatsapp-bot — La mejor bro del mundo 💖
 // 🔒 Exclusivo para OWNERS
 // ============================================================
 // • Owner escribe su número → frase aleatoria
 // • Owner la menciona con @ → frase aleatoria
+// • No cita ni responde al mensaje original
 // • Usuarios normales no activan el sistema
 // ============================================================
 
@@ -62,14 +62,13 @@ const FRASES = [
 ]
 
 // ============================================================
-// 👑 COMPROBAR OWNERS
+// 👑 VERIFICAR OWNER
 // ============================================================
 
 function esOwner(m, conn) {
     const sender = conn.decodeJid(m.sender || '')
     const numero = sender.split('@')[0].replace(/\D/g, '')
 
-    // Owner configurado en global.owner
     const owners = Array.isArray(global.owner)
         ? global.owner
         : []
@@ -77,15 +76,15 @@ function esOwner(m, conn) {
     const ownerConfigurado = owners.some(owner => {
         const valor = Array.isArray(owner) ? owner[0] : owner
         const numeroOwner = String(valor || '').replace(/\D/g, '')
+
         return numeroOwner && numeroOwner === numero
     })
 
-    // También admite el owner principal si el framework lo marca
     return ownerConfigurado || m.isOwner === true
 }
 
 // ============================================================
-// 💖 DETECTAR MENCIÓN O NÚMERO
+// 💖 DETECTAR NÚMERO O MENCIÓN
 // ============================================================
 
 const handler = async (m, { conn }) => {
@@ -100,33 +99,37 @@ const handler = async (m, { conn }) => {
             ''
         )
 
+        // Detectar número escrito
         const numeroEscrito = texto
             .replace(/\D/g, '')
             .includes(BRO_NUMBER)
 
+        // Detectar mención real de WhatsApp
         const menciones = Array.isArray(m.mentionedJid)
             ? m.mentionedJid
             : []
 
         const mencionada = menciones.some(jid => {
             const normalizado = conn.decodeJid(jid || '')
-            return normalizado.split('@')[0].replace(/\D/g, '') === BRO_NUMBER
+            const numero = normalizado
+                .split('@')[0]
+                .replace(/\D/g, '')
+
+            return numero === BRO_NUMBER
         })
 
         if (!numeroEscrito && !mencionada) return
 
+        // Elegir una frase al azar
         const frase = FRASES[
             Math.floor(Math.random() * FRASES.length)
         ].replace(/@BRO/g, `@${BRO_NUMBER}`)
 
-        await conn.sendMessage(
-            m.chat,
-            {
-                text: frase,
-                mentions: [BRO_JID]
-            },
-            { quoted: m }
-        )
+        // Enviar sin citar ni responder al mensaje original
+        await conn.sendMessage(m.chat, {
+            text: frase,
+            mentions: [BRO_JID]
+        })
 
     } catch (error) {
         console.error('[MEJOR BRO] Error:', error)

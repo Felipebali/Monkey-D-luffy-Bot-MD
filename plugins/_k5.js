@@ -4,22 +4,26 @@
  * 🧹 WHATSAPP-BOT — KICKALL SILENCIOSO
  *
  * • Comando exclusivo de owners
- * • Expulsa hasta 10 participantes por tanda
+ * • Expulsa hasta 10 participantes por tanda, en una llamada
  * • Espera 10 segundos entre tandas
- * • No envía mensajes de inicio, progreso ni finalización
+ * • No envía mensajes al grupo
  * • Protege administradores, owners, creador y bot
  * • Evita ejecuciones simultáneas por grupo
  * • Se detiene ante errores consecutivos
  */
 
 const BATCH_SIZE = 10
-const ACTION_DELAY = 1000
 const BATCH_DELAY = 10000
 const MAX_CONSECUTIVE_ERRORS = 3
 
 const running = new Set()
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+const sleep = ms =>
+    new Promise(resolve => setTimeout(resolve, ms))
+
+// ============================================================
+// 🔧 NORMALIZACIÓN DE JID
+// ============================================================
 
 function normalizeJid(jid = '') {
     return String(jid || '')
@@ -27,6 +31,10 @@ function normalizeJid(jid = '') {
         .replace(/:\d+(?=@)/g, '')
         .toLowerCase()
 }
+
+// ============================================================
+// 👑 OWNERS
+// ============================================================
 
 function getOwners() {
     const owners = Array.isArray(global.owner)
@@ -37,13 +45,18 @@ function getOwners() {
 
     return owners
         .map(owner => {
-            const value = Array.isArray(owner) ? owner[0] : owner
+            const value = Array.isArray(owner)
+                ? owner[0]
+                : owner
+
             if (!value) return null
 
             const id = String(value).trim()
 
             return /^\+?\d+$/.test(id)
-                ? normalizeJid(id.replace(/^\+/, '') + '@s.whatsapp.net')
+                ? normalizeJid(
+                    id.replace(/^\+/, '') + '@s.whatsapp.net'
+                )
                 : normalizeJid(id)
         })
         .filter(Boolean)
@@ -51,30 +64,43 @@ function getOwners() {
 
 function isOwnerJid(jid, owners) {
     const normalized = normalizeJid(jid)
+
     if (!normalized) return false
 
     if (owners.includes(normalized)) return true
 
     const number = normalized.split('@')[0]
 
-    return owners.some(owner => owner.split('@')[0] === number)
+    return owners.some(owner =>
+        owner.split('@')[0] === number
+    )
 }
+
+// ============================================================
+// 🔎 PARTICIPANTES
+// ============================================================
 
 function idsOf(participant) {
     return [
         participant?.id,
         participant?.jid,
         participant?.lid
-    ].filter(Boolean).map(normalizeJid)
+    ]
+        .filter(Boolean)
+        .map(normalizeJid)
 }
 
 function findParticipant(participants, jid) {
-    const jidNormalized = normalizeJid(jid)
+    const normalized = normalizeJid(jid)
 
-    return participants.find(p =>
-        idsOf(p).includes(jidNormalized)
+    return participants.find(participant =>
+        idsOf(participant).includes(normalized)
     )
 }
+
+// ============================================================
+// 🧹 COMANDO KICKALL
+// ============================================================
 
 const handler = async (m, { conn }) => {
     // Solo grupos.
@@ -82,11 +108,14 @@ const handler = async (m, { conn }) => {
 
     // Solo owners del bot.
     const owners = getOwners()
-    const sender = normalizeJid(m.sender || m.participant || '')
+
+    const sender = normalizeJid(
+        m.sender || m.participant || ''
+    )
 
     if (!isOwnerJid(sender, owners)) return
 
-    // Evitar dos procesos simultáneos en el mismo grupo.
+    // Evitar ejecuciones simultáneas en el mismo grupo.
     if (running.has(m.chat)) return
 
     let metadata
@@ -94,12 +123,16 @@ const handler = async (m, { conn }) => {
     try {
         metadata = await conn.groupMetadata(m.chat)
     } catch (error) {
-        console.error('[KICKALL] Error obteniendo metadata:', error)
+        console.error(
+            '[KICKALL] Error obteniendo metadata:',
+            error
+        )
         return
     }
 
     const participants = metadata.participants || []
 
+    // Obtener el JID del bot.
     let botJid
 
     try {
@@ -112,28 +145,42 @@ const handler = async (m, { conn }) => {
         botJid = normalizeJid(conn.user?.id || '')
     }
 
-    const botParticipant = findParticipant(participants, botJid)
-
     // El bot necesita ser administrador.
+    const botParticipant = findParticipant(
+        participants,
+        botJid
+    )
+
     if (!botParticipant?.admin) return
 
     // Identificar al creador del grupo.
-    const creator = participants.find(p =>
-        p.admin === 'superadmin' || p.admin === 'creator'
+    const creator = participants.find(participant =>
+        participant.admin === 'superadmin' ||
+        participant.admin === 'creator'
     )
 
     const creatorIds = new Set(idsOf(creator))
 
-    // Seleccionar participantes que no sean administradores
-    // ni cuentas protegidas.
-    const targets = participants.filter(p => {
-        if (!p.id || p.admin) return false
+    // Seleccionar usuarios que pueden ser expulsados.
+    const targets = participants.filter(participant => {
+        if (!participant.id || participant.admin) {
+            return false
+        }
 
-        const ids = idsOf(p)
+        const ids = idsOf(participant)
 
+        // Proteger al bot.
         if (ids.includes(botJid)) return false
-        if (ids.some(id => isOwnerJid(id, owners))) return false
-        if (ids.some(id => creatorIds.has(id))) return false
+
+        // Proteger a los owners.
+        if (ids.some(id => isOwnerJid(id, owners))) {
+            return false
+        }
+
+        // Proteger al creador del grupo.
+        if (ids.some(id => creatorIds.has(id))) {
+            return false
+        }
 
         return true
     })
@@ -146,65 +193,87 @@ const handler = async (m, { conn }) => {
     let removed = 0
 
     try {
-        // Procesar hasta 10 participantes por tanda.
-        for (let i = 0; i < targets.length; i += BATCH_SIZE) {
-            const batch = targets.slice(i, i + BATCH_SIZE)
+        // Procesar tandas de hasta 10 participantes.
+        for (
+            let i = 0;
+            i < targets.length;
+            i += BATCH_SIZE
+        ) {
+            const batch = targets.slice(
+                i,
+                i + BATCH_SIZE
+            )
 
-            for (const target of batch) {
-                try {
-                    // Actualizar metadata antes de cada expulsión.
-                    const currentMetadata = await conn.groupMetadata(m.chat)
-                    const currentParticipants = currentMetadata.participants || []
+            try {
+                // Actualizar la lista antes de cada tanda.
+                const currentMetadata =
+                    await conn.groupMetadata(m.chat)
 
+                const currentParticipants =
+                    currentMetadata.participants || []
+
+                const validIds = []
+
+                for (const target of batch) {
                     const participant = findParticipant(
                         currentParticipants,
                         target.id
                     )
 
-                    // Ya no está en el grupo.
-                    if (!participant) {
-                        consecutiveErrors = 0
-                        continue
-                    }
+                    // El participante ya no está en el grupo.
+                    if (!participant?.id) continue
 
                     const ids = idsOf(participant)
 
                     // Revalidar las protecciones.
-                    if (
-                        participant.admin ||
-                        ids.includes(botJid) ||
-                        ids.some(id => isOwnerJid(id, owners)) ||
-                        ids.some(id => creatorIds.has(id))
-                    ) {
-                        consecutiveErrors = 0
-                        continue
-                    }
+                    if (participant.admin) continue
 
+                    if (ids.includes(botJid)) continue
+
+                    if (
+                        ids.some(id =>
+                            isOwnerJid(id, owners)
+                        )
+                    ) continue
+
+                    if (
+                        ids.some(id =>
+                            creatorIds.has(id)
+                        )
+                    ) continue
+
+                    validIds.push(participant.id)
+                }
+
+                // Expulsar la tanda completa en una sola llamada.
+                if (validIds.length > 0) {
                     await conn.groupParticipantsUpdate(
                         m.chat,
-                        [participant.id],
+                        validIds,
                         'remove'
                     )
 
-                    removed++
-                    consecutiveErrors = 0
-
-                } catch (error) {
-                    consecutiveErrors++
-
-                    console.error(
-                        '[KICKALL] Error al expulsar participante:',
-                        error
-                    )
-
-                    // Detenerse si WhatsApp rechaza varias acciones seguidas.
-                    if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-                        return
-                    }
+                    removed += validIds.length
                 }
 
-                // Pausa entre expulsiones individuales.
-                await sleep(ACTION_DELAY)
+                // La tanda se procesó sin errores.
+                consecutiveErrors = 0
+
+            } catch (error) {
+                consecutiveErrors++
+
+                console.error(
+                    '[KICKALL] Error procesando tanda:',
+                    error
+                )
+
+                // Detenerse después de varios errores consecutivos.
+                if (
+                    consecutiveErrors >=
+                    MAX_CONSECUTIVE_ERRORS
+                ) {
+                    return
+                }
             }
 
             // Esperar 10 segundos antes de la siguiente tanda.
@@ -214,12 +283,19 @@ const handler = async (m, { conn }) => {
         }
 
     } catch (error) {
-        console.error('[KICKALL] Error general:', error)
+        console.error(
+            '[KICKALL] Error general:',
+            error
+        )
 
     } finally {
         running.delete(m.chat)
     }
 }
+
+// ============================================================
+// ⚙️ CONFIGURACIÓN
+// ============================================================
 
 handler.command = ['kickall']
 handler.group = true

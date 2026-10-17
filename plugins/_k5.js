@@ -1,35 +1,25 @@
 
 /**
  * 📂 plugins/kickall.js
- * 🧹 WHATSAPP-BOT — ELIMINACIÓN POR TANDAS
+ * 🧹 WHATSAPP-BOT — KICKALL SILENCIOSO
  *
- * Comando: .kickall
- *
- * • Exclusivo de los owners del bot
- * • Elimina participantes de 10 en 10
- * • Pausa entre tandas
- * • Procesa los usuarios individualmente
+ * • Comando exclusivo de owners
+ * • Expulsa hasta 10 participantes por tanda
+ * • Espera 10 segundos entre tandas
+ * • No envía mensajes de inicio, progreso ni finalización
  * • Protege administradores, owners, creador y bot
- * • Evita procesos simultáneos
+ * • Evita ejecuciones simultáneas por grupo
  * • Se detiene ante errores consecutivos
  */
-
-// ============================================================
-// ⚙️ CONFIGURACIÓN
-// ============================================================
 
 const BATCH_SIZE = 10
 const ACTION_DELAY = 1000
 const BATCH_DELAY = 10000
 const MAX_CONSECUTIVE_ERRORS = 3
 
-const kickallRunning = new Set()
+const running = new Set()
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
-
-// ============================================================
-// 🔧 NORMALIZAR JID
-// ============================================================
 
 function normalizeJid(jid = '') {
     return String(jid || '')
@@ -37,10 +27,6 @@ function normalizeJid(jid = '') {
         .replace(/:\d+(?=@)/g, '')
         .toLowerCase()
 }
-
-// ============================================================
-// 👑 OBTENER OWNERS
-// ============================================================
 
 function getOwners() {
     const owners = Array.isArray(global.owner)
@@ -51,130 +37,68 @@ function getOwners() {
 
     return owners
         .map(owner => {
-            const value = Array.isArray(owner)
-                ? owner[0]
-                : owner
-
+            const value = Array.isArray(owner) ? owner[0] : owner
             if (!value) return null
 
             const id = String(value).trim()
 
-            // Si global.owner contiene números sin sufijo.
-            if (/^\+?\d+$/.test(id)) {
-                return normalizeJid(
-                    id.replace(/^\+/, '') + '@s.whatsapp.net'
-                )
-            }
-
-            return normalizeJid(id)
+            return /^\+?\d+$/.test(id)
+                ? normalizeJid(id.replace(/^\+/, '') + '@s.whatsapp.net')
+                : normalizeJid(id)
         })
         .filter(Boolean)
 }
 
-// ============================================================
-// 🔎 COMPROBAR SI UN JID PERTENECE A UN OWNER
-// ============================================================
-
 function isOwnerJid(jid, owners) {
     const normalized = normalizeJid(jid)
-
     if (!normalized) return false
 
     if (owners.includes(normalized)) return true
 
     const number = normalized.split('@')[0]
 
-    return owners.some(owner => {
-        const ownerNumber = owner.split('@')[0]
-        return number === ownerNumber
-    })
+    return owners.some(owner => owner.split('@')[0] === number)
 }
 
-// ============================================================
-// 📩 ENVIAR MENSAJE
-// ============================================================
+function idsOf(participant) {
+    return [
+        participant?.id,
+        participant?.jid,
+        participant?.lid
+    ].filter(Boolean).map(normalizeJid)
+}
 
-async function reply(conn, m, text) {
-    return conn.sendMessage(
-        m.chat,
-        { text },
-        { quoted: m }
+function findParticipant(participants, jid) {
+    const jidNormalized = normalizeJid(jid)
+
+    return participants.find(p =>
+        idsOf(p).includes(jidNormalized)
     )
 }
-
-// ============================================================
-// 🚀 HANDLER PRINCIPAL
-// ============================================================
 
 const handler = async (m, { conn }) => {
+    // Solo grupos.
+    if (!m.isGroup) return
 
-    // --------------------------------------------------------
-    // 👥 SOLO GRUPOS
-    // --------------------------------------------------------
-
-    if (!m.isGroup) {
-        return reply(
-            conn,
-            m,
-            '❌ *COMANDO NO DISPONIBLE*\n\nEste comando solo funciona en grupos.'
-        )
-    }
-
-    // --------------------------------------------------------
-    // 👑 SOLO OWNERS DEL BOT
-    // --------------------------------------------------------
-
+    // Solo owners del bot.
     const owners = getOwners()
+    const sender = normalizeJid(m.sender || m.participant || '')
 
-    const sender = normalizeJid(
-        m.sender || m.participant || ''
-    )
+    if (!isOwnerJid(sender, owners)) return
 
-    if (!isOwnerJid(sender, owners)) {
-        return reply(
-            conn,
-            m,
-            '🔐 *ACCESO DENEGADO*\n\n' +
-            'Este comando es exclusivo de los propietarios del bot.'
-        )
-    }
-
-    // --------------------------------------------------------
-    // 🔒 EVITAR PROCESOS SIMULTÁNEOS
-    // --------------------------------------------------------
-
-    if (kickallRunning.has(m.chat)) {
-        return reply(
-            conn,
-            m,
-            '⚠️ *PROCESO EN EJECUCIÓN*\n\n' +
-            'Ya hay un proceso `.kickall` activo en este grupo.'
-        )
-    }
-
-    // --------------------------------------------------------
-    // 📋 OBTENER PARTICIPANTES
-    // --------------------------------------------------------
+    // Evitar dos procesos simultáneos en el mismo grupo.
+    if (running.has(m.chat)) return
 
     let metadata
 
     try {
         metadata = await conn.groupMetadata(m.chat)
     } catch (error) {
-        console.error('[KICKALL] Error obteniendo grupo:', error)
-
-        return reply(
-            conn,
-            m,
-            '❌ No pude obtener los participantes del grupo.'
-        )
+        console.error('[KICKALL] Error obteniendo metadata:', error)
+        return
     }
 
     const participants = metadata.participants || []
-
-    // --------------------------------------------------------
-    // 🤖 IDENTIFICAR BOT
-    // --------------------------------------------------------
 
     let botJid
 
@@ -188,264 +112,114 @@ const handler = async (m, { conn }) => {
         botJid = normalizeJid(conn.user?.id || '')
     }
 
-    // --------------------------------------------------------
-    // 🛡️ VERIFICAR ADMINISTRADOR DEL BOT
-    // --------------------------------------------------------
+    const botParticipant = findParticipant(participants, botJid)
 
-    const botParticipant = participants.find(p => {
-        const ids = [p.id, p.jid, p.lid]
-            .filter(Boolean)
-            .map(normalizeJid)
+    // El bot necesita ser administrador.
+    if (!botParticipant?.admin) return
 
-        return ids.includes(botJid)
-    })
-
-    if (!botParticipant?.admin) {
-        return reply(
-            conn,
-            m,
-            '🤖 *NECESITO SER ADMINISTRADOR*\n\n' +
-            'Promocioná al bot a administrador para poder expulsar participantes.'
-        )
-    }
-
-    // --------------------------------------------------------
-    // 👑 IDENTIFICAR CREADOR
-    // --------------------------------------------------------
-
+    // Identificar al creador del grupo.
     const creator = participants.find(p =>
-        p.admin === 'superadmin' ||
-        p.admin === 'creator'
+        p.admin === 'superadmin' || p.admin === 'creator'
     )
 
-    const creatorIds = [
-        creator?.id,
-        creator?.jid,
-        creator?.lid
-    ]
-        .filter(Boolean)
-        .map(normalizeJid)
+    const creatorIds = new Set(idsOf(creator))
 
-    // --------------------------------------------------------
-    // 🛡️ FILTRAR PARTICIPANTES PROTEGIDOS
-    // --------------------------------------------------------
-
-    const protectedParticipants = new Set([
-        botJid,
-        ...owners,
-        ...creatorIds
-    ])
-
+    // Seleccionar participantes que no sean administradores
+    // ni cuentas protegidas.
     const targets = participants.filter(p => {
-        const ids = [p.id, p.jid, p.lid]
-            .filter(Boolean)
-            .map(normalizeJid)
+        if (!p.id || p.admin) return false
 
-        // Proteger al bot, los owners y el creador.
-        if (ids.some(id => protectedParticipants.has(id))) {
-            return false
-        }
+        const ids = idsOf(p)
 
-        // Proteger a todos los administradores.
-        if (p.admin) return false
-
-        // Evitar actuar sobre participantes sin identificador.
-        if (!p.id) return false
+        if (ids.includes(botJid)) return false
+        if (ids.some(id => isOwnerJid(id, owners))) return false
+        if (ids.some(id => creatorIds.has(id))) return false
 
         return true
     })
 
-    if (!targets.length) {
-        return reply(
-            conn,
-            m,
-            'ℹ️ *KICKALL*\n\n' +
-            'No encontré participantes que puedan ser expulsados.\n\n' +
-            '🛡️ Los administradores, owners, creador y bot están protegidos.'
-        )
-    }
+    if (!targets.length) return
 
-    // --------------------------------------------------------
-    // 🚀 INICIAR PROCESO
-    // --------------------------------------------------------
+    running.add(m.chat)
 
-    kickallRunning.add(m.chat)
-
-    let removed = 0
-    let errors = 0
     let consecutiveErrors = 0
-    let batchNumber = 0
-    let stoppedByErrors = false
+    let removed = 0
 
     try {
-        await reply(
-            conn,
-            m,
-            '╭━━━〔 🧹 〕━━━╮\n' +
-            '   *KICKALL INICIADO*\n' +
-            '╰━━━━━━━━━━━━━━╯\n\n' +
-            `👥 *Participantes seleccionados:* ${targets.length}\n` +
-            `🔢 *Por tanda:* ${BATCH_SIZE}\n` +
-            `⏱️ *Pausa entre tandas:* ${BATCH_DELAY / 1000} segundos\n\n` +
-            '🛡️ Administradores, owners, creador y bot protegidos.\n\n' +
-            '⚙️ El proceso ha comenzado.'
-        )
-
-        // ----------------------------------------------------
-        // 🔄 PROCESAR DE 10 EN 10
-        // ----------------------------------------------------
-
+        // Procesar hasta 10 participantes por tanda.
         for (let i = 0; i < targets.length; i += BATCH_SIZE) {
             const batch = targets.slice(i, i + BATCH_SIZE)
 
-            batchNumber++
-
-            let batchRemoved = 0
-
-            for (const participant of batch) {
-                const jid = participant.id
-
+            for (const target of batch) {
                 try {
-                    // Actualizar los participantes antes de expulsar.
-                    // Si ya no está, se omite.
+                    // Actualizar metadata antes de cada expulsión.
                     const currentMetadata = await conn.groupMetadata(m.chat)
+                    const currentParticipants = currentMetadata.participants || []
 
-                    const stillPresent = currentMetadata.participants?.some(p => {
-                        const ids = [p.id, p.jid, p.lid]
-                            .filter(Boolean)
-                            .map(normalizeJid)
+                    const participant = findParticipant(
+                        currentParticipants,
+                        target.id
+                    )
 
-                        return ids.includes(normalizeJid(jid))
-                    })
-
-                    if (!stillPresent) {
+                    // Ya no está en el grupo.
+                    if (!participant) {
                         consecutiveErrors = 0
                         continue
                     }
 
-                    // Protección adicional frente a cambios de permisos.
-                    const currentParticipant = currentMetadata.participants.find(p => {
-                        const ids = [p.id, p.jid, p.lid]
-                            .filter(Boolean)
-                            .map(normalizeJid)
+                    const ids = idsOf(participant)
 
-                        return ids.includes(normalizeJid(jid))
-                    })
-
+                    // Revalidar las protecciones.
                     if (
-                        !currentParticipant ||
-                        currentParticipant.admin ||
-                        isOwnerJid(jid, owners) ||
-                        normalizeJid(jid) === botJid ||
-                        [currentParticipant.id, currentParticipant.jid, currentParticipant.lid]
-                            .filter(Boolean)
-                            .some(id => creatorIds.includes(normalizeJid(id)))
+                        participant.admin ||
+                        ids.includes(botJid) ||
+                        ids.some(id => isOwnerJid(id, owners)) ||
+                        ids.some(id => creatorIds.has(id))
                     ) {
+                        consecutiveErrors = 0
                         continue
                     }
 
                     await conn.groupParticipantsUpdate(
                         m.chat,
-                        [jid],
+                        [participant.id],
                         'remove'
                     )
 
                     removed++
-                    batchRemoved++
                     consecutiveErrors = 0
 
-                    await sleep(ACTION_DELAY)
-
                 } catch (error) {
-                    errors++
                     consecutiveErrors++
 
                     console.error(
-                        `[KICKALL] Error con ${jid}:`,
+                        '[KICKALL] Error al expulsar participante:',
                         error
                     )
 
+                    // Detenerse si WhatsApp rechaza varias acciones seguidas.
                     if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-                        stoppedByErrors = true
-                        break
+                        return
                     }
                 }
+
+                // Pausa entre expulsiones individuales.
+                await sleep(ACTION_DELAY)
             }
 
-            // -----------------------------------------------
-            // 📊 INFORME DE LA TANDA
-            // -----------------------------------------------
-
-            await reply(
-                conn,
-                m,
-                '╭━━━〔 🔄 〕━━━╮\n' +
-                `   *KICKALL — TANDA ${batchNumber}*\n` +
-                '╰━━━━━━━━━━━━━━╯\n\n' +
-                `✅ *Eliminados en esta tanda:* ${batchRemoved}\n` +
-                `📊 *Total eliminados:* ${removed}\n` +
-                `❌ *Errores:* ${errors}\n` +
-                `👥 *Participantes seleccionados:* ${targets.length}`
-            )
-
-            if (stoppedByErrors) break
-
+            // Esperar 10 segundos antes de la siguiente tanda.
             if (i + BATCH_SIZE < targets.length) {
                 await sleep(BATCH_DELAY)
             }
         }
 
-        // ----------------------------------------------------
-        // 🛑 RESULTADO FINAL
-        // ----------------------------------------------------
-
-        if (stoppedByErrors) {
-            await reply(
-                conn,
-                m,
-                '╭━━━〔 🛑 〕━━━╮\n' +
-                '   *KICKALL DETENIDO*\n' +
-                '╰━━━━━━━━━━━━━━╯\n\n' +
-                'Se alcanzó el límite de errores consecutivos.\n\n' +
-                `✅ *Eliminados:* ${removed}\n` +
-                `❌ *Errores:* ${errors}\n` +
-                `🔢 *Tandas procesadas:* ${batchNumber}\n\n` +
-                '⚠️ Revisá los permisos y la conexión antes de volver a intentarlo.'
-            )
-        } else {
-            await reply(
-                conn,
-                m,
-                '╭━━━〔 ✅ 〕━━━╮\n' +
-                '   *KICKALL FINALIZADO*\n' +
-                '╰━━━━━━━━━━━━━━╯\n\n' +
-                `🧹 *Eliminados:* ${removed}\n` +
-                `❌ *Errores:* ${errors}\n` +
-                `🔢 *Tandas procesadas:* ${batchNumber}\n\n` +
-                '🛡️ Los administradores, owners, creador y bot fueron protegidos.'
-            )
-        }
-
     } catch (error) {
         console.error('[KICKALL] Error general:', error)
 
-        await reply(
-            conn,
-            m,
-            '❌ *KICKALL INTERRUMPIDO*\n\n' +
-            `✅ Eliminados: ${removed}\n` +
-            `❌ Errores: ${errors}\n\n` +
-            'Ocurrió un error inesperado durante el proceso.'
-        )
-
     } finally {
-        kickallRunning.delete(m.chat)
+        running.delete(m.chat)
     }
 }
-
-// ============================================================
-// ⚙️ CONFIGURACIÓN
-// ============================================================
 
 handler.command = ['kickall']
 handler.group = true

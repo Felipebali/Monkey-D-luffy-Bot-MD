@@ -13,7 +13,7 @@ import axios from 'axios'
 // ============================================================
 
 const MAX_DURATION_SECONDS = 7 * 60
-const COOLDOWN_SECONDS = 120
+const COOLDOWN_SECONDS = 300
 
 // Cooldown individual por usuario
 const cooldowns = new Map()

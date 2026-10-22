@@ -31,8 +31,9 @@ const TRES_DIAS = 3 * 24 * 60 * 60 * 1000
 
 // ============================================================
 // 🔔 AVISO AUTOMÁTICO: YA PUEDEN CASARSE
-// Se avisa una sola vez en el grupo donde comenzó el noviazgo.
-// No se envían mensajes privados.
+// Revisa cada 15 segundos.
+// Reintenta si falla el envío.
+// Nunca envía el aviso por privado.
 // ============================================================
 
 function registerMarriageNotifier(conn) {
@@ -45,52 +46,67 @@ function registerMarriageNotifier(conn) {
   if (global.parejasMarriageNotifierConnections.has(conn)) return
   global.parejasMarriageNotifierConnections.add(conn)
 
-  const timer = setInterval(async () => {
+  const numero = jid =>
+    String(jid || '')
+      .split('@')[0]
+      .split(':')[0]
+      .replace(/[^0-9]/g, '')
+
+  const revisarAvisos = async () => {
     try {
       const db = loadDB()
       const ahora = Date.now()
+      const parejasProcesadas = new Set()
 
       for (const id of Object.keys(db)) {
         const user = db[id]
 
-        if (!user?.pareja || !user.relacionFecha || user.matrimonioFecha) continue
-        if (id >= user.pareja) continue
+        if (!user?.pareja || !user.relacionFecha || user.matrimonioFecha)
+          continue
 
-        const parejaId = Object.keys(db).find(otherId => {
-          if (otherId === user.pareja) return true
+        const parejaNumero = numero(user.pareja)
 
-          const a = String(otherId).split(':')[0].replace(/[^0-9]/g, '')
-          const b = String(user.pareja).split(':')[0].replace(/[^0-9]/g, '')
+        const parejaId = Object.keys(db).find(otherId =>
+          otherId === user.pareja ||
+          (parejaNumero && numero(otherId) === parejaNumero)
+        )
 
-          return a && b && a === b
-        }) || user.pareja
+        if (!parejaId || parejaId === id) continue
 
         const pareja = db[parejaId]
 
-        if (!pareja || pareja.matrimonioFecha) continue
+        if (!pareja?.pareja || pareja.matrimonioFecha) continue
 
-        const fecha = Number(user.relacionFecha)
+        // Confirmar que ambos siguen siendo pareja.
+        if (
+          numero(user.pareja) !== numero(parejaId) ||
+          numero(pareja.pareja) !== numero(id)
+        ) continue
 
-        if (!Number.isFinite(fecha) || ahora - fecha < TRES_DIAS) continue
-        if (user.avisoCasarseEnviado || pareja.avisoCasarseEnviado) continue
+        const llave = [numero(id), numero(parejaId)].sort().join(':')
+
+        if (parejasProcesadas.has(llave)) continue
+        parejasProcesadas.add(llave)
+
+        const fecha = Number(user.relacionFecha || pareja.relacionFecha)
+
+        if (!Number.isFinite(fecha) || fecha <= 0) continue
+        if (ahora - fecha < TRES_DIAS) continue
+
+        if (user.avisoCasarseEnviado || pareja.avisoCasarseEnviado)
+          continue
 
         const grupo = user.grupoRelacion || pareja.grupoRelacion
 
-        // Solo enviar en un grupo conocido.
-        if (typeof grupo !== 'string' || !grupo.endsWith('@g.us')) continue
+        // Solo enviar al grupo registrado.
+        if (typeof grupo !== 'string' || !grupo.endsWith('@g.us'))
+          continue
 
-        // Marcar para evitar avisos duplicados.
-        user.avisoCasarseEnviado = true
-        pareja.avisoCasarseEnviado = true
-        saveDB(db)
+        try {
+          await conn.sendMessage(grupo, {
+            text: `╭━━━〔 💍 YA PUEDEN CASARSE 〕━━━⬣
 
-        const mentionA = id
-        const mentionB = parejaId
-
-        await conn.sendMessage(grupo, {
-          text: `╭━━━〔 💍 YA PUEDEN CASARSE 〕━━━⬣
-
-💞 ¡Atención, parejita! @${String(mentionA).split('@')[0]} y @${String(mentionB).split('@')[0]}
+💞 ¡Atención, parejita! @${id.split('@')[0]} y @${parejaId.split('@')[0]}
 
 ⏳ ¡Ya cumplieron 3 días de noviazgo!
 
@@ -100,15 +116,45 @@ function registerMarriageNotifier(conn) {
 
 ╰━━━━━━━━━━━━━━━━⬣
         💜 WHATSAPP-BOT`,
-          mentions: [mentionA, mentionB]
-        })
+            mentions: [id, parejaId]
+          })
+
+          // Marcar como enviado solamente después del envío exitoso.
+          const dbActualizada = loadDB()
+
+          if (dbActualizada[id])
+            dbActualizada[id].avisoCasarseEnviado = true
+
+          if (dbActualizada[parejaId])
+            dbActualizada[parejaId].avisoCasarseEnviado = true
+
+          saveDB(dbActualizada)
+
+          console.log(
+            `[PAREJAS] Aviso de matrimonio enviado al grupo ${grupo}`
+          )
+        } catch (errorEnvio) {
+          console.error(
+            '[PAREJAS] Falló el aviso; se volverá a intentar:',
+            errorEnvio
+          )
+        }
       }
     } catch (error) {
-      console.error('[PAREJAS] Error en aviso automático de matrimonio:', error)
+      console.error(
+        '[PAREJAS] Error revisando avisos de matrimonio:',
+        error
+      )
     }
-  }, 60 * 1000)
+  }
 
-  if (typeof timer.unref === 'function') timer.unref()
+  // Primera revisión inmediata y luego cada 15 segundos.
+  revisarAvisos()
+
+  const timer = setInterval(revisarAvisos, 15 * 1000)
+
+  if (typeof timer.unref === 'function')
+    timer.unref()
 }
 
 // ============================================================
@@ -156,11 +202,16 @@ const handler = async (m, { conn, command }) => {
       }
     }
 
-    // Compatibilidad con usuarios guardados antes de esta versión.
     const user = db[id]
-    if (user.grupoRelacion === undefined) user.grupoRelacion = null
-    if (user.avisoCasarseEnviado === undefined) user.avisoCasarseEnviado = false
-    if (user.amor === undefined) user.amor = 0
+
+    if (user.grupoRelacion === undefined)
+      user.grupoRelacion = null
+
+    if (user.avisoCasarseEnviado === undefined)
+      user.avisoCasarseEnviado = false
+
+    if (user.amor === undefined)
+      user.amor = 0
 
     return user
   }
@@ -220,9 +271,26 @@ ${text}
     return jid
   }
 
+  // Registrar un grupo si la relación se creó por privado
+  // y todavía no hay grupo guardado.
+  if (typeof m.chat === 'string' && m.chat.endsWith('@g.us')) {
+    const idActual = findUserId(sender)
+    const userActual = db[idActual]
+
+    if (userActual?.pareja && !userActual.grupoRelacion) {
+      const idPareja = findUserId(userActual.pareja)
+      const userPareja = db[idPareja]
+
+      if (userPareja) {
+        userActual.grupoRelacion = m.chat
+        userPareja.grupoRelacion = m.chat
+        saveDB(db)
+      }
+    }
+  }
+
   // ============================================================
   // 💌 PROPUESTA DE NOVIAZGO
-  // Comando: .pareja @persona o responder a un mensaje
   // ============================================================
 
   if (command === 'pareja') {
@@ -337,9 +405,10 @@ de algo muy bonito. ✨`
     proposerUser.relacionFecha = ahora
 
     // Guardar el grupo donde comenzó el noviazgo.
-    const grupoRelacion = typeof m.chat === 'string' && m.chat.endsWith('@g.us')
-      ? m.chat
-      : null
+    const grupoRelacion =
+      typeof m.chat === 'string' && m.chat.endsWith('@g.us')
+        ? m.chat
+        : null
 
     user.grupoRelacion = grupoRelacion
     proposerUser.grupoRelacion = grupoRelacion
@@ -735,7 +804,6 @@ con calma y respeto por lo que compartieron. 🌷`
   // ============================================================
   // 💕 ACCIONES ROMÁNTICAS
   // .amor, .besar, .abrazar, .flores, .regalo, .cita
-  // Aceptan mención o respuesta a un mensaje.
   // ============================================================
 
   if (['amor', 'besar', 'abrazar', 'flores', 'regalo', 'cita'].includes(command)) {
@@ -758,7 +826,7 @@ con calma y respeto por lo que compartieron. 🌷`
 
     const targetUser = getUser(target)
 
-    // Avisar si alguien intenta interactuar con una persona que ya tiene pareja.
+    // No permitir acciones con alguien que tiene otra pareja.
     if (targetUser.pareja && !sameUser(targetUser.pareja, sender)) {
       const parejaDelObjetivo = findUserId(targetUser.pareja)
 
@@ -786,7 +854,7 @@ La acción se ha detenido para respetar ese vínculo.
       )
     }
 
-    // Avisar si quien ejecuta tiene pareja e intenta interactuar con otra persona.
+    // No permitir infidelidad por parte de quien ejecuta el comando.
     if (user.pareja && !sameUser(user.pareja, target)) {
       const parejaDelSender = findUserId(user.pareja)
 

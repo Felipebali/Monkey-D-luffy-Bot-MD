@@ -1,6 +1,6 @@
+
 // 🔹 Regex
-const groupLinkRegex = /chat.whatsapp.com\/(invite\/)?([0-9A-Za-z]{20,24})/i;
-const channelRegex = /whatsapp\.com\/channel\/[0-9A-Za-z]{15,50}/i;
+const groupLinkRegex = /chat\.whatsapp\.com\/(invite\/)?([0-9A-Za-z]{20,24})/i;
 const genericGroupRegex = /(chat\.whatsapp\.com|whatsapp\.com\/invite)/i;
 
 // 👑 Obtener owners desde global.owner
@@ -43,16 +43,13 @@ export async function before(m, { conn, isAdmin, isBotAdmin }) {
 
   const isGroupLink = groupLinkRegex.test(text);
   const isGenericGroup = genericGroupRegex.test(text);
-  const isChannel = channelRegex.test(text);
 
   // ============================================================
   // 🗑️ ELIMINAR MENSAJE
   // ============================================================
 
   async function deleteMsg() {
-
     try {
-
       await conn.sendMessage(
         m.chat,
         {
@@ -66,7 +63,6 @@ export async function before(m, { conn, isAdmin, isBotAdmin }) {
           }
         }
       );
-
     } catch {}
   }
 
@@ -75,15 +71,12 @@ export async function before(m, { conn, isAdmin, isBotAdmin }) {
   // ============================================================
 
   async function kickUser() {
-
     try {
-
       await conn.groupParticipantsUpdate(
         m.chat,
         [who],
         "remove"
       );
-
     } catch {}
   }
 
@@ -96,27 +89,6 @@ export async function before(m, { conn, isAdmin, isBotAdmin }) {
   }
 
   // ============================================================
-  // 🚫 CANALES
-  // Solo borrar, NO expulsar
-  // ============================================================
-
-  if (isChannel) {
-
-    await deleteMsg();
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        text:
-          `⚠️ @${who.split("@")[0]} no se permiten enlaces de canales`,
-        mentions: [who]
-      }
-    );
-
-    return false;
-  }
-
-  // ============================================================
   // 🔐 CÓDIGO DEL GRUPO ACTUAL
   // ============================================================
 
@@ -124,17 +96,13 @@ export async function before(m, { conn, isAdmin, isBotAdmin }) {
     global.groupInviteCodes[m.chat];
 
   if (!currentInvite) {
-
     try {
-
       currentInvite =
         await conn.groupInviteCode(m.chat);
 
       global.groupInviteCodes[m.chat] =
         currentInvite;
-
     } catch {
-
       return true;
     }
   }
@@ -147,7 +115,6 @@ export async function before(m, { conn, isAdmin, isBotAdmin }) {
     isGroupLink &&
     text.includes(currentInvite)
   ) {
-
     return true;
   }
 
@@ -156,9 +123,7 @@ export async function before(m, { conn, isAdmin, isBotAdmin }) {
   // ============================================================
 
   if (isGenericGroup) {
-
     await deleteMsg();
-
     await kickUser();
 
     await conn.sendMessage(

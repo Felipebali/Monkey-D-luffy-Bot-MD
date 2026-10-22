@@ -1,64 +1,46 @@
+
 // 📂 plugins/grupo-configuracion.js
-// ⚙️ PANEL DE CONFIGURACIÓN DEL GRUPO
-// ============================================================
+// ⚙️ WHATSAPP-BOT — PANEL DE CONFIGURACIÓN DEL GRUPO
+
+import fs from 'fs'
+import path from 'path'
 
 // ============================================================
 // 🔄 ALIAS DE CONFIGURACIÓN
 // ============================================================
 
 const aliasMap = {
+  antifake: ['antifake', 'antiFake'],
+  antispam: ['antispam', 'antiSpam'],
+  antilink: ['antilink', 'antiLink'],
+  antilink2: ['antilink2', 'antiLink2'],
+  antitagall: ['tagallEnabled', 'antitagall'],
+  evento: ['evento', 'detect'],
+  onlyadmin: ['onlyadmin', 'onlyAdmin', 'soloAdmins', 'modoadmin'],
+  nsfw: ['nsfw'],
+  juegos: ['juegos', 'games'],
+  welcome: ['welcome', 'bienvenida']
+}
 
-  antifake: [
-    'antifake',
-    'antiFake'
-  ],
+// ============================================================
+// 🛡️ ANTIESTADO — BASE DE DATOS
+// ============================================================
 
-  antispam: [
-    'antispam',
-    'antiSpam'
-  ],
+const antiestadoFile = path.join('./database', 'antiestado.json')
 
-  antilink: [
-    'antilink',
-    'antiLink'
-  ],
+function getAntiEstadoValue(groupJid) {
+  try {
+    if (!fs.existsSync(antiestadoFile)) return false
 
-  antilink2: [
-    'antilink2',
-    'antiLink2'
-  ],
+    const data = JSON.parse(
+      fs.readFileSync(antiestadoFile, 'utf8')
+    )
 
-  antitagall: [
-    'tagallEnabled',
-    'antitagall'
-  ],
-
-  evento: [
-    'evento',
-    'detect'
-  ],
-
-  onlyadmin: [
-    'onlyadmin',
-    'onlyAdmin',
-    'soloAdmins',
-    'modoadmin'
-  ],
-
-  nsfw: [
-    'nsfw'
-  ],
-
-  juegos: [
-    'juegos',
-    'games'
-  ],
-
-  welcome: [
-    'welcome',
-    'bienvenida'
-  ]
-
+    return data[groupJid] === true
+  } catch (error) {
+    console.error('[PANEL] Error leyendo antiestado.json:', error)
+    return false
+  }
 }
 
 // ============================================================
@@ -66,15 +48,12 @@ const aliasMap = {
 // ============================================================
 
 function getChatValue(chat, key) {
-
   const keys = aliasMap[key]
 
   if (!keys) return false
 
   for (const k of keys) {
-
     if (chat[k] !== undefined) {
-
       const value = chat[k]
 
       return (
@@ -97,55 +76,24 @@ function getChatValue(chat, key) {
 // ============================================================
 
 function status(value) {
-
-  return value
-    ? '🟢 ACTIVADO'
-    : '🔴 DESACTIVADO'
+  return value ? '🟢 ACTIVADO' : '🔴 DESACTIVADO'
 }
 
 // ============================================================
 // 🚀 HANDLER
 // ============================================================
 
-let handler = async (
-  m,
-  {
-    isAdmin,
-    isOwner
-  }
-) => {
-
-  // ==========================================================
-  // 👥 SOLO GRUPOS
-  // ==========================================================
-
+const handler = async (m, { isAdmin, isOwner }) => {
   if (!m.isGroup) {
-
-    return m.reply(
-      '⚠️ Este comando solo funciona en grupos.'
-    )
+    return m.reply('⚠️ Este comando solo funciona en grupos.')
   }
-
-  // ==========================================================
-  // 🛡️ ADMIN / OWNER
-  // ==========================================================
 
   if (!isAdmin && !isOwner) {
-
-    return m.reply(
-      '🚫 Solo administradores pueden usar este panel.'
-    )
+    return m.reply('🚫 Solo administradores pueden usar este panel.')
   }
 
-  // ==========================================================
-  // 📂 BASE DE DATOS
-  // ==========================================================
-
   if (!global.db?.data) {
-
-    return m.reply(
-      '❌ La base de datos no está disponible.'
-    )
+    return m.reply('❌ La base de datos no está disponible.')
   }
 
   if (!global.db.data.chats) {
@@ -156,12 +104,8 @@ let handler = async (
     global.db.data.chats[m.chat] = {}
   }
 
-  const chat =
-    global.db.data.chats[m.chat]
-
-  // ==========================================================
-  // 📋 PANEL
-  // ==========================================================
+  const chat = global.db.data.chats[m.chat]
+  const antiestado = getAntiEstadoValue(m.chat)
 
   const panel = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
@@ -193,6 +137,10 @@ let handler = async (
 ⚡ AntiTagAll
 └─ ${status(getChatValue(chat, 'antitagall'))}
    └─ *.antitagall*
+
+🚨 AntiEstado
+└─ ${status(antiestado)}
+   └─ *.antiestado*
 
 ━━━━━━━━━━━━━━━━━━━━━━
 🛠️ *ADMINISTRACIÓN*
@@ -235,40 +183,34 @@ let handler = async (
 🚫 .antifake
 🛡️ .antispam
 ⚡ .antitagall
+🚨 .antiestado
 
 🎭 .evento
 👑 .modoadmin
-
 👋 .welcome
-
 🎮 .juegos
 🔞 .nsfw
 
 ━━━━━━━━━━━━━━━━━━━━━━
 💡 *FUNCIONAMIENTO*
+━━━━━━━━━━━━━━━━━━━━━━
 
 Los comandos funcionan como interruptor.
 
 Ejemplo:
 
 *.welcome*
-
 🟢 ACTIVADO
 
 Volvés a usar:
 
 *.welcome*
-
 🔴 DESACTIVADO
 
 ━━━━━━━━━━━━━━━━━━━━━━
 ⚙️ *PANEL DE CONFIGURACIÓN*
 ━━━━━━━━━━━━━━━━━━━━━━
 `.trim()
-
-  // ==========================================================
-  // 📤 ENVIAR PANEL
-  // ==========================================================
 
   return m.reply(panel)
 }
@@ -277,42 +219,10 @@ Volvés a usar:
 // 📚 AYUDA
 // ============================================================
 
-handler.help = [
-  'panel',
-  'config'
-]
-
-// ============================================================
-// 🏷️ CATEGORÍA
-// ============================================================
-
-handler.tags = [
-  'grupo'
-]
-
-// ============================================================
-// ⚙️ COMANDOS
-// ============================================================
-
-handler.command = [
-  'panel',
-  'config'
-]
-
-// ============================================================
-// 👥 SOLO GRUPOS
-// ============================================================
-
+handler.help = ['panel', 'config']
+handler.tags = ['grupo']
+handler.command = ['panel', 'config']
 handler.group = true
-
-// ============================================================
-// 👮 SOLO ADMIN
-// ============================================================
-
 handler.admin = true
-
-// ============================================================
-// 📤 EXPORT
-// ============================================================
 
 export default handler

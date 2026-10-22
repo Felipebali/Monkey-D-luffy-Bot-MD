@@ -269,7 +269,7 @@ let handler = async (m, { conn, text }) => {
             `⏳ *¡No atomices! JAJAJA* 🐾\n\n` +
             `ꕤ Ya usaste este comando recientemente.\n` +
             `ꕤ Volvé a intentarlo en *${minutes > 0 ? `${minutes} min ` : ''}${seconds} seg*.\n\n` +
-            `ׅ  ׄ  ✿ *Cooldown:* 2 minutos.`
+            `ׅ  ׄ  ✿ *Cooldown:* 5 minutos.`
         },
         { quoted: m }
       )

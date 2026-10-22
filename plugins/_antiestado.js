@@ -1,8 +1,9 @@
 
-// 📂 plugins/antiestado.js
-// 🛡️ WHATSAPP-BOT — ANTIESTADO
-// Comando: .antiestado
-// Requiere permisos de administrador para expulsar usuarios.
+ // 📂 plugins/antiestado.js
+ // 🛡️ WHATSAPP-BOT — ANTIESTADO
+ // Comando: .antiestado
+ // Intenta eliminar notificaciones de estados y avisa en el grupo.
+ // No expulsa usuarios. Se aplica a todos por igual.
 
 import fs from 'fs'
 import path from 'path'
@@ -52,20 +53,6 @@ function digits(jid) {
     .split('@')[0]
     .split(':')[0]
     .replace(/\D/g, '')
-}
-
-function isOwner(conn, jid) {
-  const owners = global.owner || []
-  const senderDigits = digits(normalizeJid(conn, jid))
-
-  if (!senderDigits) return false
-
-  return owners.some(owner => {
-    if (Array.isArray(owner)) owner = owner[0]
-    if (typeof owner !== 'string') return false
-
-    return digits(owner) === senderDigits
-  })
 }
 
 function unwrapMessage(message) {
@@ -150,53 +137,17 @@ function getSenderJid(conn, event, msg, groupJid) {
   return sender ? normalizeJid(conn, sender) : null
 }
 
-async function isGroupAdmin(conn, groupJid, jid) {
-  if (!jid) return false
-
-  try {
-    const metadata = await conn.groupMetadata(groupJid)
-    const senderJid = normalizeJid(conn, jid)
-    const senderDigits = digits(senderJid)
-
-    const participant = (metadata.participants || []).find(p => {
-      const ids = [p.id, p.jid, p.phoneNumber, p.lid].filter(Boolean)
-
-      return ids.some(id => {
-        const normalized = normalizeJid(conn, id)
-
-        return normalized === senderJid ||
-          (
-            digits(id) &&
-            senderDigits &&
-            digits(id) === senderDigits
-          )
-      })
-    })
-
-    return Boolean(
-      participant &&
-      (
-        participant.admin === 'admin' ||
-        participant.admin === 'superadmin' ||
-        participant.isAdmin ||
-        participant.isSuperAdmin
-      )
-    )
-  } catch (error) {
-    console.error('[ANTIESTADO] Error consultando administradores:', error)
-    return false
-  }
-}
-
 async function tryDeleteNotification(conn, groupJid, msg) {
   const key = msg?.key
 
   if (!key?.id || key?.remoteJid !== groupJid) {
+    console.warn('[ANTIESTADO] No hay una clave válida para borrar la notificación.')
     return false
   }
 
   try {
     await conn.sendMessage(groupJid, { delete: key })
+    console.log('[ANTIESTADO] Solicitud de eliminación enviada.')
     return true
   } catch (error) {
     console.error('[ANTIESTADO] No se pudo borrar la notificación:', error)
@@ -204,27 +155,23 @@ async function tryDeleteNotification(conn, groupJid, msg) {
   }
 }
 
-async function sendRemovalNotice(conn, groupJid, senderJid) {
+async function sendWarning(conn, groupJid, senderJid) {
   try {
     await conn.sendMessage(groupJid, {
-      text: `╭━━━〔 🚨 ANTIESTADO 〕━━━⬣
+      text: `╭━━━〔 🚫 ANTIESTADO 〕━━━⬣
 
-⚠️ *¡INFRACCIÓN DETECTADA!*
+⚠️ Atención: @${digits(senderJid)}
 
-👤 Usuario expulsado: @${digits(senderJid)}
+📢 *No se permiten estados mencionando a este grupo.*
 
-📌 Motivo: Mencionar al grupo mediante un estado de WhatsApp.
-
-⛔ Sanción: Expulsión del grupo.
-
-🛡️ Respetá las reglas para evitar sanciones.
+🛡️ Por favor, respetá las reglas del grupo y evitá publicar estados que lo mencionen.
 
 ╰━━━━━━━━━━━━━━━━⬣
         💜 WHATSAPP-BOT`,
       mentions: [senderJid]
     })
 
-    console.log('[ANTIESTADO] Aviso de expulsión enviado.')
+    console.log('[ANTIESTADO] Aviso enviado al grupo.')
   } catch (error) {
     console.error('[ANTIESTADO] No se pudo enviar el aviso:', error)
   }
@@ -251,17 +198,25 @@ async function processGroupStatusMention(conn, event) {
     const groupJid = getGroupJid(event, msg)
     if (!groupJid) return
 
+    // Comprobar si está activado en este grupo.
     const config = loadDB()
     if (config[groupJid] !== true) return
 
-    const senderJid = getSenderJid(conn, event, msg, groupJid)
+    const senderJid = getSenderJid(
+      conn,
+      event,
+      msg,
+      groupJid
+    )
+
     if (!senderJid) {
-      console.warn('[ANTIESTADO] Se detectó una mención, pero no se identificó al autor.')
+      console.warn('[ANTIESTADO] No se pudo identificar al autor.')
       return
     }
 
     const botJid = normalizeJid(conn, conn.user?.id || '')
 
+    // Evitar procesar mensajes propios del bot.
     if (
       botJid &&
       (
@@ -272,63 +227,11 @@ async function processGroupStatusMention(conn, event) {
       return
     }
 
-    const owner = isOwner(conn, senderJid)
-    const admin = await isGroupAdmin(conn, groupJid, senderJid)
-
-    // Intentar borrar la notificación.
-    // Esto no garantiza que se elimine el estado original.
+    // Intentar eliminar la notificación y advertir en el grupo.
+    // No se expulsa ni se sanciona automáticamente a nadie.
     await tryDeleteNotification(conn, groupJid, msg)
+    await sendWarning(conn, groupJid, senderJid)
 
-    // El owner y los administradores no son expulsados.
-    if (owner || admin) return
-
-    // Verificar los permisos del bot.
-    const botAdmin = await isGroupAdmin(conn, groupJid, botJid)
-
-    if (!botAdmin) {
-      console.warn('[ANTIESTADO] El bot no es administrador:', groupJid)
-      return
-    }
-
-    try {
-      const result = await conn.groupParticipantsUpdate(
-        groupJid,
-        [senderJid],
-        'remove'
-      )
-
-      console.log('[ANTIESTADO] Resultado de expulsión:', result)
-
-      // Si la API devuelve un estado explícito de error,
-      // no publicar un aviso afirmando que fue expulsado.
-      const participantResult = Array.isArray(result)
-        ? result.find(p =>
-            p.jid === senderJid ||
-            p.id === senderJid ||
-            p.phoneNumber === senderJid
-          )
-        : null
-
-      const status = participantResult?.status
-
-      if (
-        status != null &&
-        String(status) !== '200'
-      ) {
-        console.warn(
-          '[ANTIESTADO] WhatsApp devolvió un estado no exitoso:',
-          participantResult
-        )
-        return
-      }
-
-      // Separado de la expulsión para que un error del aviso
-      // no se confunda con un error al expulsar.
-      await sendRemovalNotice(conn, groupJid, senderJid)
-
-    } catch (error) {
-      console.error('[ANTIESTADO] No se pudo expulsar al usuario:', error)
-    }
   } catch (error) {
     console.error('[ANTIESTADO] Error procesando mención:', error)
   }
@@ -351,8 +254,7 @@ function registerListeners(conn) {
     }
   })
 
-  // Solo funcionará si la versión o el fork de Baileys
-  // emite este evento.
+  // Funciona solo si la versión o el fork de Baileys emite este evento.
   conn.ev.on('GroupStatusMention', async event => {
     await processGroupStatusMention(conn, event)
   })
@@ -372,8 +274,43 @@ const handler = async (m, { conn, command }) => {
   }
 
   const sender = normalizeJid(conn, m.sender)
-  const owner = isOwner(conn, sender)
-  const admin = await isGroupAdmin(conn, m.chat, sender)
+  const owners = global.owner || []
+  const senderDigits = digits(sender)
+
+  const owner = owners.some(item => {
+    const value = Array.isArray(item) ? item[0] : item
+    return typeof value === 'string' &&
+      digits(value) === senderDigits &&
+      senderDigits !== ''
+  })
+
+  let admin = false
+
+  try {
+    const metadata = await conn.groupMetadata(m.chat)
+    const participant = (metadata.participants || []).find(p => {
+      const ids = [p.id, p.jid, p.phoneNumber, p.lid].filter(Boolean)
+      return ids.some(id =>
+        normalizeJid(conn, id) === sender ||
+        (
+          digits(id) &&
+          digits(id) === senderDigits
+        )
+      )
+    })
+
+    admin = Boolean(
+      participant &&
+      (
+        participant.admin === 'admin' ||
+        participant.admin === 'superadmin' ||
+        participant.isAdmin ||
+        participant.isSuperAdmin
+      )
+    )
+  } catch (error) {
+    console.error('[ANTIESTADO] Error comprobando permisos:', error)
+  }
 
   if (!owner && !admin) {
     return m.reply(
@@ -391,26 +328,19 @@ const handler = async (m, { conn, command }) => {
     enabled
       ? `╭━━━〔 🛡️ ANTIESTADO ACTIVADO 〕━━━⬣
 
-✅ La protección de este grupo está activada.
+✅ Protección activada para este grupo.
 
-👁️ Se vigilarán las menciones al grupo en estados que Baileys permita detectar.
+📢 Si se detecta una mención de estado, el bot avisará en el grupo y mencionará a la persona.
 
-⚖️ *REGLAS DEL SISTEMA*
+👥 La regla se aplica a usuarios, administradores y owners por igual.
 
-👑 Owners y administradores: exentos de expulsión.
-🚫 Usuarios normales: podrán ser expulsados si se detecta la infracción y el bot tiene permisos.
-
-💠 La detección depende de los eventos que reciba el bot.
+⚠️ No se expulsa a nadie automáticamente.
 
 ╰━━━━━━━━━━━━━━━━⬣
         💜 WHATSAPP-BOT`
       : `╭━━━〔 🔓 ANTIESTADO DESACTIVADO 〕━━━⬣
 
-💤 La protección automática de este grupo quedó desactivada.
-
-📌 El sistema dejará de actuar mientras esté apagado.
-
-🛡️ Podrás volver a activarlo con .antiestado.
+💤 La protección quedó desactivada en este grupo.
 
 ╰━━━━━━━━━━━━━━━━⬣
         💜 WHATSAPP-BOT`

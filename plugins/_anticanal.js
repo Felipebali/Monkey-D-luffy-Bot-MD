@@ -1,4 +1,3 @@
-
 /**
  * 📂 plugins/anticanal.js
  * 🛡️ WHATSAPP-BOT — ANTICANAL ACTIVABLE
@@ -8,10 +7,10 @@
  * .anticanal on    Activar
  * .anticanal off   Desactivar
  *
- * Detecta enlaces whatsapp.com/channel/
- * Borra el mensaje y avisa al grupo.
- * No exceptúa administradores ni owner al detectar enlaces.
- * Solo administradores y owner pueden cambiar la configuración.
+ * 🚫 Elimina enlaces de canales enviados por usuarios comunes.
+ * 🛡️ Exceptúa administradores y superadministradores.
+ * 👑 Exceptúa owners.
+ * 🔐 Solo administradores y owners pueden cambiar la configuración.
  */
 
 import fs from 'fs'
@@ -56,10 +55,12 @@ const CANAL_REGEX =
 
 function obtenerTexto(m) {
   const msg = m.message || {}
+
   const contenido =
     msg.ephemeralMessage?.message ||
     msg.viewOnceMessage?.message ||
     msg.viewOnceMessageV2?.message ||
+    msg.viewOnceMessageV2Extension?.message ||
     msg
 
   return String(
@@ -77,27 +78,45 @@ function obtenerAutor(m) {
   return m.key?.participant || m.participant || m.sender || ''
 }
 
+function normalizarId(id) {
+  return String(id || '')
+    .split('@')[0]
+    .split(':')[0]
+    .replace(/\D/g, '')
+}
+
 function esOwner(sender) {
-  const numero = String(sender || '').split('@')[0].split(':')[0]
+  const numero = normalizarId(sender)
+  if (!numero) return false
 
   return (global.owner || []).some(owner => {
     const id = Array.isArray(owner) ? owner[0] : owner
-    return String(id || '').replace(/\D/g, '') === numero.replace(/\D/g, '')
+    return normalizarId(id) === numero
   })
 }
 
 async function esAdmin(conn, chat, sender) {
   try {
     const metadata = await conn.groupMetadata(chat)
+    const autor = String(sender || '')
+    const autorNumero = normalizarId(autor)
+
     const participante = metadata.participants.find(p => {
       const ids = [p.id, p.jid, p.lid].filter(Boolean)
+
       return ids.some(id => {
-        const a = String(id).split(':')[0]
-        const b = String(sender).split(':')[0]
-        return a === b ||
-          (a.includes('@s.whatsapp.net') &&
-           b.includes('@s.whatsapp.net') &&
-           a.split('@')[0] === b.split('@')[0])
+        const idTexto = String(id)
+
+        if (idTexto === autor) return true
+
+        if (
+          idTexto.includes('@s.whatsapp.net') &&
+          autor.includes('@s.whatsapp.net')
+        ) {
+          return normalizarId(idTexto) === autorNumero
+        }
+
+        return false
       })
     })
 
@@ -106,10 +125,14 @@ async function esAdmin(conn, chat, sender) {
       participante?.admin === 'superadmin'
     )
   } catch (e) {
-    console.error('[ANTICANAL] No se pudieron verificar administradores:', e)
+    console.error('[ANTICANAL] Error verificando administradores:', e)
     return false
   }
 }
+
+// ============================================================
+// 🔘 COMANDO .ANTICANAL
+// ============================================================
 
 const handler = async (m, { conn, command, args }) => {
   const chat = m.chat || m.key?.remoteJid
@@ -122,35 +145,46 @@ const handler = async (m, { conn, command, args }) => {
   const config = cargarConfig()
   const subcomando = String(args?.[0] || '').toLowerCase()
 
-  // ACTIVAR / DESACTIVAR
-  if (command === 'anticanal') {
-    if (!esOwner(sender) && !(await esAdmin(conn, chat, sender))) {
-      return m.reply(
-        '⛔ Solo los administradores del grupo o el owner pueden cambiar el anticanal.'
-      )
-    }
+  if (command !== 'anticanal') return
 
-    const estadoActual = config.grupos[chat] === true
-    let nuevoEstado
-
-    if (['on', 'activar', 'activado', 'si', 'sí'].includes(subcomando)) {
-      nuevoEstado = true
-    } else if (['off', 'desactivar', 'desactivado', 'no'].includes(subcomando)) {
-      nuevoEstado = false
-    } else {
-      nuevoEstado = !estadoActual
-    }
-
-    config.grupos[chat] = nuevoEstado
-    guardarConfig(config)
-
+  if (!esOwner(sender) && !(await esAdmin(conn, chat, sender))) {
     return m.reply(
-      nuevoEstado
-        ? '✅ Anticanal ACTIVADO.\n\n🚫 Se eliminarán los mensajes que contengan enlaces de canales de WhatsApp.'
-        : '🔕 Anticanal DESACTIVADO.\n\nLos enlaces de canales de WhatsApp ya no serán bloqueados.'
+      '⛔ Solo los administradores del grupo o el owner pueden cambiar el anticanal.'
     )
   }
+
+  const estadoActual = config.grupos[chat] === true
+  let nuevoEstado
+
+  if (['on', 'activar', 'activado', 'si', 'sí'].includes(subcomando)) {
+    nuevoEstado = true
+  } else if (
+    ['off', 'desactivar', 'desactivado', 'no'].includes(subcomando)
+  ) {
+    nuevoEstado = false
+  } else {
+    nuevoEstado = !estadoActual
+  }
+
+  config.grupos[chat] = nuevoEstado
+
+  try {
+    guardarConfig(config)
+  } catch (e) {
+    console.error('[ANTICANAL] Error guardando configuración:', e)
+    return m.reply('❌ No se pudo guardar la configuración del anticanal.')
+  }
+
+  return m.reply(
+    nuevoEstado
+      ? '✅ Anticanal ACTIVADO.\n\n🚫 Se eliminarán los enlaces de canales enviados por usuarios comunes.\n\n🛡️ Administradores y owners están exentos.'
+      : '🔕 Anticanal DESACTIVADO.\n\nLos enlaces de canales de WhatsApp ya no serán bloqueados.'
+  )
 }
+
+// ============================================================
+// 🚫 DETECCIÓN DE ENLACES
+// ============================================================
 
 handler.before = async function (m, { conn }) {
   try {
@@ -160,8 +194,6 @@ handler.before = async function (m, { conn }) {
     if (m.key?.fromMe) return
 
     const config = cargarConfig()
-
-    // Solo moderar grupos donde el anticanal está activado.
     if (config.grupos[chat] !== true) return
 
     const texto = limpiarTexto(obtenerTexto(m))
@@ -170,17 +202,25 @@ handler.before = async function (m, { conn }) {
     const autor = obtenerAutor(m)
     if (!autor || !m.key?.id) return
 
+    // 👑 Los owners pueden enviar enlaces.
+    if (esOwner(autor)) return
+
+    // 🛡️ Los administradores también están exentos.
+    if (await esAdmin(conn, chat, autor)) return
+
+    // 🚫 Eliminar mensaje de usuario común.
     let borrado = false
 
     try {
       await conn.sendMessage(chat, {
         delete: {
           remoteJid: chat,
-          fromMe: Boolean(m.key.fromMe),
+          fromMe: false,
           id: m.key.id,
           participant: autor
         }
       })
+
       borrado = true
     } catch (e) {
       console.error('[ANTICANAL] Error borrando mensaje:', e)
@@ -188,7 +228,7 @@ handler.before = async function (m, { conn }) {
 
     const aviso = borrado
       ? `🚫 @${autor.split('@')[0]}, no se permiten enlaces de canales de WhatsApp en este grupo.\n\n🗑️ Mensaje eliminado.`
-      : `🚫 @${autor.split('@')[0]}, no se permiten enlaces de canales de WhatsApp en este grupo.\n\n⚠️ No pude eliminar el mensaje. Verificá los permisos del bot.`
+      : `🚫 @${autor.split('@')[0]}, no se permiten enlaces de canales de WhatsApp en este grupo.\n\n⚠️ No pude eliminar el mensaje. Verificá que el bot sea administrador.`
 
     await conn.sendMessage(chat, {
       text: aviso,

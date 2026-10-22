@@ -1,4 +1,3 @@
-
 // 📂 plugins/grupo-configuracion.js
 // ⚙️ WHATSAPP-BOT — PANEL DE CONFIGURACIÓN DEL GRUPO
 
@@ -39,6 +38,27 @@ function getAntiEstadoValue(groupJid) {
     return data[groupJid] === true
   } catch (error) {
     console.error('[PANEL] Error leyendo antiestado.json:', error)
+    return false
+  }
+}
+
+// ============================================================
+// 🚫 ANTICANAL — BASE DE DATOS
+// ============================================================
+
+const anticanalFile = path.join('./database', 'anticanal.json')
+
+function getAntiCanalValue(groupJid) {
+  try {
+    if (!fs.existsSync(anticanalFile)) return false
+
+    const data = JSON.parse(
+      fs.readFileSync(anticanalFile, 'utf8')
+    )
+
+    return data.grupos?.[groupJid] === true
+  } catch (error) {
+    console.error('[PANEL] Error leyendo anticanal.json:', error)
     return false
   }
 }
@@ -106,6 +126,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
 
   const chat = global.db.data.chats[m.chat]
   const antiestado = getAntiEstadoValue(m.chat)
+  const anticanal = getAntiCanalValue(m.chat)
 
   const panel = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
@@ -141,6 +162,10 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🚨 AntiEstado
 └─ ${status(antiestado)}
    └─ *.antiestado*
+
+📢 AntiCanal
+└─ ${status(anticanal)}
+   └─ *.anticanal*
 
 ━━━━━━━━━━━━━━━━━━━━━━
 🛠️ *ADMINISTRACIÓN*
@@ -184,6 +209,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🛡️ .antispam
 ⚡ .antitagall
 🚨 .antiestado
+📢 .anticanal
 
 🎭 .evento
 👑 .modoadmin

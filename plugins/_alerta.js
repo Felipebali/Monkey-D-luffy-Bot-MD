@@ -2,7 +2,7 @@
 // 🚨 Sistema de Alertas — WhatsApp-Bot
 // ============================================================
 
-const grupoDestino = '120363410955044864@g.us'
+const grupoDestino = '120363410511426114@g.us'
 
 
 let handler = async (m, { conn, text }) => {

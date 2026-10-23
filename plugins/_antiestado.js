@@ -8,6 +8,10 @@ import path from 'path'
 
 const ARCHIVO = path.resolve('./database/antiestado.json')
 
+// ============================================================
+// 📁 CONFIGURACIÓN
+// ============================================================
+
 function leerConfig() {
   try {
     if (!fs.existsSync(ARCHIVO)) return {}
@@ -25,8 +29,15 @@ function guardarConfig(config) {
 }
 
 function digits(jid = '') {
-  return String(jid).split('@')[0].split(':')[0].replace(/\D/g, '')
+  return String(jid)
+    .split('@')[0]
+    .split(':')[0]
+    .replace(/\D/g, '')
 }
+
+// ============================================================
+// 👑 ADMINISTRADORES Y OWNERS
+// ============================================================
 
 function esAdminOOwner(m) {
   if (m.isAdmin || m.isOwner || m.isROwner) return true
@@ -40,6 +51,10 @@ function esAdminOOwner(m) {
   })
 }
 
+// ============================================================
+// 🚫 AVISO AL GRUPO
+// ============================================================
+
 async function sendWarning(conn, groupJid, senderJid) {
   try {
     await conn.sendMessage(groupJid, {
@@ -49,16 +64,16 @@ async function sendWarning(conn, groupJid, senderJid) {
 
 📢 *No se permiten estados mencionando a este grupo.*
 
-🛡️ Respetá las reglas del grupo y evitá publicar estados que lo mencionen.
+🛡️ Por favor, respetá las reglas del grupo y evitá publicar estados que lo mencionen.
 
 ╰━━━━━━━━━━━━━━━━⬣
         💜 WHATSAPP-BOT`,
       mentions: [senderJid]
     })
 
-    console.log('[ANTIESTADO] Aviso enviado.')
+    console.log('[ANTIESTADO] Aviso enviado al grupo.')
   } catch (error) {
-    console.error('[ANTIESTADO] Error enviando aviso:', error)
+    console.error('[ANTIESTADO] Error enviando el aviso:', error)
   }
 }
 
@@ -78,14 +93,15 @@ const handler = async (m, { conn }) => {
   const config = leerConfig()
   const grupo = m.chat
 
-  config[grupo] = !config[grupo]
+  config[grupo] = config[grupo] !== true
   guardarConfig(config)
 
+  // Sin quoted: no cita el comando .antiestado.
   await conn.sendMessage(m.chat, {
     text: config[grupo]
       ? '✅ *ANTIESTADO ACTIVADO*\n\n🛡️ Se vigilarán las menciones de estados detectables en este grupo.'
       : '❌ *ANTIESTADO DESACTIVADO*\n\nLa protección quedó desactivada.'
-  }, { quoted: m })
+  })
 }
 
 // ============================================================
@@ -103,6 +119,7 @@ handler.all = async function (m) {
     if (config[m.chat] !== true) return
 
     const mensaje = m.message || {}
+
     const tipo = String(
       m.mtype ||
       Object.keys(mensaje)[0] ||
@@ -123,8 +140,8 @@ handler.all = async function (m) {
 
     if (!senderJid) return
 
-    // Intentar eliminar el mensaje de mención del chat.
-    // Requiere que WhatsApp permita al bot eliminar ese mensaje.
+    // Intentar eliminar el mensaje de mención del grupo.
+    // Esto no elimina el estado original de WhatsApp.
     let eliminado = false
 
     try {
@@ -132,6 +149,7 @@ handler.all = async function (m) {
         await conn.sendMessage(m.chat, {
           delete: m.key
         })
+
         eliminado = true
       }
     } catch (error) {
@@ -144,12 +162,16 @@ handler.all = async function (m) {
     await sendWarning(conn, m.chat, senderJid)
 
     console.log(
-      `[ANTIESTADO] Mención detectada. Eliminación del mensaje: ${eliminado}`
+      `[ANTIESTADO] Mención detectada. Mensaje eliminado: ${eliminado}`
     )
   } catch (error) {
     console.error('[ANTIESTADO] Error procesando mensaje:', error)
   }
 }
+
+// ============================================================
+// ⚙️ COMANDOS
+// ============================================================
 
 handler.help = ['antiestado']
 handler.tags = ['group']

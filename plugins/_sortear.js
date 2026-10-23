@@ -1,192 +1,87 @@
 
 /**
- * 📂 plugins/_sortear.js
- * 🎉 WHATSAPP-BOT — SISTEMA DE SORTEOS
+ * 📂 plugins/_suicidarse.js
+ * 💙 WHATSAPP-BOT — SISTEMA DE APOYO Y PREVENCIÓN
  *
- * Comando:
- * .sortear <premio>
- *
- * Permisos:
- * • Exclusivo para owners del bot
- *
- * Características:
- * • Selección aleatoria segura
- * • Excluye al bot
- * • Evita participantes duplicados
- * • Menciona al ganador
- * • Sin citar el mensaje original
+ * Comando: .suicidarse
+ * Disponible: grupos
+ * Objetivo: ofrecer apoyo y orientar hacia ayuda humana
  */
 
-const handler = async (m, { conn, args, groupMetadata }) => {
+const mensajesApoyo = [
+  '💙 No tienes que resolverlo todo en este momento. Mereces apoyo y compañía.',
+  '🫂 No tienes que pasar por un momento difícil en soledad. Hablar con alguien de confianza puede ayudar.',
+  '🌱 Lo que estás sintiendo merece ser escuchado. No tengas miedo de pedir ayuda.',
+  '💙 Tu vida importa. Mereces que te escuchen sin juzgarte.',
+  '🤍 Está bien no sentirse bien todo el tiempo. Busca a alguien de confianza y cuéntale cómo te encuentras.',
+  '🌤️ No necesitas tener todas las respuestas hoy. Da un paso a la vez y permite que alguien te acompañe.',
+  '🫶 Pedir ayuda no es una debilidad. Mereces cuidado, respeto y apoyo.'
+]
+
+const elegirAleatorio = (lista) =>
+  lista[Math.floor(Math.random() * lista.length)]
+
+const handler = async (m, { conn }) => {
+  if (!m.isGroup) {
+    return conn.sendMessage(m.chat, {
+      text: '💙 Este comando de apoyo está disponible en los grupos.'
+    })
+  }
+
   try {
-    // ========================================================
-    // 🔐 VALIDACIONES
-    // ========================================================
-
-    if (!m.isGroup) {
-      return conn.sendMessage(m.chat, {
-        text: '⚠️ Este comando solo puede utilizarse dentro de un grupo.'
-      })
-    }
-
-    // ========================================================
-    // 👑 VERIFICAR OWNERS DESDE global.owner
-    // ========================================================
-
-    const normalizeJid = value => {
-      if (!value) return ''
-
-      try {
-        if (typeof conn.decodeJid === 'function') {
-          value = conn.decodeJid(value)
-        }
-      } catch {}
-
-      return String(value || '').trim()
-    }
-
-    const normalizeNumber = value => normalizeJid(value)
-      .split('@')[0]
-      .split(':')[0]
-      .replace(/\D/g, '')
-
-    const owners = (Array.isArray(global.owner) ? global.owner : [])
-      .map(owner => {
-        if (Array.isArray(owner)) owner = owner[0]
-
-        if (typeof owner !== 'string' && typeof owner !== 'number') {
-          return ''
-        }
-
-        return normalizeNumber(owner)
-      })
-      .filter(Boolean)
-
-    const senderNumber = normalizeNumber(m.sender)
-
-    if (!owners.includes(senderNumber)) {
-      return conn.sendMessage(m.chat, {
-        text: '⛔ *ACCESO DENEGADO*\n\nEste comando está reservado exclusivamente para los owners del bot.',
-        mentions: [m.sender]
-      })
-    }
-
-    // ========================================================
-    // 🎁 VALIDAR PREMIO
-    // ========================================================
-
-    const premio = args.join(' ').trim()
-
-    if (!premio) {
-      return conn.sendMessage(m.chat, {
-        text: [
-          '╭━━━〔 🎉 *SISTEMA DE SORTEOS* 〕━━━⬣',
-          '',
-          'Para iniciar un sorteo, debes especificar el premio.',
-          '',
-          '📌 *Uso:* .sortear <premio>',
-          '💡 *Ejemplo:* .sortear Auriculares',
-          '',
-          '╰━━━━━━━━━━━━━━━━━━━━⬣'
-        ].join('\n')
-      })
-    }
-
-    // ========================================================
-    // 👥 OBTENER PARTICIPANTES
-    // ========================================================
-
-    const metadata = groupMetadata || await conn.groupMetadata(m.chat)
-    const participantes = metadata?.participants || []
-
-    const botJid = normalizeJid(
-      conn.user?.id || conn.user?.jid || ''
-    )
-
-    const botNumber = normalizeNumber(botJid)
-
-    // Normalizar y eliminar duplicados
-    const unicos = new Map()
-
-    for (const participante of participantes) {
-      const id = normalizeJid(
-        participante.id || participante.jid
-      )
-
-      const numero = normalizeNumber(id)
-
-      if (!id || !numero || numero === botNumber) continue
-
-      if (!unicos.has(numero)) {
-        unicos.set(numero, id)
-      }
-    }
-
-    const candidatos = [...unicos.values()]
-
-    if (candidatos.length === 0) {
-      return conn.sendMessage(m.chat, {
-        text: '⚠️ No hay participantes válidos para realizar el sorteo.'
-      })
-    }
-
-    // ========================================================
-    // 🎯 SELECCIÓN ALEATORIA
-    // ========================================================
-
-    // crypto.randomInt proporciona una selección aleatoria uniforme.
-    const { randomInt } = await import('crypto')
-    const indiceGanador = randomInt(0, candidatos.length)
-    const ganador = candidatos[indiceGanador]
-
-    const ganadorNumero = normalizeNumber(ganador)
-
-    // ========================================================
-    // 🏆 ANUNCIO DEL GANADOR
-    // ========================================================
-
-    const nombreGrupo = metadata?.subject || 'Grupo'
+    const usuario = m.sender
+    const frase = elegirAleatorio(mensajesApoyo)
 
     const mensaje = [
-      '╭━━━〔 🎉 *SORTEO OFICIAL* 〕━━━⬣',
+      '╭━━━〔 💙 ESPACIO DE APOYO 〕━━━⬣',
       '',
-      `🏆 *Premio:* ${premio}`,
-      `📍 *Grupo:* ${nombreGrupo}`,
-      `👥 *Participantes elegibles:* ${candidatos.length}`,
+      `🫂 @${usuario.split('@')[0]}, queremos recordarte algo importante:`,
       '',
-      '🎊 *¡TENEMOS UN GANADOR!*',
-      '',
-      `🥇 *Ganador:* @${ganadorNumero}`,
-      '',
-      '👏 ¡Felicitaciones! Gracias a todos por participar.',
+      frase,
       '',
       '━━━━━━━━━━━━━━━━━━━━',
-      '🎲 _Sorteo realizado por WHATSAPP-BOT_',
-      '╰━━━━━━━━━━━━━━━━━━━━⬣'
+      '💬 *NO TIENES QUE AFRONTARLO A SOLAS*',
+      '',
+      'Si este tema tiene que ver con cómo te estás sintiendo, intenta hablar con alguien de confianza y decirle claramente que necesitas compañía y ayuda.',
+      '',
+      '🇺🇾 *AYUDA EN URUGUAY*',
+      '',
+      '📞 *Línea Vida: 0800 0767 o *0767 desde celular.*',
+      '🚨 *Emergencia inmediata: 911.*',
+      '',
+      'Si existe peligro inmediato, busca a una persona que pueda quedarse contigo y contacta los servicios de emergencia.',
+      '',
+      '💙 _Tu bienestar importa. Mereces ser escuchado/a._',
+      '',
+      '╰━━━━━━━━━━━━━━━━━━━━⬣',
+      '_WHATSAPP-BOT | Apoyo y prevención_'
     ].join('\n')
 
-    return await conn.sendMessage(m.chat, {
+    await conn.sendMessage(m.chat, {
       text: mensaje,
-      mentions: [ganador]
+      mentions: [usuario]
     })
 
-  } catch (error) {
-    console.error('[WHATSAPP-BOT SORTEDOR] Error:', error)
+    // Reacción de apoyo
+    await conn.sendMessage(m.chat, {
+      react: {
+        text: '💙',
+        key: m.key
+      }
+    }).catch(() => {})
 
-    return conn.sendMessage(m.chat, {
-      text: '❌ No se pudo completar el sorteo. Inténtalo nuevamente.'
+  } catch (error) {
+    console.error('[WHATSAPP-BOT | APOYO Y PREVENCIÓN]', error)
+
+    await conn.sendMessage(m.chat, {
+      text: '💙 No pudimos mostrar el mensaje completo. Si alguien necesita ayuda, puede acudir a una persona de confianza o a los servicios de emergencia.'
     }).catch(() => {})
   }
 }
 
-// ============================================================
-// ⚙️ CONFIGURACIÓN DEL COMANDO
-// ============================================================
-
-handler.help = ['sortear <premio>']
-handler.tags = ['owner']
-handler.command = ['sortear']
+handler.help = ['suicidarse']
+handler.tags = ['prevencion']
+handler.command = ['suicidarse']
 handler.group = true
-handler.rowner = true
 
 export default handler

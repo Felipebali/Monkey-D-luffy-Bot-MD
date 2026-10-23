@@ -3,28 +3,25 @@
  * 📂 plugins/_link.js
  * 🔗 WHATSAPP-BOT — ENLACE DEL GRUPO
  *
- * 👑 Owners definidos en global.owner
- * 😂 Descansa a los demás, sin expulsarlos.
+ * 👑 Solo owners de global.owner
+ * 😂 Descansada con mención, sin citar ni expulsar
  */
 
 const handler = async (m, { conn, isBotAdmin }) => {
   if (!m.isGroup) {
-    return conn.reply(
-      m.chat,
-      '❗ Este comando solo puede usarse dentro de grupos.',
-      m
-    )
+    return conn.sendMessage(m.chat, {
+      text: '❗ Este comando solo puede usarse dentro de grupos.'
+    })
   }
 
   // 👑 Obtener owners desde global.owner
   const owners = (global.owner || []).map(owner => {
     if (Array.isArray(owner)) owner = owner[0]
 
-    return String(owner)
-      .replace(/[^0-9]/g, '')
+    return String(owner).replace(/[^0-9]/g, '')
   })
 
-  // 🔎 Normalizar el número del remitente
+  // 🔎 Normalizar el número del usuario
   const senderNumber = String(m.sender || '')
     .split('@')[0]
     .split(':')[0]
@@ -32,7 +29,7 @@ const handler = async (m, { conn, isBotAdmin }) => {
 
   const isOwner = owners.includes(senderNumber)
 
-  // 😂 Descansada para quien no sea owner (sin expulsión)
+  // 😂 Descansar al usuario sin citar el mensaje
   if (!isOwner) {
     await conn.sendMessage(m.chat, {
       react: {
@@ -42,27 +39,30 @@ const handler = async (m, { conn, isBotAdmin }) => {
     }).catch(() => {})
 
     const descansadas = [
-      `💀 *${m.pushName || 'Usuario'}*, ¿quién te dio permiso para pedir el link? JAJAJA. 😂`,
-      '😹 El enlace es exclusivo de los owners. Volvé a tu asiento, campeón. 🪑',
-      '☠️ Mucha confianza para tan pocos permisos. JAJAJA. 🐾',
-      '😂 ¿Querés el link? Primero desbloqueá el rango de owner, máquina. 👑',
-      '🐒 Tranquilo, crack... el enlace no se va a escapar. 🤣'
+      '¿Quién te dio permiso para pedir el link? JAJAJA. 😂',
+      'El enlace es exclusivo de los owners. Volvé a tu asiento, campeón. 🪑',
+      'Mucha confianza para tan pocos permisos. JAJAJA. 🐾',
+      '¿Querés el link? Primero desbloqueá el rango de owner, máquina. 👑',
+      'Tranquilo, crack... el enlace no se va a escapar. 🤣'
     ]
 
-    const texto = descansadas[
+    const descanso = descansadas[
       Math.floor(Math.random() * descansadas.length)
     ]
 
-    return conn.reply(m.chat, texto, m)
+    const nombre = m.pushName || 'Usuario'
+
+    return conn.sendMessage(m.chat, {
+      text: `☠️ @${senderNumber}\n\n💀 *${nombre}*, ${descanso}`,
+      mentions: [m.sender]
+    })
   }
 
   // 🛡️ El bot necesita ser administrador
   if (!isBotAdmin) {
-    return conn.reply(
-      m.chat,
-      '❗ Necesito ser *administrador del grupo* para obtener el enlace.',
-      m
-    )
+    return conn.sendMessage(m.chat, {
+      text: '❗ Necesito ser *administrador del grupo* para obtener el enlace.'
+    })
   }
 
   try {
@@ -101,15 +101,14 @@ ${frase}
 🐾 *WHATSAPP-BOT — Conectando grupos*
 `.trim()
 
-    return conn.reply(m.chat, texto, m)
+    // Sin citar el mensaje del comando
+    return conn.sendMessage(m.chat, { text: texto })
   } catch (err) {
     console.error('[LINK] Error obteniendo el enlace:', err)
 
-    return conn.reply(
-      m.chat,
-      '❗ No pude obtener el enlace. Verificá que el bot sea administrador del grupo.',
-      m
-    )
+    return conn.sendMessage(m.chat, {
+      text: '❗ No pude obtener el enlace. Verificá que el bot sea administrador del grupo.'
+    })
   }
 }
 

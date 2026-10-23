@@ -1,5 +1,8 @@
-// 📂 plugins/grupo-configuracion.js
-// ⚙️ WHATSAPP-BOT — PANEL DE CONFIGURACIÓN DEL GRUPO
+
+/**
+ * 📂 plugins/grupo-configuracion.js
+ * ⚙️ WHATSAPP-BOT — PANEL DE CONFIGURACIÓN DEL GRUPO
+ */
 
 import fs from 'fs'
 import path from 'path'
@@ -22,10 +25,17 @@ const aliasMap = {
 }
 
 // ============================================================
-// 🛡️ ANTIESTADO — BASE DE DATOS
+// 📁 ARCHIVOS DE CONFIGURACIÓN
 // ============================================================
 
 const antiestadoFile = path.join('./database', 'antiestado.json')
+const anticanalFile = path.join('./database', 'anticanal.json')
+const antilink2File = path.join('./database', 'antilink2.json')
+
+// ============================================================
+// 🛡️ ANTIESTADO
+// Formato esperado: { "ID_DEL_GRUPO@g.us": true }
+// ============================================================
 
 function getAntiEstadoValue(groupJid) {
   try {
@@ -43,10 +53,9 @@ function getAntiEstadoValue(groupJid) {
 }
 
 // ============================================================
-// 🚫 ANTICANAL — BASE DE DATOS
+// 📢 ANTICANAL
+// Formato esperado: { "grupos": { "ID_DEL_GRUPO@g.us": true } }
 // ============================================================
-
-const anticanalFile = path.join('./database', 'anticanal.json')
 
 function getAntiCanalValue(groupJid) {
   try {
@@ -64,7 +73,27 @@ function getAntiCanalValue(groupJid) {
 }
 
 // ============================================================
-// 🔎 OBTENER ESTADO
+// 🌍 ANTILINK2 — ENLACES SOCIALES
+// Formato esperado: { "grupos": { "ID_DEL_GRUPO@g.us": true } }
+// ============================================================
+
+function getAntiLink2Value(groupJid) {
+  try {
+    if (!fs.existsSync(antilink2File)) return false
+
+    const data = JSON.parse(
+      fs.readFileSync(antilink2File, 'utf8')
+    )
+
+    return data.grupos?.[groupJid] === true
+  } catch (error) {
+    console.error('[PANEL] Error leyendo antilink2.json:', error)
+    return false
+  }
+}
+
+// ============================================================
+// 🔎 OBTENER ESTADO DESDE LA BASE DE DATOS
 // ============================================================
 
 function getChatValue(chat, key) {
@@ -76,7 +105,7 @@ function getChatValue(chat, key) {
     if (chat[k] !== undefined) {
       const value = chat[k]
 
-      return (
+      if (
         value === true ||
         value === 1 ||
         value === '1' ||
@@ -84,7 +113,20 @@ function getChatValue(chat, key) {
         value === 'true' ||
         value === 'activo' ||
         value === 'activado'
-      )
+      ) {
+        return true
+      }
+
+      if (
+        value === false ||
+        value === 0 ||
+        value === '0' ||
+        value === 'off' ||
+        value === 'false' ||
+        value === 'desactivado'
+      ) {
+        return false
+      }
     }
   }
 
@@ -92,7 +134,7 @@ function getChatValue(chat, key) {
 }
 
 // ============================================================
-// 🟢 / 🔴 ESTADO
+// 🟢 / 🔴 MOSTRAR ESTADO
 // ============================================================
 
 function status(value) {
@@ -100,7 +142,7 @@ function status(value) {
 }
 
 // ============================================================
-// 🚀 HANDLER
+// 🚀 HANDLER DEL PANEL
 // ============================================================
 
 const handler = async (m, { isAdmin, isOwner }) => {
@@ -125,8 +167,11 @@ const handler = async (m, { isAdmin, isOwner }) => {
   }
 
   const chat = global.db.data.chats[m.chat]
+
+  // Leer estados de archivos independientes
   const antiestado = getAntiEstadoValue(m.chat)
   const anticanal = getAntiCanalValue(m.chat)
+  const antilink2 = getAntiLink2Value(m.chat)
 
   const panel = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
@@ -144,7 +189,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
    └─ *.antilink*
 
 🌍 AntiLink Social
-└─ ${status(getChatValue(chat, 'antilink2'))}
+└─ ${status(antilink2)}
    └─ *.antilink2*
 
 🚫 AntiFake
@@ -242,7 +287,7 @@ Volvés a usar:
 }
 
 // ============================================================
-// 📚 AYUDA
+// 📚 AYUDA Y COMANDOS
 // ============================================================
 
 handler.help = ['panel', 'config']

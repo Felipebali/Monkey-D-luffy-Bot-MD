@@ -1,24 +1,26 @@
-// 📂 plugins/_modoadmin-filter.js
-// 🛡️ FELIXCAT BOT — MODO ADMINISTRADOR
-// 🔒 Bloquea comandos para usuarios que no sean Admin/Owner
+
+/**
+ * 📂 plugins/_modoadmin-filter.js
+ * 🛡️ WHATSAPP-BOT — MODO ADMINISTRADOR
+ *
+ * .modoadmin → Activar / desactivar
+ *
+ * • Solo admins y owners pueden cambiar el estado
+ * • Los usuarios normales no pueden ejecutar comandos
+ *   mientras esté activado
+ * • Comandos permitidos: .modoadmin, .menu y .bot
+ * • Permite agregar comandos a chat.modoadminAllow
+ */
 
 // ============================================================
 // 👑 OBTENER OWNERS
 // ============================================================
 
 function getOwners() {
-
   return (global.owner || [])
-    .map(owner =>
-      Array.isArray(owner)
-        ? owner[0]
-        : owner
-    )
+    .map(owner => Array.isArray(owner) ? owner[0] : owner)
     .filter(Boolean)
-    .map(owner =>
-      String(owner)
-        .replace(/\D/g, '')
-    )
+    .map(owner => String(owner).replace(/\D/g, ''))
     .filter(Boolean)
 }
 
@@ -27,7 +29,6 @@ function getOwners() {
 // ============================================================
 
 function normalizeJid(jid) {
-
   if (!jid) return ''
 
   return String(jid)
@@ -40,93 +41,81 @@ function normalizeJid(jid) {
 // ============================================================
 
 function isGlobalOwner(jid) {
-
-  const number =
-    normalizeJid(jid)
-      .replace(/\D/g, '')
-
-  return getOwners()
-    .includes(number)
+  const number = normalizeJid(jid).replace(/\D/g, '')
+  return getOwners().includes(number)
 }
 
 // ============================================================
-// 🚀 HANDLER
+// 🔘 COMANDO .MODOADMIN — ACTIVAR / DESACTIVAR
 // ============================================================
 
-let handler = async (
-  m,
-  {
-    conn,
-    isAdmin,
-    isOwner
-  }
-) => {
-
+let handler = async (m, { conn, isAdmin, isOwner }) => {
   try {
-
-    // ========================================================
-    // 👥 SOLO GRUPOS
-    // ========================================================
-
-    if (!m.isGroup) return
-
-    // ========================================================
-    // 📂 DATOS DEL GRUPO
-    // ========================================================
+    if (!m.isGroup) {
+      return m.reply('⚠️ Este comando solo funciona en grupos.')
+    }
 
     const chat =
-      global.db?.data?.chats?.[m.chat]
+      global.db.data.chats[m.chat] ||
+      (global.db.data.chats[m.chat] = {})
 
-    if (!chat) return
+    const owner =
+      isOwner || isGlobalOwner(m.sender)
 
-    // ========================================================
-    // 🔘 MODO ADMIN DESACTIVADO
-    // ========================================================
+    // Solo admins y owners pueden cambiarlo
+    if (!owner && !isAdmin) {
+      return m.reply(
+        '⛔ Solo los administradores y owners pueden activar o desactivar el modo admin.'
+      )
+    }
 
-    if (!chat.modoadmin) return
+    // Alternar estado
+    chat.modoadmin = !chat.modoadmin
 
-    // ========================================================
-    // 📝 OBTENER TEXTO
-    // ========================================================
+    return conn.sendMessage(m.chat, {
+      text: chat.modoadmin
+        ? '🔒 *MODO ADMIN ACTIVADO*\n\n🚫 Solo los administradores y owners pueden utilizar comandos.\n\n✅ Comandos permitidos para todos: .modoadmin, .menu y .bot'
+        : '🔓 *MODO ADMIN DESACTIVADO*\n\n✅ Los usuarios pueden volver a utilizar los comandos normalmente.'
+    })
 
+  } catch (e) {
+    console.error('❌ Error en comando modoadmin:', e)
+    return m.reply('❌ Ocurrió un error al cambiar el modo admin.')
+  }
+}
+
+handler.command = /^modoadmin$/i
+handler.group = true
+
+// ============================================================
+// 🛡️ FILTRO GLOBAL DE COMANDOS
+// ============================================================
+
+handler.all = async function (m, { conn, isAdmin, isOwner }) {
+  try {
+    if (!m.isGroup) return
+    if (m.key?.fromMe) return
     if (!m.text) return
 
-    const body =
-      String(m.text).trim()
+    const chat = global.db?.data?.chats?.[m.chat]
 
-    if (!body) return
+    // Modo admin desactivado
+    if (!chat?.modoadmin) return
 
-    // ========================================================
-    // 🔎 SOLO COMANDOS
-    // ========================================================
+    const body = String(m.text).trim()
 
+    // Solo filtrar comandos con prefijo punto
     if (!body.startsWith('.')) return
 
-    // ========================================================
-    // 🧹 LIMPIAR COMANDO
-    // ========================================================
-
-    const command =
-      body
-        .slice(1)
-        .trim()
-        .split(/\s+/)[0]
-        .toLowerCase()
+    const command = body
+      .slice(1)
+      .trim()
+      .split(/\s+/)[0]
+      .toLowerCase()
 
     if (!command) return
 
-    // ========================================================
-    // 📋 COMANDOS PERMITIDOS
-    // ========================================================
-    //
-    // Estos funcionan aunque Modo Admin esté activo.
-    //
-    // Se pueden agregar comandos desde:
-    //
-    // chat.modoadminAllow = ['menu', 'bot']
-    //
-    // ========================================================
-
+    // Comandos permitidos aunque el modo admin esté activo
     const permitidosBase = [
       'modoadmin',
       'menu',
@@ -136,95 +125,47 @@ let handler = async (
     const permitidosExtra =
       Array.isArray(chat.modoadminAllow)
         ? chat.modoadminAllow
-            .map(x =>
-              String(x)
-                .toLowerCase()
-                .trim()
-            )
+            .map(x => String(x).toLowerCase().trim())
             .filter(Boolean)
         : []
 
     const permitidos = [
-      ...new Set([
-        ...permitidosBase,
-        ...permitidosExtra
-      ])
+      ...new Set([...permitidosBase, ...permitidosExtra])
     ]
 
-    // ========================================================
-    // ✅ COMANDO PERMITIDO
-    // ========================================================
+    if (permitidos.includes(command)) return
 
-    if (
-      permitidos.includes(command)
-    ) {
-      return
-    }
+    // Owners con acceso total
+    if (isOwner || isGlobalOwner(m.sender)) return
 
-    // ========================================================
-    // 👑 OWNER → ACCESO TOTAL
-    // ========================================================
+    // Administradores con acceso total
+    if (isAdmin) return
 
-    const globalOwner =
-      isGlobalOwner(m.sender)
+    // Bloquear al usuario normal
+    await conn.sendMessage(m.chat, {
+      text:
+        `🚫 *MODO ADMIN ACTIVADO*\n\n` +
+        `👑 Solo los administradores pueden utilizar comandos.\n\n` +
+        `⛔ Comando bloqueado: *.${command}*\n\n` +
+        `💡 Pedile a un administrador que desactive el modo admin.`,
+      mentions: [m.sender]
+    })
 
-    if (
-      isOwner ||
-      globalOwner
-    ) {
-      return
-    }
-
-    // ========================================================
-    // 🛡️ ADMIN → ACCESO TOTAL
-    // ========================================================
-
-    if (isAdmin) {
-      return
-    }
-
-    // ========================================================
-    // 🚫 USUARIO NORMAL → BLOQUEAR
-    // ========================================================
-
-    await conn.reply(
-      m.chat,
-`🚫 *MODO ADMIN ACTIVADO*
-
-━━━━━━━━━━━━━━━━━━
-
-👑 Solo los administradores pueden utilizar comandos.
-
-⛔ *Comando bloqueado:*
-*.${command}*
-
-━━━━━━━━━━━━━━━━━━
-
-💡 Si necesitás utilizar un comando, pedile a un administrador que desactive el modo admin.`,
-      m
-    )
-
-    // ========================================================
-    // 🔥 BLOQUEO REAL
-    // ========================================================
-
+    // Detiene el procesamiento si el cargador respeta el retorno true
     return true
 
   } catch (e) {
-
-    console.error(
-      '❌ Error en _modoadmin-filter:',
-      e
-    )
-
-    return
+    console.error('❌ Error en filtro modoadmin:', e)
   }
 }
 
 // ============================================================
-// ⚙️ LOADER
+// 📌 EXPORTACIÓN
 // ============================================================
 
-handler.all = true
+handler.help = ['modoadmin']
+handler.tags = ['group']
+handler.command = /^modoadmin$/i
+handler.group = true
 
 export default handler

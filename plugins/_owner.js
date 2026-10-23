@@ -1,124 +1,109 @@
-// 📂 plugins/owner.js
-// 👑 SISTEMA DE PROPIETARIOS
-// ✨ Diseño premium + menciones + validación
-// ============================================================
 
+ // 📂 plugins/owner.js
+ // 👑 WHATSAPP-BOT — OWNERS PREMIUM
+ // ✨ Angee 🧸🩷 & Pipe 🥶
+ 
 let handler = async (m, { conn }) => {
-
-  // ==========================================================
-  // ⚙️ CONFIGURACIÓN
-  // ==========================================================
-
   if (!Array.isArray(global.owner) || global.owner.length === 0) {
     return m.reply(
-      '╭━━━〔 ⚠️ 〕━━━╮\n' +
-      '   *SIN PROPIETARIOS*\n' +
-      '╰━━━━━━━━━━━━━━╯\n\n' +
-      '❌ No hay owners configurados actualmente.'
+      '╭━━━〔 ⚠️ SISTEMA DE OWNERS 〕━━━╮\n' +
+      '┃\n' +
+      '┃ ❌ No hay propietarios configurados.\n' +
+      '┃\n' +
+      '╰━━━━━━━━━━━━━━━━━━━━━━╯'
     )
   }
 
-  // Mostrar un máximo de 3 propietarios
-  const owners = global.owner.slice(0, 2)
-
+  const owners = global.owner
   const mentions = []
   const tarjetas = []
 
-  // ==========================================================
-  // 👑 GENERAR TARJETAS DE OWNERS
-  // ==========================================================
+  const normalizar = (valor) => String(valor || '')
+    .trim()
+    .replace(/@s\.whatsapp\.net/gi, '')
+    .replace(/@c\.us/gi, '')
+    .replace(/@lid/gi, '')
+    .replace(/:\d+$/g, '')
+    .replace(/\D/g, '')
 
   for (let i = 0; i < owners.length; i++) {
-
     const data = owners[i]
+    const numeroOriginal = Array.isArray(data) ? data[0] : data
+    const nombreOriginal = Array.isArray(data) ? data[1] : null
 
-    const numeroOriginal = Array.isArray(data)
-      ? data[0]
-      : data
+    const numero = normalizar(numeroOriginal)
 
-    const nombreOriginal = Array.isArray(data)
-      ? data[1]
-      : null
+    if (!numero || numero.length < 7 || numero.length > 15) continue
 
-    const numero = String(numeroOriginal || '')
-      .trim()
-      .replace(/@s\.whatsapp\.net/gi, '')
-      .replace(/@c\.us/gi, '')
-      .replace(/\D/g, '')
+    const nombreConfig = String(nombreOriginal || '').trim()
+    const nombreLower = nombreConfig.toLowerCase()
 
-    // Evitar crear menciones vacías o incorrectas
-    if (!numero || numero.length < 7 || numero.length > 15) {
-      continue
+    // Personalización para Angee y Pipe
+    let nombre = nombreConfig || `Owner ${i + 1}`
+    let emoji = '👑'
+    let rol = 'Propietario oficial'
+    let estilo = '💠'
+
+    if (nombreLower.includes('angee') || nombreLower.includes('angelina')) {
+      nombre = 'Angee 🧸🩷'
+      emoji = '🎀'
+      rol = 'Propietaria oficial'
+      estilo = '🌸'
+    } else if (
+      nombreLower.includes('pipe') ||
+      nombreLower.includes('felipe')
+    ) {
+      nombre = 'Pipe 🥶'
+      emoji = '⚡'
+      rol = 'Propietario oficial'
+      estilo = '❄️'
     }
 
-    const nombre = String(
-      nombreOriginal || `Owner ${i + 1}`
-    ).trim().slice(0, 60)
-
     const jid = `${numero}@s.whatsapp.net`
-
     mentions.push(jid)
 
     tarjetas.push(
-      `╭━━━〔 👑 〕━━━╮\n` +
-      `┃ *${nombre || `Owner ${i + 1}`}*\n` +
+      `╭━━━〔 ${emoji} OWNER ${String(i + 1).padStart(2, '0')} 〕━━━╮\n` +
+      `┃\n` +
+      `┃ ${estilo} *${nombre}*\n` +
       `┃\n` +
       `┃ 📱 @${numero}\n` +
-      `┃ 🛡️ Propietario oficial\n` +
-      `╰━━━━━━━━━━━━━━╯`
+      `┃ ${emoji} ${rol}\n` +
+      `┃ 🔐 Acceso de propietario\n` +
+      `┃\n` +
+      `╰━━━━━━━━━━━━━━━━━━━━━━╯`
     )
   }
-
-  // ==========================================================
-  // 🛑 COMPROBAR RESULTADOS
-  // ==========================================================
 
   if (tarjetas.length === 0) {
     return m.reply(
-      '❌ No se encontraron propietarios con números válidos.'
+      '╭━━━〔 ⚠️ 〕━━━╮\n' +
+      '┃ No se encontraron owners con números válidos.\n' +
+      '╰━━━━━━━━━━━━━━╯'
     )
   }
 
-  // ==========================================================
-  // 🎨 ENCABEZADO Y PIE
-  // ==========================================================
-
   const encabezado =
-    `╭━━━〔 ✨ 〕━━━╮\n` +
-    `   *LISTA DE OWNERS*\n` +
-    `╰━━━━━━━━━━━━━━╯\n\n` +
-    `👑 *Equipo de administración*\n` +
-    `🔐 Usuarios autorizados como propietarios\n\n`
+    `╭━━━〔 👑 WHATSAPP-BOT 〕━━━╮\n` +
+    `┃\n` +
+    `┃ ✨ *EQUIPO DE PROPIETARIOS*\n` +
+    `┃ 🛡️ Administración oficial del bot\n` +
+    `┃ 💜 Confianza · Control · Seguridad\n` +
+    `┃\n` +
+    `╰━━━━━━━━━━━━━━━━━━━━━━╯\n\n`
 
   const pie =
-    `\n\n━━━━━━━━━━━━━━━━━━\n` +
-    `👥 *Total:* ${tarjetas.length} ${tarjetas.length === 1 ? 'propietario' : 'propietarios'}\n` +
-    `⚙️ *Estado:* Configuración activa`
+    `\n\n╭━━━〔 📊 ESTADÍSTICAS 〕━━━╮\n` +
+    `┃ 👥 Total: *${tarjetas.length}* ${tarjetas.length === 1 ? 'propietario' : 'propietarios'}\n` +
+    `┃ 🟢 Estado: *Configuración activa*\n` +
+    `┃ 🤖 Bot: *WHATSAPP-BOT*\n` +
+    `╰━━━━━━━━━━━━━━━━━━━━━━╯`
 
-  const texto =
-    encabezado +
-    tarjetas.join('\n\n') +
-    pie
-
-  // ==========================================================
-  // 📤 ENVIAR MENSAJE
-  // ==========================================================
-
-  return conn.sendMessage(
-    m.chat,
-    {
-      text: texto,
-      mentions
-    },
-    {
-      quoted: m
-    }
-  )
+  return conn.sendMessage(m.chat, {
+    text: encabezado + tarjetas.join('\n\n') + pie,
+    mentions
+  }, { quoted: m })
 }
-
-// ============================================================
-// ⚙️ CONFIGURACIÓN DEL COMANDO
-// ============================================================
 
 handler.command = /^owner$/i
 handler.help = ['owner']

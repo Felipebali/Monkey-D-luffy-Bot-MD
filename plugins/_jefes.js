@@ -11,13 +11,13 @@
  * • Owners del bot
  * • Administradores del grupo
  *
- * Orden del mensaje:
+ * Orden:
  * 1. Aviso
- * 2. Owners del bot
+ * 2. Todos los owners de global.owner
  * 3. Administradores del grupo
  *
- * • No cita el mensaje original.
- * • Menciona a los participantes correspondientes.
+ * • Sin citar el mensaje original.
+ * • Muestra todos los owners configurados.
  * • Obtiene los owners desde global.owner.
  */
 
@@ -40,7 +40,7 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     }
 
     // ========================================================
-    // 🧰 FUNCIONES DE NORMALIZACIÓN
+    // 🧰 NORMALIZACIÓN
     // ========================================================
 
     const normalizeJid = value => {
@@ -56,29 +56,41 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     }
 
     const normalizeNumber = value => {
-      return normalizeJid(value)
+      const raw = String(value || '').trim()
+
+      // Acepta números, JID y entradas habituales de global.owner.
+      return normalizeJid(raw)
         .split('@')[0]
         .split(':')[0]
         .replace(/\D/g, '')
     }
 
     // ========================================================
-    // 👑 OWNERS DESDE global.owner
+    // 👑 TODOS LOS OWNERS DE global.owner
     // ========================================================
 
-    const owners = [...new Set(
-      (Array.isArray(global.owner) ? global.owner : [])
-        .map(owner => {
-          if (Array.isArray(owner)) owner = owner[0]
+    const rawOwners = Array.isArray(global.owner)
+      ? global.owner
+      : global.owner
+        ? [global.owner]
+        : []
 
-          if (typeof owner !== 'string' && typeof owner !== 'number') {
-            return ''
-          }
+    const owners = [
+      ...new Set(
+        rawOwners
+          .map(owner => {
+            // Formato habitual: ['598XXXXXXXX', 'Nombre', true]
+            if (Array.isArray(owner)) owner = owner[0]
 
-          return normalizeNumber(owner)
-        })
-        .filter(Boolean)
-    )]
+            if (typeof owner !== 'string' && typeof owner !== 'number') {
+              return ''
+            }
+
+            return normalizeNumber(owner)
+          })
+          .filter(Boolean)
+      )
+    ]
 
     const sender = normalizeJid(m.sender)
     const senderNumber = normalizeNumber(sender)
@@ -92,7 +104,7 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     }
 
     // ========================================================
-    // 👥 OBTENER PARTICIPANTES
+    // 👥 METADATOS Y PARTICIPANTES
     // ========================================================
 
     const metadata = groupMetadata || await conn.groupMetadata(m.chat)
@@ -115,15 +127,8 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     })
 
     // ========================================================
-    // 👑 OWNERS PRESENTES EN EL GRUPO
-    // ========================================================
-
-    const ownersInGroup = normalizedParticipants.filter(participant =>
-      owners.includes(participant.number)
-    )
-
-    // ========================================================
     // 🛡️ ADMINISTRADORES DEL GRUPO
+    // Excluye owners y al propio bot.
     // ========================================================
 
     const admins = normalizedParticipants.filter(participant =>
@@ -133,7 +138,7 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     )
 
     // ========================================================
-    // 🏷️ TÍTULOS DE OWNERS
+    // 🏷️ TÍTULOS DE LOS OWNERS
     // ========================================================
 
     const ownerTitles = {}
@@ -153,7 +158,7 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     const aviso = typeof text === 'string' ? text.trim() : ''
 
     // ========================================================
-    // 📝 CONSTRUIR MENSAJE EN EL ORDEN SOLICITADO
+    // 📝 CONSTRUIR MENSAJE
     // ========================================================
 
     const lines = [
@@ -161,30 +166,37 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
       '',
       `📛 *Grupo:* ${metadata.subject || 'Sin nombre'}`,
       `👥 *Miembros:* ${participants.length}`,
-      `🛡️ *Administradores:* ${admins.length + ownersInGroup.length}`,
+      `👑 *Owners configurados:* ${owners.length}`,
+      `🛡️ *Administradores del grupo:* ${admins.length}`,
       ''
     ]
 
     // 1️⃣ AVISO PRIMERO
-    lines.push('📢 *AVISO PARA LOS ADMINISTRADORES*')
-    lines.push(aviso || 'No se escribió ningún aviso.')
+    lines.push('╭━━━〔 📢 *AVISO PARA LOS ADMINISTRADORES* 〕')
+
+    lines.push(
+      aviso || 'No se escribió ningún aviso.'
+    )
+
     lines.push('')
 
-    // 2️⃣ OWNERS DESPUÉS DEL AVISO
+    // 2️⃣ TODOS LOS OWNERS CONFIGURADOS
     lines.push('╭━━━〔 👑 *OWNERS DEL BOT* 〕')
 
-    if (ownersInGroup.length > 0) {
-      for (const owner of ownersInGroup) {
-        const title = ownerTitles[owner.number] || 'Owner 👑'
-        lines.push(`▸ ${title}: @${owner.number}`)
-      }
+    if (owners.length > 0) {
+      owners.forEach((number, index) => {
+        const title = ownerTitles[number] ||
+          `Owner del Bot ${index + 1} 👑`
+
+        lines.push(`▸ ${title}: @${number}`)
+      })
     } else {
-      lines.push('▸ No hay owners del bot presentes en este grupo.')
+      lines.push('▸ No hay owners configurados en global.owner.')
     }
 
     lines.push('')
 
-    // 3️⃣ ADMINISTRADORES AL FINAL
+    // 3️⃣ ADMINISTRADORES DEL GRUPO AL FINAL
     lines.push('╭━━━〔 🛡️ *ADMINISTRADORES DEL GRUPO* 〕')
 
     if (admins.length > 0) {
@@ -192,7 +204,7 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
         lines.push(`▸ @${admin.number}`)
       }
     } else {
-      lines.push('▸ No hay otros administradores.')
+      lines.push('▸ No hay otros administradores del grupo.')
     }
 
     lines.push('')
@@ -211,9 +223,12 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     // 📣 MENCIONES SIN DUPLICADOS
     // ========================================================
 
+    // Se incluyen todos los owners configurados.
+    // WhatsApp puede no resolver menciones de personas
+    // que no estén en el grupo o utilicen identificadores LID.
     const mentions = [
       ...new Set([
-        ...ownersInGroup.map(owner => owner.id),
+        ...owners.map(number => `${number}@s.whatsapp.net`),
         ...admins.map(admin => admin.id),
         sender
       ].filter(Boolean))

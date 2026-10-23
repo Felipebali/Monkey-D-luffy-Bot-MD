@@ -34,7 +34,7 @@ const handler = async (m, { conn }) => {
       nombre: 'Angee 🧸🩷',
       emoji: '🧸',
       rol: 'Creadora y propietaria',
-      frase: 'Hay personas que llegan a tu vida y terminan siendo familia sin compartir la misma sangre. 🩷'
+      frase: 'Hay amistades que hacen más llevaderos los días y convierten cualquier charla en un buen recuerdo. 🧸🩷✨'
     },
     {
       numero: pipeNumero,

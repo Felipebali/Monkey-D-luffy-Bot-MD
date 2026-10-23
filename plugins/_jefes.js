@@ -3,11 +3,22 @@
  * 📂 plugins/admins.js
  * 👥 WHATSAPP-BOT — ADMINISTRACIÓN DEL GRUPO
  *
- * Comando:
+ * Comandos:
  * .admins
  * .admins aviso para los administradores
  *
- * Permisos: owners del bot o admins del grupo.
+ * Permisos:
+ * • Owners del bot
+ * • Administradores del grupo
+ *
+ * Orden del mensaje:
+ * 1. Aviso
+ * 2. Owners del bot
+ * 3. Administradores del grupo
+ *
+ * • No cita el mensaje original.
+ * • Menciona a los participantes correspondientes.
+ * • Obtiene los owners desde global.owner.
  */
 
 const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) => {
@@ -29,15 +40,17 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     }
 
     // ========================================================
-    // 👑 OWNERS DESDE global.owner
+    // 🧰 FUNCIONES DE NORMALIZACIÓN
     // ========================================================
 
     const normalizeJid = value => {
       if (!value) return ''
 
-      if (typeof conn.decodeJid === 'function') {
-        value = conn.decodeJid(value)
-      }
+      try {
+        if (typeof conn.decodeJid === 'function') {
+          value = conn.decodeJid(value)
+        }
+      } catch {}
 
       return String(value || '').trim()
     }
@@ -49,23 +62,29 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
         .replace(/\D/g, '')
     }
 
-    const owners = (global.owner || [])
-      .map(owner => {
-        if (Array.isArray(owner)) owner = owner[0]
+    // ========================================================
+    // 👑 OWNERS DESDE global.owner
+    // ========================================================
 
-        if (typeof owner !== 'string' && typeof owner !== 'number') {
-          return ''
-        }
+    const owners = [...new Set(
+      (Array.isArray(global.owner) ? global.owner : [])
+        .map(owner => {
+          if (Array.isArray(owner)) owner = owner[0]
 
-        return normalizeNumber(owner)
-      })
-      .filter(Boolean)
+          if (typeof owner !== 'string' && typeof owner !== 'number') {
+            return ''
+          }
+
+          return normalizeNumber(owner)
+        })
+        .filter(Boolean)
+    )]
 
     const sender = normalizeJid(m.sender)
     const senderNumber = normalizeNumber(sender)
     const senderIsOwner = owners.includes(senderNumber)
 
-    // Solo owners o admins del grupo
+    // Solo owners o administradores del grupo
     if (!senderIsOwner && !isAdmin) {
       return conn.sendMessage(m.chat, {
         text: '🚫 Solo los administradores del grupo o los dueños del bot pueden usar este comando.'
@@ -128,7 +147,13 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     }
 
     // ========================================================
-    // 📝 CONSTRUIR MENSAJE
+    // 📢 AVISO OPCIONAL
+    // ========================================================
+
+    const aviso = typeof text === 'string' ? text.trim() : ''
+
+    // ========================================================
+    // 📝 CONSTRUIR MENSAJE EN EL ORDEN SOLICITADO
     // ========================================================
 
     const lines = [
@@ -140,18 +165,27 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
       ''
     ]
 
-    if (ownersInGroup.length > 0) {
-      lines.push('👑 *DUEÑOS DEL BOT*')
+    // 1️⃣ AVISO PRIMERO
+    lines.push('📢 *AVISO PARA LOS ADMINISTRADORES*')
+    lines.push(aviso || 'No se escribió ningún aviso.')
+    lines.push('')
 
+    // 2️⃣ OWNERS DESPUÉS DEL AVISO
+    lines.push('╭━━━〔 👑 *OWNERS DEL BOT* 〕')
+
+    if (ownersInGroup.length > 0) {
       for (const owner of ownersInGroup) {
         const title = ownerTitles[owner.number] || 'Owner 👑'
         lines.push(`▸ ${title}: @${owner.number}`)
       }
-
-      lines.push('')
+    } else {
+      lines.push('▸ No hay owners del bot presentes en este grupo.')
     }
 
-    lines.push('🛡️ *ADMINISTRADORES DEL GRUPO*')
+    lines.push('')
+
+    // 3️⃣ ADMINISTRADORES AL FINAL
+    lines.push('╭━━━〔 🛡️ *ADMINISTRADORES DEL GRUPO* 〕')
 
     if (admins.length > 0) {
       for (const admin of admins) {
@@ -162,21 +196,12 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
     }
 
     lines.push('')
-
-    // 📢 Aviso opcional
-    const aviso = typeof text === 'string' ? text.trim() : ''
-
-    if (aviso) {
-      lines.push('📢 *AVISO PARA LOS ADMINISTRADORES*')
-      lines.push(aviso)
-      lines.push('')
-    }
+    lines.push('╰━━━━━━━━━━━━━━━━━━━━⬣')
 
     const role = senderIsOwner
       ? '👑 Dueño del bot'
       : '🛡️ Administrador del grupo'
 
-    lines.push('╰━━━━━━━━━━━━━━━━━━━━⬣')
     lines.push(`⚡ *Solicitado por:* @${senderNumber}`)
     lines.push(`🎖️ *Rol:* ${role}`)
 
@@ -194,14 +219,17 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
       ].filter(Boolean))
     ]
 
-    // Enviar sin citar el mensaje original
+    // ========================================================
+    // 📤 ENVIAR SIN CITAR EL MENSAJE ORIGINAL
+    // ========================================================
+
     return conn.sendMessage(m.chat, {
       text: message,
       mentions
     })
 
   } catch (error) {
-    console.error('[ADMINS] Error:', error)
+    console.error('[WHATSAPP-BOT ADMINS] Error:', error)
 
     return conn.sendMessage(m.chat, {
       text: '❌ Ocurrió un error al obtener la lista de administradores.'
@@ -210,7 +238,7 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
 }
 
 // ============================================================
-// 📚 CONFIGURACIÓN
+// 📚 CONFIGURACIÓN DEL COMANDO
 // ============================================================
 
 handler.command = ['admins']

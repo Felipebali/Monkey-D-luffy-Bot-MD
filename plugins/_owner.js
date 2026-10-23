@@ -1,16 +1,13 @@
 
 // 📂 plugins/owner.js
 // 👑 WHATSAPP-BOT — OWNERS PREMIUM
-// 🎀 Angee 🧸🩷 | ❄️ Pipe 🥶
+// 🧸🩷 Angee | 🥶 Pipe
 
 const handler = async (m, { conn }) => {
-  if (!Array.isArray(global.owner) || global.owner.length === 0) {
+  if (!Array.isArray(global.owner) || global.owner.length < 2) {
     return m.reply(
-      '╭━━━〔 ⚠️ SISTEMA DE OWNERS 〕━━━╮\n' +
-      '┃\n' +
-      '┃ ❌ No hay propietarios configurados.\n' +
-      '┃\n' +
-      '╰━━━━━━━━━━━━━━━━━━━━━━━━╯'
+      '⚠️ *Faltan propietarios en la configuración.*\n\n' +
+      'Configurá a Pipe y Angee en global.owner.'
     )
   }
 
@@ -22,31 +19,29 @@ const handler = async (m, { conn }) => {
     .replace(/:\d+$/g, '')
     .replace(/\D/g, '')
 
-  // Obtener los números de los owners configurados.
-  const configurados = global.owner.map(data => ({
-    numero: normalizar(Array.isArray(data) ? data[0] : data)
-  }))
+  // Se asume: global.owner[0] = Pipe y global.owner[1] = Angee.
+  const pipeNumero = normalizar(
+    Array.isArray(global.owner[0]) ? global.owner[0][0] : global.owner[0]
+  )
 
-  // Buscar los números configurados de Angee y Pipe.
-  // Se identifican por el orden: primer owner = Pipe,
-  // segundo owner = Angee, salvo que cambies los índices.
-  const pipeNumero = configurados[0]?.numero
-  const angeeNumero = configurados[1]?.numero
+  const angeeNumero = normalizar(
+    Array.isArray(global.owner[1]) ? global.owner[1][0] : global.owner[1]
+  )
 
   const personas = [
     {
       numero: angeeNumero,
-      nombre: 'Ange 🧸🩷',
-      emoji: '🎀',
-      rol: 'Propietaria oficial',
-      estilo: '🌸'
+      nombre: 'Angee 🧸🩷',
+      emoji: '🧸',
+      rol: 'Creadora y propietaria',
+      frase: 'Hay personas que llegan a tu vida y terminan siendo familia sin compartir la misma sangre. 🩷'
     },
     {
       numero: pipeNumero,
       nombre: 'Pipe 🥶',
-      emoji: '❄️',
-      rol: 'Propietario oficial',
-      estilo: '⚡'
+      emoji: '🥶',
+      rol: 'Creador y propietario',
+      frase: 'En silencio, a mi ritmo y a mi manera; no necesito demostrar quién soy. 🥶'
     }
   ]
 
@@ -60,56 +55,47 @@ const handler = async (m, { conn }) => {
       persona.numero.length > 15
     ) continue
 
-    const jid = `${persona.numero}@s.whatsapp.net`
-
-    mentions.push(jid)
+    mentions.push(`${persona.numero}@s.whatsapp.net`)
 
     tarjetas.push(
       `╭━━━〔 ${persona.emoji} 〕━━━╮\n` +
       `┃\n` +
-      `┃ ${persona.estilo} *${persona.nombre}*\n` +
-      `┃\n` +
+      `┃ ✨ *${persona.nombre}*\n` +
+      `┃ 🛡️ ${persona.rol}\n` +
       `┃ 📱 @${persona.numero}\n` +
-      `┃ ${persona.emoji} ${persona.rol}\n` +
-      `┃ 🔐 Acceso de propietario\n` +
       `┃\n` +
-      `╰━━━━━━━━━━━━━━━━━━╯`
+      `┃ 💬 *Una frase para vos:*\n` +
+      `┃ _${persona.frase}_\n` +
+      `┃\n` +
+      `╰━━━━━━━━━━━━━━━━━━━━╯`
     )
   }
 
-  if (tarjetas.length === 0) {
+  if (tarjetas.length !== 2) {
     return m.reply(
-      '╭━━━〔 ⚠️ ERROR 〕━━━╮\n' +
-      '┃ No se encontraron números válidos.\n' +
-      '┃ Revisá la configuración de global.owner.\n' +
-      '╰━━━━━━━━━━━━━━━━━━╯'
+      '❌ *No se pudieron validar los dos propietarios.*\n' +
+      'Revisá los números y el orden en global.owner.'
     )
   }
 
-  const encabezado =
+  const texto =
     `╭━━━〔 👑 WHATSAPP-BOT 〕━━━╮\n` +
     `┃\n` +
-    `┃ ✨ *EQUIPO DE PROPIETARIOS*\n` +
-    `┃ 🛡️ Administración oficial\n` +
-    `┃ 💜 Confianza · Control · Seguridad\n` +
+    `┃ 💜 *NUESTRO EQUIPO*\n` +
+    `┃ Dos owners, dos estilos\n` +
+    `┃ Una misma familia de bot\n` +
     `┃\n` +
-    `╰━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n`
+    `╰━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+    tarjetas.join('\n\n') +
+    `\n\n╭━━━〔 💠 SISTEMA 〕━━━╮\n` +
+    `┃ 👥 Propietarios: *2*\n` +
+    `┃ 🔐 Estado: *Configuración activa*\n` +
+    `╰━━━━━━━━━━━━━━━━━━━━━━╯`
 
-  const pie =
-    `\n\n╭━━━〔 📊 INFORMACIÓN 〕━━━╮\n` +
-    `┃ 👥 Total: *${tarjetas.length} ${tarjetas.length === 1 ? 'propietario' : 'propietarios'}*\n` +
-    `┃ 🟢 Estado: *Configuración activa*\n` +
-    `┃ 🤖 Sistema: *WHATSAPP-BOT*\n` +
-    `╰━━━━━━━━━━━━━━━━━━━━━━━━╯`
-
-  return conn.sendMessage(
-    m.chat,
-    {
-      text: encabezado + tarjetas.join('\n\n') + pie,
-      mentions
-    },
-    { quoted: m }
-  )
+  return conn.sendMessage(m.chat, {
+    text: texto,
+    mentions
+  }, { quoted: m })
 }
 
 handler.command = /^owner$/i

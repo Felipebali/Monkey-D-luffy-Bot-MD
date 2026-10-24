@@ -1,14 +1,26 @@
 
 /**
- * 📂 plugins/juegos.js
+ * 📂 plugins/grupos-juegos.js
  * 🎮 WHATSAPP-BOT — CONTROL DE MINI-JUEGOS
+ *
+ * Comando: .juegos
+ * Permisos: Administradores y owners
  */
 
 const handler = async (m, { conn, isAdmin, isOwner }) => {
   try {
-    const chat = global.db.data.chats[m.chat] ||= {}
+    // 📂 Verificar y preparar la base de datos
+    if (!global.db.data.chats) {
+      global.db.data.chats = {}
+    }
 
-    // 🔐 Permisos: administradores y owners
+    if (!global.db.data.chats[m.chat]) {
+      global.db.data.chats[m.chat] = {}
+    }
+
+    const chat = global.db.data.chats[m.chat]
+
+    // 🔐 Verificar permisos
     if (!isAdmin && !isOwner) {
       return await conn.sendMessage(
         m.chat,
@@ -16,8 +28,12 @@ const handler = async (m, { conn, isAdmin, isOwner }) => {
           text:
             '╭━━━〔 🔒 *ACCESO DENEGADO* 〕━━━╮\n' +
             '┃\n' +
-            '┃ ❌ Este comando es exclusivo\n' +
-            '┃ para administradores y dueños.\n' +
+            '┃ ❌ No tienes permiso para usar\n' +
+            '┃ este comando.\n' +
+            '┃\n' +
+            '┃ 👑 Solo los administradores\n' +
+            '┃ y dueños pueden cambiar el estado\n' +
+            '┃ de los mini-juegos.\n' +
             '┃\n' +
             '╰━━━━━━━━━━━━━━━━━━━━━━╯'
         },
@@ -25,22 +41,21 @@ const handler = async (m, { conn, isAdmin, isOwner }) => {
       )
     }
 
-    // 🎮 Cambiar estado de los juegos
+    // 🎮 Cambiar el estado de los juegos
     chat.games = !chat.games
 
-    const activados = chat.games
-
-    const mensaje = activados
+    const mensaje = chat.games
       ? (
           '╭━━━〔 🎮 *ZONA DE JUEGOS* 〕━━━╮\n' +
           '┃\n' +
           '┃ 🟢 *¡MINI-JUEGOS ACTIVADOS!*\n' +
           '┃\n' +
-          '┃ ✨ La diversión ha comenzado.\n' +
-          '┃ 🎯 Los juegos están disponibles\n' +
-          '┃    nuevamente en este grupo.\n' +
+          '┃ ✨ ¡Que comience la diversión!\n' +
+          '┃ 🎯 Los mini-juegos vuelven a\n' +
+          '┃ estar disponibles en este grupo.\n' +
           '┃\n' +
-          '┃ 💬 ¡Que comience la partida!\n' +
+          '┃ 🎲 Reúne a tus amigos y juega.\n' +
+          '┃ 🍀 ¡Mucha suerte a todos!\n' +
           '┃\n' +
           '╰━━━━━━━━━━━━━━━━━━━━━━╯'
         )
@@ -51,10 +66,10 @@ const handler = async (m, { conn, isAdmin, isOwner }) => {
           '┃\n' +
           '┃ 🌙 La diversión queda en pausa.\n' +
           '┃ 🚫 Los comandos de mini-juegos\n' +
-          '┃    deben permanecer desactivados.\n' +
+          '┃ quedan desactivados en este grupo.\n' +
           '┃\n' +
-          '┃ 🔔 Un admin puede reactivarlos\n' +
-          '┃    cuando quiera.\n' +
+          '┃ 🔔 Un administrador puede\n' +
+          '┃ volver a activarlos cuando quiera.\n' +
           '┃\n' +
           '╰━━━━━━━━━━━━━━━━━━━━━━╯'
         )
@@ -66,17 +81,22 @@ const handler = async (m, { conn, isAdmin, isOwner }) => {
     )
 
   } catch (e) {
-    console.error('[JUEGOS] Error:', e)
+    console.error('[GRUPOS-JUEGOS] Error:', e)
 
-    await m.reply(
-      '╭━━━〔 ⚠️ *ERROR* 〕━━━╮\n' +
-      '┃\n' +
-      '┃ ❌ No se pudo cambiar el estado\n' +
-      '┃ de los mini-juegos.\n' +
-      '┃\n' +
-      '┃ 🔄 Inténtalo nuevamente.\n' +
-      '┃\n' +
-      '╰━━━━━━━━━━━━━━━━━━╯'
+    await conn.sendMessage(
+      m.chat,
+      {
+        text:
+          '╭━━━〔 ⚠️ *ERROR* 〕━━━╮\n' +
+          '┃\n' +
+          '┃ ❌ No se pudo cambiar el estado\n' +
+          '┃ de los mini-juegos.\n' +
+          '┃\n' +
+          '┃ 🔄 Inténtalo nuevamente.\n' +
+          '┃\n' +
+          '╰━━━━━━━━━━━━━━━━━━╯'
+      },
+      { quoted: m }
     )
   }
 }

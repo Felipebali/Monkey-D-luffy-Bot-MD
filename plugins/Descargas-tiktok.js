@@ -3,10 +3,7 @@
  * 📂 plugins/tiktok.js
  * 🎵 WHATSAPP-BOT — DESCARGADOR DE TIKTOK
  *
- * Comandos:
- * .tt <enlace>
- * .tiktok <enlace>
- * .ttdl <enlace>
+ * Comandos: .tt / .tiktok / .ttdl
  */
 
 import axios from 'axios'
@@ -15,82 +12,99 @@ global.emoji = '🎵'
 
 const API_URL = 'https://api.tiktokdl.xyz/'
 
-const TIKTOK_REGEX =
-  /^(?:https?:\/\/)?(?:www\.|vm\.|vt\.)?tiktok\.com\/\S+$/i
-
-const reaccionar = async (m, emoji) => {
-  try {
-    if (typeof m.react === 'function') {
-      await m.react(emoji)
-    }
-  } catch {}
-}
-
 const handler = async (m, { conn, args, usedPrefix, command }) => {
+  const react = async emoji => {
+    try {
+      if (typeof m.react === 'function') {
+        await m.react(emoji)
+      }
+    } catch {}
+  }
+
   try {
     const input = args?.[0]?.trim()
 
-    // 📌 Validar que exista un enlace.
+    // 📌 Comprobar que se haya ingresado un enlace.
     if (!input) {
       return conn.sendMessage(
         m.chat,
         {
           text:
-            '⚡ *Debés ingresar un enlace de TikTok.*\n\n' +
+            '⚡️ *Debés ingresar un enlace de TikTok.*\n\n' +
             `📌 *Ejemplo:* ${usedPrefix + command} https://vm.tiktok.com/ZMreHF2dC/`
         },
         { quoted: m }
       )
     }
 
-    // 🔎 Validar formato del enlace.
-    if (!TIKTOK_REGEX.test(input)) {
+    // 🔎 Validar el formato del enlace.
+    let url
+
+    try {
+      url = new URL(input.startsWith('http') ? input : `https://${input}`)
+    } catch {
       return conn.sendMessage(
         m.chat,
-        { text: '❎ El enlace de TikTok no es válido.' },
+        { text: '❎ Enlace de TikTok inválido.' },
         { quoted: m }
       )
     }
 
-    await reaccionar(m, '⌛')
+    const host = url.hostname.toLowerCase()
+    const esTikTok =
+      host === 'tiktok.com' ||
+      host.endsWith('.tiktok.com')
+
+    if (!esTikTok) {
+      return conn.sendMessage(
+        m.chat,
+        { text: '❎ El enlace debe pertenecer a TikTok.' },
+        { quoted: m }
+      )
+    }
+
+    await react('⌛')
 
     // 🌐 Consultar la API.
     const { data } = await axios.get(API_URL, {
-      params: { url: input },
+      params: { url: url.href },
       timeout: 30000,
       headers: {
         'User-Agent': 'Mozilla/5.0'
       }
     })
 
-    if (!data || typeof data !== 'object') {
-      throw new Error('La API devolvió una respuesta inválida.')
+    if (!data || !data.video) {
+      throw new Error(
+        data?.message || 'No se pudo obtener el video de TikTok.'
+      )
     }
 
     const videoUrl =
       typeof data.video === 'string'
         ? data.video
-        : data.video?.url
+        : data.video.url
 
-    if (!videoUrl || !/^https?:\/\//i.test(videoUrl)) {
-      throw new Error(
-        data.message || 'No se pudo obtener el video. Probá con otro enlace.'
-      )
+    if (
+      typeof videoUrl !== 'string' ||
+      !/^https?:\/\//i.test(videoUrl)
+    ) {
+      throw new Error('La API no devolvió una URL de video válida.')
     }
 
     const title = String(data.title || 'Sin título')
     const author = String(data.author_name || 'Desconocido')
-    const duration = data.duration ?? 'Desconocida'
+    const duration = String(data.duration ?? 'Desconocida')
 
     const caption = [
-      '╭━━━〔 🎵 *WHATSAPP-BOT | TIKTOK* 〕━━━⬣',
+      '╭━━━〔 🎵 *WHATSAPP-BOT - DESCARGAS* 〕━━━⬣',
       `┃ ❒ *Autor:* ${author}`,
       `┃ ❒ *Título:* ${title}`,
       `┃ ❒ *Duración:* ${duration}`,
       '╰━━━━━━━━━━━━━━━━━━━━━━⬣'
     ].join('\n')
 
-    // 📥 Enviar video.
+    // 📥 Enviar el video al chat.
     await conn.sendMessage(
       m.chat,
       {
@@ -101,19 +115,26 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
       { quoted: m }
     )
 
-    await reaccionar(m, '✅')
-  } catch (error) {
-    console.error('[TIKTOK] Error:', error?.response?.data || error)
+    await react('✅')
+  } catch (e) {
+    console.error(
+      '[TIKTOK] Error:',
+      e.response?.data || e.message || e
+    )
 
-    await reaccionar(m, '❌')
+    await react('❌')
 
-    const mensaje = error?.code === 'ECONNABORTED'
+    const mensaje = e.code === 'ECONNABORTED'
       ? 'La API tardó demasiado en responder. Intentá nuevamente.'
-      : 'No se pudo descargar el video. El enlace puede ser privado o la API puede estar caída.'
+      : e.response?.status === 429
+        ? 'La API recibió demasiadas solicitudes. Esperá un momento.'
+        : 'No se pudo descargar el video. Puede haber fallado la API o el enlace.'
 
     return conn.sendMessage(
       m.chat,
-      { text: `❌ *Error de TikTok*\n\n${mensaje}` },
+      {
+        text: `❌ *Error de TikTok*\n\n${mensaje}`
+      },
       { quoted: m }
     )
   }

@@ -1,55 +1,126 @@
-import axios from 'axios';
 
-global.emoji = '🎵';
+/**
+ * 📂 plugins/tiktok.js
+ * 🎵 WHATSAPP-BOT — DESCARGADOR DE TIKTOK
+ *
+ * Comandos:
+ * .tt <enlace>
+ * .tiktok <enlace>
+ * .ttdl <enlace>
+ */
 
-const handler = async (m, { conn, text, args, usedPrefix, command }) => {
+import axios from 'axios'
+
+global.emoji = '🎵'
+
+const API_URL = 'https://api.tiktokdl.xyz/'
+
+const TIKTOK_REGEX =
+  /^(?:https?:\/\/)?(?:www\.|vm\.|vt\.)?tiktok\.com\/\S+$/i
+
+const reaccionar = async (m, emoji) => {
   try {
-    if (!args[0]) {
+    if (typeof m.react === 'function') {
+      await m.react(emoji)
+    }
+  } catch {}
+}
+
+const handler = async (m, { conn, args, usedPrefix, command }) => {
+  try {
+    const input = args?.[0]?.trim()
+
+    // 📌 Validar que exista un enlace.
+    if (!input) {
       return conn.sendMessage(
         m.chat,
-        { text: `⚡️ Debes ingresar un enlace de TikTok.\n\n📌 *Ejemplo:* ${usedPrefix + command} https://vm.tiktok.com/ZMreHF2dC/` },
+        {
+          text:
+            '⚡ *Debés ingresar un enlace de TikTok.*\n\n' +
+            `📌 *Ejemplo:* ${usedPrefix + command} https://vm.tiktok.com/ZMreHF2dC/`
+        },
         { quoted: m }
-      );
+      )
     }
 
-    if (!/(?:https?:\/\/)?(?:www\.|vm\.|vt\.|t\.?)?tiktok\.com\/([^\s&]+)/gi.test(args[0])) {
-      return conn.sendMessage(m.chat, { text: `❎ Enlace de TikTok inválido.` }, { quoted: m });
+    // 🔎 Validar formato del enlace.
+    if (!TIKTOK_REGEX.test(input)) {
+      return conn.sendMessage(
+        m.chat,
+        { text: '❎ El enlace de TikTok no es válido.' },
+        { quoted: m }
+      )
     }
 
-    if (typeof m.react === 'function') m.react('⌛');
+    await reaccionar(m, '⌛')
 
-    // 🔹 API pública de TikTok (ejemplo: tiktokdl.xyz)
-    const { data } = await axios.get(`https://api.tiktokdl.xyz/?url=${args[0]}`);
-    if (!data || !data.video) throw new Error('No se pudo obtener el video de TikTok');
+    // 🌐 Consultar la API.
+    const { data } = await axios.get(API_URL, {
+      params: { url: input },
+      timeout: 30000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0'
+      }
+    })
 
-    const videoUrl = data.video;
-    const title = data.title || 'Sin título';
-    const author = data.author_name || 'Desconocido';
-    const duration = data.duration || 'Desconocida';
+    if (!data || typeof data !== 'object') {
+      throw new Error('La API devolvió una respuesta inválida.')
+    }
 
-    const caption = `
-╭━━━〔 ⚡️ *FelixCat-Bot-Descargas* ⚡️ 〕━━━⬣
-┃ ❒ *Autor:* ${author}
-┃ ❒ *Título:* ${title}
-┃ ❒ *Duración:* ${duration}
-╰━━━━━━━━━━━━━━━━━━━━━━⬣
-`.trim();
+    const videoUrl =
+      typeof data.video === 'string'
+        ? data.video
+        : data.video?.url
 
-    await conn.sendMessage(m.chat, {
-      video: { url: videoUrl },
-      caption
-    }, { quoted: m });
+    if (!videoUrl || !/^https?:\/\//i.test(videoUrl)) {
+      throw new Error(
+        data.message || 'No se pudo obtener el video. Probá con otro enlace.'
+      )
+    }
 
-    if (typeof m.react === 'function') m.react('✅');
+    const title = String(data.title || 'Sin título')
+    const author = String(data.author_name || 'Desconocido')
+    const duration = data.duration ?? 'Desconocida'
 
-  } catch (e) {
-    if (typeof m.react === 'function') m.react('❌');
-    return conn.sendMessage(m.chat, { text: `❌ *Error:* ${e.message}` }, { quoted: m });
+    const caption = [
+      '╭━━━〔 🎵 *WHATSAPP-BOT | TIKTOK* 〕━━━⬣',
+      `┃ ❒ *Autor:* ${author}`,
+      `┃ ❒ *Título:* ${title}`,
+      `┃ ❒ *Duración:* ${duration}`,
+      '╰━━━━━━━━━━━━━━━━━━━━━━⬣'
+    ].join('\n')
+
+    // 📥 Enviar video.
+    await conn.sendMessage(
+      m.chat,
+      {
+        video: { url: videoUrl },
+        caption,
+        mimetype: 'video/mp4'
+      },
+      { quoted: m }
+    )
+
+    await reaccionar(m, '✅')
+  } catch (error) {
+    console.error('[TIKTOK] Error:', error?.response?.data || error)
+
+    await reaccionar(m, '❌')
+
+    const mensaje = error?.code === 'ECONNABORTED'
+      ? 'La API tardó demasiado en responder. Intentá nuevamente.'
+      : 'No se pudo descargar el video. El enlace puede ser privado o la API puede estar caída.'
+
+    return conn.sendMessage(
+      m.chat,
+      { text: `❌ *Error de TikTok*\n\n${mensaje}` },
+      { quoted: m }
+    )
   }
-};
+}
 
-handler.help = ["tiktok"];
-handler.tags = ["descargas"];
-handler.command = ["tt", "tiktok", "ttdl"];
+handler.help = ['tt <enlace>', 'tiktok <enlace>', 'ttdl <enlace>']
+handler.tags = ['descargas']
+handler.command = /^(tt|tiktok|ttdl)$/i
 
-export default handler;
+export default handler

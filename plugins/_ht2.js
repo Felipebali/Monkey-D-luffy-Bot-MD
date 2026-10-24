@@ -25,6 +25,10 @@ const INVITE_LINKS = [
 const FRECUENCIAS = [1, 2, 3, 6, 12]
 const recordatorios = new Map()
 
+// ============================================================
+// ⚙️ UTILIDADES
+// ============================================================
+
 function normalizarJid(jid = '') {
   return String(jid).trim().split(':')[0].toLowerCase()
 }
@@ -35,11 +39,14 @@ function normalizarNumero(numero = '') {
 
 function esOwner(m) {
   const owners = Array.isArray(global.owner) ? global.owner : []
+
   const sender = normalizarNumero(
     String(m.sender || '').split('@')[0].split(':')[0]
   )
 
-  return Boolean(sender) && owners.some(owner => {
+  if (!sender) return false
+
+  return owners.some(owner => {
     const numero = Array.isArray(owner) ? owner[0] : owner
     return normalizarNumero(numero) === sender
   })
@@ -51,16 +58,17 @@ function obtenerCodigo(link) {
 
 function obtenerClavesParticipante(participante) {
   const claves = new Set()
-  const jid = normalizarJid(participante?.id)
+  const id = String(participante?.id || '')
+  const jid = normalizarJid(id)
 
   if (jid) claves.add(`jid:${jid}`)
 
-  const id = String(participante?.id || '')
   const esTelefono =
     id.endsWith('@s.whatsapp.net') ||
     id.endsWith('@c.us')
 
-  const telefono = participante?.phoneNumber ||
+  const telefono =
+    participante?.phoneNumber ||
     (esTelefono ? id.split('@')[0] : '')
 
   const numero = normalizarNumero(telefono)
@@ -78,11 +86,15 @@ function perteneceAUnGrupo(participante, miembros) {
   return false
 }
 
+// ============================================================
+// 👥 OBTENER LOS TRES GRUPOS
+// ============================================================
+
 async function obtenerGruposObjetivo(conn) {
   if (typeof conn.groupGetInviteInfo !== 'function') {
     throw new Error(
-      'Baileys no permite consultar los enlaces. ' +
-      'Configura los ID reales de los tres grupos.'
+      'Tu versión de Baileys no permite consultar los enlaces. ' +
+      'Configura los ID reales de los tres grupos en el plugin.'
     )
   }
 
@@ -120,11 +132,15 @@ async function obtenerParticipantes(conn, grupoId) {
   return metadata.participants || []
 }
 
+// ============================================================
+// 📢 ENVIAR INVITACIÓN Y MENCIONAR PENDIENTES
+// ============================================================
+
 async function enviarRecordatorio(conn, chat) {
   const grupos = await obtenerGruposObjetivo(conn)
   const miembros = new Set()
 
-  // Reunir los miembros de los tres grupos.
+  // Reunir participantes de los tres grupos de destino.
   for (const grupoId of grupos) {
     const participantes = await obtenerParticipantes(conn, grupoId)
 
@@ -135,7 +151,7 @@ async function enviarRecordatorio(conn, chat) {
     }
   }
 
-  // Buscar pendientes en el grupo donde se publica el aviso.
+  // Revisar el grupo donde se publica el aviso.
   const participantesAnuncio = await obtenerParticipantes(conn, chat)
   const menciones = []
   const vistos = new Set()
@@ -143,6 +159,7 @@ async function enviarRecordatorio(conn, chat) {
 
   for (const participante of participantesAnuncio) {
     const jid = participante.id
+
     if (!jid) continue
 
     const jidNormalizado = normalizarJid(jid)
@@ -152,6 +169,7 @@ async function enviarRecordatorio(conn, chat) {
 
     vistos.add(jidNormalizado)
 
+    // No mencionar a quien ya esté en alguno de los tres grupos.
     if (perteneceAUnGrupo(participante, miembros)) continue
 
     menciones.push(jid)
@@ -162,10 +180,10 @@ async function enviarRecordatorio(conn, chat) {
     .join('\n\n')
 
   const encabezado = menciones.length
-    ? '👋 Invitamos a quienes todavía no están en ninguno de los grupos:\n' +
+    ? '👋 *Personas que todavía no están en los grupos:*\n' +
       menciones.map(jid => `@${jid.split('@')[0]}`).join(' ') +
       '\n\n'
-    : '📢 Compartimos los enlaces de nuestros grupos:\n\n'
+    : '📢 *Compartimos los enlaces de nuestros grupos:*\n\n'
 
   await conn.sendMessage(chat, {
     text:
@@ -182,6 +200,10 @@ async function enviarRecordatorio(conn, chat) {
   return menciones.length
 }
 
+// ============================================================
+// ⏱️ FORMATO DE TIEMPO
+// ============================================================
+
 function formatoTiempo(ms) {
   if (ms <= 0) return 'ahora'
 
@@ -194,10 +216,17 @@ function formatoTiempo(ms) {
 
   if (horas) partes.push(`${horas} h`)
   if (minutos) partes.push(`${minutos} min`)
-  if (!horas && !minutos) partes.push(`${segundos} s`)
+
+  if (!horas && !minutos) {
+    partes.push(`${segundos} s`)
+  }
 
   return partes.join(' ')
 }
+
+// ============================================================
+// 📊 ESTADO DEL RECORDATORIO
+// ============================================================
 
 function obtenerEstado(chat) {
   const estado = recordatorios.get(chat)
@@ -207,25 +236,36 @@ function obtenerEstado(chat) {
       '📊 *ESTADO DE HT2 PRO*\n\n' +
       '🔴 Estado: desactivado\n' +
       `🔗 Enlaces configurados: ${INVITE_LINKS.length}\n\n` +
-      'Activar: .ht2 on'
+      '▶️ Activar: .ht2 on'
     )
   }
 
   const falta = estado.proximoEnvio - Date.now()
+
+  const ultimoEnvio = estado.ultimoEnvio
+    ? new Date(estado.ultimoEnvio).toLocaleString('es-UY', {
+        timeZone: 'America/Montevideo'
+      })
+    : 'Sin envíos registrados'
 
   return (
     '📊 *ESTADO DE HT2 PRO*\n\n' +
     '🟢 Estado: activo\n' +
     `⏰ Frecuencia: cada ${estado.horas} hora(s)\n` +
     `🔗 Enlaces configurados: ${INVITE_LINKS.length}\n` +
-    `📨 Último envío: ${estado.ultimoEnvio\n      ? new Date(estado.ultimoEnvio).toLocaleString('es-UY', { timeZone: 'America/Montevideo' })\n      : 'Sin envíos registrados'}\n` +
+    `📨 Último envío: ${ultimoEnvio}\n` +
     `⏳ Próximo envío: en ${formatoTiempo(falta)}\n\n` +
     '🧪 Probar: .ht2 test\n' +
     '🛑 Detener: .ht2 off'
   )
 }
 
+// ============================================================
+// 👑 COMANDO PRINCIPAL
+// ============================================================
+
 const handler = async (m, { conn, args }) => {
+  // Solo owners.
   if (!esOwner(m)) {
     return m.reply(
       '⛔ *ACCESO DENEGADO*\n\n' +
@@ -234,95 +274,144 @@ const handler = async (m, { conn, args }) => {
   }
 
   if (!m.isGroup) {
-    return m.reply('⚠️ Este comando solo funciona dentro de un grupo.')
+    return m.reply(
+      '⚠️ Este comando solo funciona dentro de un grupo.'
+    )
   }
 
   const chat = m.chat
   const accion = String(args?.[0] || '').toLowerCase()
 
+  // ----------------------------------------------------------
   // 📊 ESTADO
+  // ----------------------------------------------------------
+
   if (accion === 'estado' || accion === 'status') {
     return m.reply(obtenerEstado(chat))
   }
 
-  // 🧪 PRUEBA
+  // ----------------------------------------------------------
+  // 🧪 PRUEBA INMEDIATA
+  // ----------------------------------------------------------
+
   if (accion === 'test' || accion === 'prueba') {
     try {
       const cantidad = await enviarRecordatorio(conn, chat)
 
       return m.reply(
         '✅ *PRUEBA COMPLETADA*\n\n' +
-        `👥 Menciones enviadas: ${cantidad}`
+        `👥 Menciones realizadas: ${cantidad}\n` +
+        '📨 Se envió el mensaje de invitación.'
       )
     } catch (error) {
       console.error('[HT2 PRO] Error en prueba:', error)
-      return m.reply(`❌ Error de HT2:\n${error.message}`)
+
+      return m.reply(
+        `❌ *ERROR DE HT2*\n\n${error.message}`
+      )
     }
   }
 
-  // 🛑 DETENER
+  // ----------------------------------------------------------
+  // 🛑 APAGAR
+  // ----------------------------------------------------------
+
   if (['off', 'stop'].includes(accion)) {
     const activo = recordatorios.get(chat)
 
-    if (activo?.timer) clearInterval(activo.timer)
+    if (activo?.timer) {
+      clearInterval(activo.timer)
+    }
 
     recordatorios.delete(chat)
 
-    return m.reply('🛑 HT2 quedó desactivado en este grupo.')
+    return m.reply(
+      '🛑 *HT2 DESACTIVADO*\n\n' +
+      'Ya no se enviarán recordatorios automáticos en este grupo.'
+    )
   }
 
-  // ✅ ACTIVAR
+  // ----------------------------------------------------------
+  // 🟢 ACTIVAR
+  // ----------------------------------------------------------
+
   if (['on', 'start'].includes(accion)) {
     const solicitadas = Number(args?.[1] || 1)
-    const horas = FRECUENCIAS.includes(solicitadas)
-      ? solicitadas
-      : 1
 
+    if (!FRECUENCIAS.includes(solicitadas)) {
+      return m.reply(
+        '⚠️ Frecuencia no válida.\n\n' +
+        'Usá una de estas opciones:\n' +
+        '.ht2 on\n' +
+        '.ht2 on 2\n' +
+        '.ht2 on 3\n' +
+        '.ht2 on 6\n' +
+        '.ht2 on 12'
+      )
+    }
+
+    const horas = solicitadas
     const anterior = recordatorios.get(chat)
 
-    if (anterior?.timer) clearInterval(anterior.timer)
+    if (anterior?.timer) {
+      clearInterval(anterior.timer)
+    }
+
     recordatorios.delete(chat)
 
     try {
-      // Envío inicial.
+      // Envío inicial: no se manda confirmación adicional.
       await enviarRecordatorio(conn, chat)
+
+      const ahora = Date.now()
 
       const estado = {
         timer: null,
         horas,
-        ultimoEnvio: Date.now(),
-        proximoEnvio: Date.now() + horas * 60 * 60 * 1000
+        ultimoEnvio: ahora,
+        proximoEnvio: ahora + horas * 60 * 60 * 1000
       }
 
       estado.timer = setInterval(async () => {
         try {
           await enviarRecordatorio(conn, chat)
 
-          estado.ultimoEnvio = Date.now()
+          const envio = Date.now()
+
+          estado.ultimoEnvio = envio
+          estado.proximoEnvio =
+            envio + estado.horas * 60 * 60 * 1000
+        } catch (error) {
+          console.error('[HT2 PRO] Error en envío automático:', error)
+
+          // Mantener actualizado el próximo intento aunque falle.
           estado.proximoEnvio =
             Date.now() + estado.horas * 60 * 60 * 1000
-        } catch (error) {
-          console.error('[HT2 PRO] Error automático:', error)
         }
       }, horas * 60 * 60 * 1000)
 
       recordatorios.set(chat, estado)
 
-      // No se manda un mensaje de confirmación adicional.
+      // Sin mensaje de confirmación extra.
       return
     } catch (error) {
       console.error('[HT2 PRO] No se pudo activar:', error)
 
       return m.reply(
-        `❌ No se pudo activar HT2:\n${error.message}`
+        '❌ *NO SE PUDO ACTIVAR HT2*\n\n' +
+        `${error.message}\n\n` +
+        'Revisá los enlaces y los permisos del bot.'
       )
     }
   }
 
+  // ----------------------------------------------------------
   // 📖 AYUDA
+  // ----------------------------------------------------------
+
   return m.reply(
     '👑 *HT2 PRO — PANEL DE CONTROL*\n\n' +
-    '🧪 .ht2 test — probar envío\n' +
+    '🧪 .ht2 test — probar envío inmediato\n' +
     '🟢 .ht2 on — cada 1 hora\n' +
     '🟢 .ht2 on 2 — cada 2 horas\n' +
     '🟢 .ht2 on 3 — cada 3 horas\n' +
@@ -332,6 +421,10 @@ const handler = async (m, { conn, args }) => {
     '🛑 .ht2 off — detener recordatorios'
   )
 }
+
+// ============================================================
+// 📌 CONFIGURACIÓN DEL PLUGIN
+// ============================================================
 
 handler.help = [
   'ht2',

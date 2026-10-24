@@ -1,26 +1,44 @@
 
 // 📂 plugins/ht2.js
 // 👑 WHATSAPP-BOT — HT2
-// 🔐 Comando exclusivo para owners
+// 🔐 Acceso exclusivo a global.owner
+
+const normalizar = (jid = '') => String(jid)
+  .trim()
+  .split('@')[0]
+  .split(':')[0]
+  .replace(/\D/g, '')
+
+function esOwner(m) {
+  const owners = Array.isArray(global.owner) ? global.owner : []
+  const sender = normalizar(m.sender)
+
+  if (!sender) return false
+
+  return owners.some(owner => {
+    const numero = Array.isArray(owner) ? owner[0] : owner
+    return normalizar(numero) === sender
+  })
+}
 
 const handler = async (m, { conn }) => {
-  const esOwner = m.isROwner || m.isOwner
-
-  if (!esOwner) {
-    return m.reply('⛔ Este comando es exclusivo de los owners de WHATSAPP-BOT.')
+  if (!esOwner(m)) {
+    return m.reply(
+      '⛔ *ACCESO DENEGADO*\n\n' +
+      '👑 Este comando es exclusivo de los owners de WHATSAPP-BOT.'
+    )
   }
 
   if (!m.isGroup) {
     return m.reply('⚠️ Este comando solo funciona en grupos.')
   }
 
-  const link = 'https://chat.whatsapp.com/HwQuzOOfqA8C38ICFG4jq5?s=cl&p=a&mlu=4&ilr=4&iam=0'
+  const link =
+    'https://chat.whatsapp.com/HwQuzOOfqA8C38ICFG4jq5?s=cl&p=a&mlu=4&ilr=4&iam=0'
 
   await conn.sendMessage(m.chat, {
-    text: `📢 Invitación:\n${link}`
+    text: `📢 *INVITACIÓN*\n\n${link}`
   })
-
-  return m.reply('✅ Invitación publicada.')
 }
 
 handler.help = ['ht2']

@@ -4,6 +4,7 @@
  * 🎵 WHATSAPP-BOT — DESCARGADOR DE TIKTOK
  *
  * Comandos: .tt / .tiktok / .ttdl
+ * No utiliza global.dfail ni failureHandler.
  */
 
 import axios from 'axios'
@@ -12,19 +13,19 @@ global.emoji = '🎵'
 
 const API_URL = 'https://api.tiktokdl.xyz/'
 
-const handler = async (m, { conn, args, usedPrefix, command }) => {
-  const react = async emoji => {
-    try {
-      if (typeof m.react === 'function') {
-        await m.react(emoji)
-      }
-    } catch {}
-  }
+const reaccionar = async (m, emoji) => {
+  try {
+    if (typeof m.react === 'function') {
+      await m.react(emoji)
+    }
+  } catch {}
+}
 
+const handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
     const input = args?.[0]?.trim()
 
-    // 📌 Comprobar que se haya ingresado un enlace.
+    // 📌 Verificar el enlace.
     if (!input) {
       return conn.sendMessage(
         m.chat,
@@ -37,7 +38,6 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
       )
     }
 
-    // 🔎 Validar el formato del enlace.
     let url
 
     try {
@@ -45,27 +45,27 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
     } catch {
       return conn.sendMessage(
         m.chat,
-        { text: '❎ Enlace de TikTok inválido.' },
+        { text: '❎ El enlace ingresado no es válido.' },
         { quoted: m }
       )
     }
 
     const host = url.hostname.toLowerCase()
-    const esTikTok =
-      host === 'tiktok.com' ||
-      host.endsWith('.tiktok.com')
 
-    if (!esTikTok) {
+    if (
+      host !== 'tiktok.com' &&
+      !host.endsWith('.tiktok.com')
+    ) {
       return conn.sendMessage(
         m.chat,
-        { text: '❎ El enlace debe pertenecer a TikTok.' },
+        { text: '❎ Debés ingresar un enlace de TikTok válido.' },
         { quoted: m }
       )
     }
 
-    await react('⌛')
+    await reaccionar(m, '⌛')
 
-    // 🌐 Consultar la API.
+    // 🌐 Consultar API de descarga.
     const { data } = await axios.get(API_URL, {
       params: { url: url.href },
       timeout: 30000,
@@ -76,20 +76,20 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (!data || !data.video) {
       throw new Error(
-        data?.message || 'No se pudo obtener el video de TikTok.'
+        data?.message || 'La API no devolvió el video.'
       )
     }
 
     const videoUrl =
       typeof data.video === 'string'
         ? data.video
-        : data.video.url
+        : data.video?.url
 
     if (
       typeof videoUrl !== 'string' ||
       !/^https?:\/\//i.test(videoUrl)
     ) {
-      throw new Error('La API no devolvió una URL de video válida.')
+      throw new Error('La URL del video recibida no es válida.')
     }
 
     const title = String(data.title || 'Sin título')
@@ -104,7 +104,7 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
       '╰━━━━━━━━━━━━━━━━━━━━━━⬣'
     ].join('\n')
 
-    // 📥 Enviar el video al chat.
+    // 📥 Enviar video.
     await conn.sendMessage(
       m.chat,
       {
@@ -115,28 +115,32 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
       { quoted: m }
     )
 
-    await react('✅')
-  } catch (e) {
+    await reaccionar(m, '✅')
+
+  } catch (error) {
     console.error(
       '[TIKTOK] Error:',
-      e.response?.data || e.message || e
+      error?.response?.data || error?.message || error
     )
 
-    await react('❌')
+    await reaccionar(m, '❌')
 
-    const mensaje = e.code === 'ECONNABORTED'
-      ? 'La API tardó demasiado en responder. Intentá nuevamente.'
-      : e.response?.status === 429
-        ? 'La API recibió demasiadas solicitudes. Esperá un momento.'
-        : 'No se pudo descargar el video. Puede haber fallado la API o el enlace.'
+    const mensaje =
+      error?.code === 'ECONNABORTED'
+        ? 'La API tardó demasiado en responder.'
+        : error?.response?.status === 429
+          ? 'La API está recibiendo demasiadas solicitudes. Esperá un momento.'
+          : 'No se pudo descargar el video. Puede haber fallado la API o el enlace.'
 
-    return conn.sendMessage(
-      m.chat,
-      {
-        text: `❌ *Error de TikTok*\n\n${mensaje}`
-      },
-      { quoted: m }
-    )
+    try {
+      return await conn.sendMessage(
+        m.chat,
+        { text: `❌ *Error de TikTok*\n\n${mensaje}` },
+        { quoted: m }
+      )
+    } catch (sendError) {
+      console.error('[TIKTOK] No se pudo enviar el error:', sendError)
+    }
   }
 }
 

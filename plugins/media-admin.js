@@ -1,30 +1,17 @@
+
 // 📂 plugins/media-admin.js
 // 🛡️ WHATSAPP-BOT — SISTEMA COMPLETO DE MEDIOS
 // 💾 Guardado automático + administrador + limpieza de DB
-// 📌 Recuperación en el grupo donde se usa el comando
-// 📌 Grupo central conservado para otras funciones
+// 📌 Recuperación con confirmación junto al archivo
 // ============================================================
 
 import fs from 'fs'
 import path from 'path'
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
 
-// ============================================================
-// 📁 CONFIGURACIÓN
-// ============================================================
-
 const MEDIA_DB_FILE = './database/media.json'
 const MEDIA_FOLDER = './media'
-
-// ============================================================
-// 📌 GRUPO CENTRAL ORIGINAL
-// ============================================================
-
 const MEDIA_GROUP = '120363410955044864@g.us'
-
-// ============================================================
-// 📂 CREAR CARPETAS Y BASE DE DATOS
-// ============================================================
 
 fs.mkdirSync('./database', { recursive: true })
 fs.mkdirSync(MEDIA_FOLDER, { recursive: true })
@@ -34,7 +21,7 @@ if (!fs.existsSync(MEDIA_DB_FILE)) {
 }
 
 // ============================================================
-// 👑 OBTENER OWNERS
+// 👑 OWNERS
 // ============================================================
 
 function getOwners() {
@@ -44,10 +31,6 @@ function getOwners() {
         .map(owner => String(owner).trim())
         .filter(Boolean)
 }
-
-// ============================================================
-// 🔐 NORMALIZAR JID
-// ============================================================
 
 function normalizeJid(jid) {
     if (!jid) return ''
@@ -67,9 +50,7 @@ function getNumber(jid) {
 
 function isOwner(m, conn) {
     const sender = normalizeJid(
-        conn?.decodeJid
-            ? conn.decodeJid(m.sender)
-            : m.sender
+        conn?.decodeJid ? conn.decodeJid(m.sender) : m.sender
     )
 
     const senderNumber = getNumber(sender)
@@ -90,7 +71,7 @@ function isOwner(m, conn) {
 }
 
 // ============================================================
-// 📂 CARGAR BASE DE DATOS
+// 📂 BASE DE DATOS
 // ============================================================
 
 function loadMediaDB() {
@@ -111,10 +92,6 @@ function loadMediaDB() {
     }
 }
 
-// ============================================================
-// 💾 GUARDAR BASE DE DATOS
-// ============================================================
-
 function saveMediaDB(list) {
     try {
         const tempFile = `${MEDIA_DB_FILE}.tmp`
@@ -126,7 +103,6 @@ function saveMediaDB(list) {
         )
 
         fs.renameSync(tempFile, MEDIA_DB_FILE)
-
         return true
     } catch (error) {
         console.error('[MEDIA] Error guardando media.json:', error)
@@ -135,7 +111,7 @@ function saveMediaDB(list) {
 }
 
 // ============================================================
-// 📍 OBTENER RUTA DEL ARCHIVO
+// 📍 RUTA SEGURA DEL ARCHIVO
 // ============================================================
 
 function getFilePath(item) {
@@ -183,14 +159,12 @@ function getFilePath(item) {
 }
 
 // ============================================================
-// 🧹 SINCRONIZAR REGISTROS CON LOS ARCHIVOS
+// 🔄 SINCRONIZAR BASE DE DATOS
 // ============================================================
 
 function syncMediaDB() {
     try {
         const list = loadMediaDB()
-
-        // No sobrescribir la base si no se pudo leer.
         if (!list) return null
 
         const valid = list.filter(item => Boolean(getFilePath(item)))
@@ -219,14 +193,10 @@ function syncMediaDB() {
     }
 }
 
-// ============================================================
-// 🚀 SINCRONIZAR AL CARGAR EL PLUGIN
-// ============================================================
-
 syncMediaDB()
 
 // ============================================================
-// 💾 GUARDAR IMÁGENES, VIDEOS, AUDIOS Y DOCUMENTOS
+// 💾 GUARDAR MEDIOS ENTRANTES
 // ============================================================
 
 async function saveIncomingMedia(m, conn) {
@@ -241,19 +211,12 @@ async function saveIncomingMedia(m, conn) {
         }
 
         const type = typeMap[m.mtype]
-
         if (!type) return
 
-        const buffer = await downloadMediaMessage(
-            m,
-            'buffer',
-            {}
-        )
-
+        const buffer = await downloadMediaMessage(m, 'buffer', {})
         if (!buffer || !buffer.length) return
 
         const list = syncMediaDB()
-
         if (!list) return
 
         const uniqueName =
@@ -267,7 +230,7 @@ async function saveIncomingMedia(m, conn) {
             extension = '.mp4'
         } else if (type === 'audio') {
             extension = '.mp3'
-        } else if (type === 'document') {
+        } else {
             const originalName =
                 m.msg?.fileName ||
                 m.message?.documentMessage?.fileName ||
@@ -308,7 +271,9 @@ async function saveIncomingMedia(m, conn) {
                 m.msg?.mimetype ||
                 m.message?.documentMessage?.mimetype ||
                 null,
-            date: new Date().toLocaleString()
+            date: new Date().toLocaleString('es-UY', {
+                timeZone: 'America/Montevideo'
+            })
         }
 
         list.push(entry)
@@ -317,7 +282,6 @@ async function saveIncomingMedia(m, conn) {
             try {
                 fs.unlinkSync(filepath)
             } catch {}
-
             return
         }
 
@@ -335,11 +299,19 @@ async function saveIncomingMedia(m, conn) {
 }
 
 // ============================================================
-// 📤 ENVIAR ARCHIVO A UN GRUPO
+// 📤 ENVIAR ARCHIVO CON CONFIRMACIÓN EN EL MISMO MENSAJE
 // ============================================================
 
-async function sendMediaToGroup(conn, groupId, item, filepath) {
+async function sendMediaToGroup(conn, chatId, item, filepath) {
     const buffer = fs.readFileSync(filepath)
+    const id = item.id
+
+    const caption =
+        `╭━━〔 ✅ *MEDIO RECUPERADO* 〕━━╮\n\n` +
+        `📂 *Media N.º ${id} recuperada correctamente.*\n` +
+        `📦 *Tipo:* ${item.type}\n` +
+        `📄 *Archivo:* ${item.filename}\n\n` +
+        `╰━━━━━━━━━━━━━━━━━━╯`
 
     const mimetype =
         item.mimetype ||
@@ -351,31 +323,37 @@ async function sendMediaToGroup(conn, groupId, item, filepath) {
         )
 
     if (item.type === 'image') {
-        return conn.sendMessage(groupId, {
+        return conn.sendMessage(chatId, {
             image: buffer,
-            mimetype
+            mimetype,
+            caption
         })
     }
 
     if (item.type === 'video') {
-        return conn.sendMessage(groupId, {
+        return conn.sendMessage(chatId, {
             video: buffer,
-            mimetype
+            mimetype,
+            caption
         })
     }
 
     if (item.type === 'audio') {
-        return conn.sendMessage(groupId, {
-            audio: buffer,
+        // WhatsApp no admite caption normal en mensajes de audio.
+        // Se envía como documento para que el texto acompañe al archivo.
+        return conn.sendMessage(chatId, {
+            document: buffer,
             mimetype,
-            ptt: false
+            fileName: item.filename || 'audio.mp3',
+            caption
         })
     }
 
-    return conn.sendMessage(groupId, {
+    return conn.sendMessage(chatId, {
         document: buffer,
         mimetype,
-        fileName: item.filename || 'archivo'
+        fileName: item.filename || 'archivo',
+        caption
     })
 }
 
@@ -385,10 +363,6 @@ async function sendMediaToGroup(conn, groupId, item, filepath) {
 
 const handler = async (m, { conn, args, text }) => {
     try {
-        // --------------------------------------------------------
-        // 👑 SOLO OWNERS
-        // --------------------------------------------------------
-
         if (!isOwner(m, conn)) return
 
         let list = syncMediaDB()
@@ -417,9 +391,7 @@ const handler = async (m, { conn, args, text }) => {
 
         if (
             !cmd ||
-            cmd === 'list' ||
-            cmd === 'lista' ||
-            cmd === 'medias'
+            ['list', 'lista', 'medias'].includes(cmd)
         ) {
             if (!list.length) {
                 return conn.reply(
@@ -429,15 +401,13 @@ const handler = async (m, { conn, args, text }) => {
                 )
             }
 
-            const max = Math.min(list.length, 800)
-
-            const lines = list.slice(0, max).map(item => (
+            const lines = list.slice(0, 800).map(item =>
                 `🆔 *ID:* ${item.id}\n` +
                 `📄 *Archivo:* ${item.filename}\n` +
                 `📦 *Tipo:* ${item.type}\n` +
                 `👥 *Grupo:* ${item.groupName || item.groupId || 'Privado'}\n` +
                 `📅 *Fecha:* ${item.date || 'Desconocida'}`
-            ))
+            )
 
             return conn.reply(
                 m.chat,
@@ -453,15 +423,12 @@ const handler = async (m, { conn, args, text }) => {
         // 🧹 LIMPIAR TODOS LOS MEDIOS
         // --------------------------------------------------------
 
-        if (
-            ['clear', 'clean', 'wipe', 'limpiar'].includes(cmd)
-        ) {
+        if (['clear', 'clean', 'wipe', 'limpiar'].includes(cmd)) {
             let deletedFiles = 0
             let failedFiles = 0
 
             for (const item of list) {
                 const filepath = getFilePath(item)
-
                 if (!filepath) continue
 
                 try {
@@ -496,12 +463,10 @@ const handler = async (m, { conn, args, text }) => {
         }
 
         // --------------------------------------------------------
-        // 🔄 SINCRONIZAR BASE DE DATOS
+        // 🔄 SINCRONIZAR
         // --------------------------------------------------------
 
-        if (
-            ['sync', 'sincronizar', 'repair', 'fix'].includes(cmd)
-        ) {
+        if (['sync', 'sincronizar', 'repair', 'fix'].includes(cmd)) {
             const before = loadMediaDB()
 
             if (!before) {
@@ -533,7 +498,6 @@ const handler = async (m, { conn, args, text }) => {
 
         // --------------------------------------------------------
         // 🗑️ BORRAR MEDIOS POR ID
-        // Ejemplo: .media del 2
         // --------------------------------------------------------
 
         if (
@@ -597,7 +561,8 @@ const handler = async (m, { conn, args, text }) => {
                 global.db.data.mediaList = list
             }
 
-            let response = `🗑️ *MEDIOS ELIMINADOS*\n\n✅ Eliminados: *${deleted}*`
+            let response =
+                `🗑️ *MEDIOS ELIMINADOS*\n\n✅ Eliminados: *${deleted}*`
 
             if (notFound.length) {
                 response += `\n❌ No encontrados: *${notFound.join(', ')}*`
@@ -608,13 +573,7 @@ const handler = async (m, { conn, args, text }) => {
 
         // --------------------------------------------------------
         // 📤 RECUPERAR MEDIO POR ID
-        //
-        // .media 1
-        // .media 100
-        //
-        // 📌 ENVÍA AL GRUPO DONDE SE EJECUTA EL COMANDO
-        // 📌 Si se usa en privado, envía al chat privado
-        // 📌 No responde con confirmación adicional
+        // Ejemplo: .media 5
         // --------------------------------------------------------
 
         if (/^\d+$/.test(cmd)) {
@@ -655,10 +614,9 @@ const handler = async (m, { conn, args, text }) => {
                 )
             }
 
-            // Enviar al mismo chat donde se ejecutó .media.
-            // En un grupo: al grupo actual.
-            // En privado: al chat privado actual.
             try {
+                // El archivo y la confirmación salen en un mismo mensaje.
+                // Se envía al chat donde se ejecutó el comando.
                 await sendMediaToGroup(
                     conn,
                     m.chat,
@@ -670,14 +628,19 @@ const handler = async (m, { conn, args, text }) => {
                     `[MEDIA] Falló el envío del ID ${id} al chat ${m.chat}:`,
                     error
                 )
+
+                return conn.reply(
+                    m.chat,
+                    `❌ No se pudo recuperar el medio N.º ${id}.`,
+                    m
+                )
             }
 
-            // Sin confirmación adicional.
             return
         }
 
         // --------------------------------------------------------
-        // ❓ COMANDO NO RECONOCIDO
+        // ❓ COMANDO DESCONOCIDO
         // --------------------------------------------------------
 
         return conn.reply(
@@ -698,7 +661,6 @@ const handler = async (m, { conn, args, text }) => {
 handler.all = async function (m) {
     try {
         if (!m?.message) return
-
         await saveIncomingMedia(m, this)
     } catch (error) {
         console.error('[MEDIA] Error en handler.all:', error)
@@ -706,9 +668,19 @@ handler.all = async function (m) {
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN DEL PLUGIN
+// ⚙️ CONFIGURACIÓN
 // ============================================================
 
+handler.help = [
+    'media',
+    'media <id>',
+    'media del <id>',
+    'media list',
+    'media sync',
+    'media limpiar'
+]
+
+handler.tags = ['owner']
 handler.command = ['media', 'medias']
 handler.owner = true
 

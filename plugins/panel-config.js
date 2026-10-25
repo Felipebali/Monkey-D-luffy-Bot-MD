@@ -1,8 +1,6 @@
 
-/**
- * 📂 plugins/grupo-configuracion.js
- * ⚙️ WHATSAPP-BOT — PANEL DE CONFIGURACIÓN DEL GRUPO
- */
+// 📂 plugins/grupo-configuracion.js
+// ⚙️ WHATSAPP-BOT — PANEL DE CONFIGURACIÓN DEL GRUPO
 
 import fs from 'fs'
 import path from 'path'
@@ -21,7 +19,8 @@ const aliasMap = {
   onlyadmin: ['onlyadmin', 'onlyAdmin', 'soloAdmins', 'modoadmin'],
   nsfw: ['nsfw'],
   juegos: ['juegos', 'games'],
-  welcome: ['welcome', 'bienvenida']
+  welcome: ['welcome', 'bienvenida'],
+  antiestado2: ['antiestado2']
 }
 
 // ============================================================
@@ -34,7 +33,6 @@ const antilink2File = path.join('./database', 'antilink2.json')
 
 // ============================================================
 // 🛡️ ANTIESTADO
-// Formato esperado: { "ID_DEL_GRUPO@g.us": true }
 // ============================================================
 
 function getAntiEstadoValue(groupJid) {
@@ -54,7 +52,6 @@ function getAntiEstadoValue(groupJid) {
 
 // ============================================================
 // 📢 ANTICANAL
-// Formato esperado: { "grupos": { "ID_DEL_GRUPO@g.us": true } }
 // ============================================================
 
 function getAntiCanalValue(groupJid) {
@@ -73,8 +70,7 @@ function getAntiCanalValue(groupJid) {
 }
 
 // ============================================================
-// 🌍 ANTILINK2 — ENLACES SOCIALES
-// Formato esperado: { "grupos": { "ID_DEL_GRUPO@g.us": true } }
+// 🌍 ANTILINK2
 // ============================================================
 
 function getAntiLink2Value(groupJid) {
@@ -168,10 +164,13 @@ const handler = async (m, { isAdmin, isOwner }) => {
 
   const chat = global.db.data.chats[m.chat]
 
-  // Leer estados de archivos independientes
+  // Estados guardados en archivos independientes
   const antiestado = getAntiEstadoValue(m.chat)
   const anticanal = getAntiCanalValue(m.chat)
   const antilink2 = getAntiLink2Value(m.chat)
+
+  // AntiEstado2 usa global.db.data.chats
+  const antiestado2 = getChatValue(chat, 'antiestado2')
 
   const panel = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
@@ -207,6 +206,10 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🚨 AntiEstado
 └─ ${status(antiestado)}
    └─ *.antiestado*
+
+🚨 AntiEstado2
+└─ ${status(antiestado2)}
+   └─ *.antiestado2*
 
 📢 AntiCanal
 └─ ${status(anticanal)}
@@ -254,6 +257,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🛡️ .antispam
 ⚡ .antitagall
 🚨 .antiestado
+🚨 .antiestado2
 📢 .anticanal
 
 🎭 .evento

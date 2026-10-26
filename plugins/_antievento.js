@@ -11,13 +11,23 @@ function getChatData(chatId) {
   return global.db.data.chats[chatId]
 }
 
+// ============================================================
+// 🔎 DETECTAR EVENT
+// ============================================================
+
 function containsEvent(message, depth = 0) {
-  if (!message || typeof message !== 'object' || depth > 8) {
+  if (!message || typeof message !== 'object' || depth > 10) {
     return false
   }
 
   for (const [key, value] of Object.entries(message)) {
-    if (key.toLowerCase() === 'Event') {
+    const normalized = key.toLowerCase()
+
+    if (
+      normalized === 'event' ||
+      normalized === 'eventmessage' ||
+      normalized === 'eventcreationmessage'
+    ) {
       return true
     }
 
@@ -36,6 +46,8 @@ function isEventMessage(m) {
 
   return (
     type === 'event' ||
+    type.includes('eventmessage') ||
+    type.includes('eventcreation') ||
     containsEvent(m.message) ||
     containsEvent(m.msg)
   )
@@ -55,8 +67,8 @@ const handler = async (m, { conn }) => {
 
   return conn.sendMessage(m.chat, {
     text: chat.antievento
-      ? '🎭 *ANTIEVENTO ACTIVADO* ✅\n\n🚫 Se intentarán eliminar los mensajes de tipo `Event`.\n🔔 Se mencionará al usuario detectado.'
-      : '🎭 *ANTIEVENTO DESACTIVADO* ❌\n\nLa moderación de eventos quedó desactivada.'
+      ? '🎭 *ANTIEVENTO ACTIVADO* ✅\n\n🚫 Se intentarán eliminar los mensajes Event.\n🔔 Se mencionará al usuario que los publique.'
+      : '🎭 *ANTIEVENTO DESACTIVADO* ❌\n\nLa función quedó desactivada.'
   })
 }
 
@@ -67,7 +79,7 @@ handler.group = true
 handler.admin = true
 
 // ============================================================
-// 🔍 DETECCIÓN Y ELIMINACIÓN
+// 🗑️ DETECCIÓN Y ELIMINACIÓN
 // ============================================================
 
 handler.all = async function (m) {
@@ -76,33 +88,48 @@ handler.all = async function (m) {
   const chat = global.db?.data?.chats?.[m.chat]
   if (!chat?.antievento) return
 
-  if (!isEventMessage(m)) return
+  // Diagnóstico para identificar el formato real de Event.
+  const eventDetected = isEventMessage(m)
 
-  const sender = m.sender || m.key?.participant || m.participant
-  if (!sender) return
+  console.log('[ANTIEVENTO] Tipo:', m.mtype)
+  console.log('[ANTIEVENTO] Detectado:', eventDetected)
 
+  if (!eventDetected) return
+
+  const sender =
+    m.sender ||
+    m.key?.participant ||
+    m.participant
+
+  if (!sender) {
+    console.log('[ANTIEVENTO] No se pudo identificar al autor.')
+    return
+  }
+
+  const key = m.key
   let deleted = false
 
-  if (m.key?.id && m.key?.remoteJid) {
+  if (key?.id && key?.remoteJid) {
     try {
       await this.sendMessage(m.chat, {
-        delete: m.key
+        delete: key
       })
+
       deleted = true
     } catch (error) {
-      console.error('[ANTIEVENTO] Error al borrar:', error)
+      console.error('[ANTIEVENTO] Error al eliminar:', error)
     }
   }
 
   const text = deleted
-    ? '🚨 *ANTIEVENTO*\n\n' +
+    ? '🎭 *ANTIEVENTO*\n\n' +
       `👤 Usuario: @${sender.split('@')[0]}\n` +
-      '🚫 No se permiten estos eventos en el grupo.\n' +
+      '🚫 No se permiten eventos de este tipo en el grupo.\n' +
       '🗑️ Se solicitó eliminar el mensaje.'
-    : '🚨 *ANTIEVENTO*\n\n' +
+    : '🎭 *ANTIEVENTO*\n\n' +
       `👤 Usuario: @${sender.split('@')[0]}\n` +
-      '🚫 Se detectó un evento no permitido.\n' +
-      '⚠️ No se pudo confirmar su eliminación.'
+      '🚫 Se detectó un mensaje Event.\n' +
+      '⚠️ No se pudo confirmar la eliminación.'
 
   try {
     await this.sendMessage(m.chat, {

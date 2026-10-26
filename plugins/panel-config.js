@@ -1,4 +1,3 @@
-
 // 📂 plugins/grupo-configuracion.js
 // ⚙️ WHATSAPP-BOT — PANEL DE CONFIGURACIÓN DEL GRUPO
 
@@ -20,7 +19,8 @@ const aliasMap = {
   nsfw: ['nsfw'],
   juegos: ['juegos', 'games'],
   welcome: ['welcome', 'bienvenida'],
-  antiestado2: ['antiestado2']
+  antiestado2: ['antiestado2'],
+  antiencuesta: ['antiencuesta']
 }
 
 // ============================================================
@@ -169,8 +169,9 @@ const handler = async (m, { isAdmin, isOwner }) => {
   const anticanal = getAntiCanalValue(m.chat)
   const antilink2 = getAntiLink2Value(m.chat)
 
-  // AntiEstado2 usa global.db.data.chats
+  // Estados guardados en global.db.data.chats
   const antiestado2 = getChatValue(chat, 'antiestado2')
+  const antiencuesta = getChatValue(chat, 'antiencuesta')
 
   const panel = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
@@ -210,6 +211,10 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🚨 AntiEstado2
 └─ ${status(antiestado2)}
    └─ *.antiestado2*
+
+📊 AntiEncuesta
+└─ ${status(antiencuesta)}
+   └─ *.antiencuesta*
 
 📢 AntiCanal
 └─ ${status(anticanal)}
@@ -258,6 +263,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
 ⚡ .antitagall
 🚨 .antiestado
 🚨 .antiestado2
+📊 .antiencuesta
 📢 .anticanal
 
 🎭 .evento

@@ -17,7 +17,7 @@ function containsEvent(message, depth = 0) {
   }
 
   for (const [key, value] of Object.entries(message)) {
-    if (key.toLowerCase() === 'event') {
+    if (key.toLowerCase() === 'Event') {
       return true
     }
 

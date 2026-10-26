@@ -88,12 +88,7 @@ handler.all = async function (m) {
   const chat = global.db?.data?.chats?.[m.chat]
   if (!chat?.antievento) return
 
-  // Diagnóstico para identificar el formato real de Event.
   const eventDetected = isEventMessage(m)
-
-  console.log('[ANTIEVENTO] Tipo:', m.mtype)
-  console.log('[ANTIEVENTO] Detectado:', eventDetected)
-
   if (!eventDetected) return
 
   const sender =
@@ -101,10 +96,7 @@ handler.all = async function (m) {
     m.key?.participant ||
     m.participant
 
-  if (!sender) {
-    console.log('[ANTIEVENTO] No se pudo identificar al autor.')
-    return
-  }
+  if (!sender) return
 
   const key = m.key
   let deleted = false
@@ -117,7 +109,7 @@ handler.all = async function (m) {
 
       deleted = true
     } catch (error) {
-      console.error('[ANTIEVENTO] Error al eliminar:', error)
+      deleted = false
     }
   }
 
@@ -137,7 +129,7 @@ handler.all = async function (m) {
       mentions: [sender]
     })
   } catch (error) {
-    console.error('[ANTIEVENTO] Error al enviar aviso:', error)
+    // Evita mostrar errores en la consola.
   }
 }
 

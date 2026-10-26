@@ -16,6 +16,7 @@ const aliasMap = {
   antitagall: ['tagallEnabled', 'antitagall'],
   evento: ['evento', 'detect'],
   antievento: ['antievento'],
+  antilocation: ['antilocation'],
   onlyadmin: ['onlyadmin', 'onlyAdmin', 'soloAdmins', 'modoadmin'],
   nsfw: ['nsfw'],
   juegos: ['juegos', 'games'],
@@ -174,6 +175,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
   const antiestado2 = getChatValue(chat, 'antiestado2')
   const antiencuesta = getChatValue(chat, 'antiencuesta')
   const antievento = getChatValue(chat, 'antievento')
+  const antilocation = getChatValue(chat, 'antilocation')
 
   const panel = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
@@ -221,6 +223,10 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🎫 AntiEvento
 └─ ${status(antievento)}
    └─ *.antievento*
+
+📍 AntiLocation
+└─ ${status(antilocation)}
+   └─ *.antilocation*
 
 📢 AntiCanal
 └─ ${status(anticanal)}
@@ -271,6 +277,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🚨 .antiestado2
 📊 .antiencuesta
 🎫 .antievento
+📍 .antilocation
 📢 .anticanal
 
 🎭 .evento

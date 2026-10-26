@@ -35,6 +35,7 @@ function normalizeJid(value = '') {
   const jid = String(value).trim().replace(/^\+/, '')
 
   if (!jid) return null
+
   if (jid.endsWith('@c.us')) {
     return jid.replace('@c.us', '@s.whatsapp.net')
   }
@@ -134,6 +135,7 @@ function participantMatches(participant, targetJid) {
   if (!participant || !targetJid) return false
 
   const target = normalizeJid(targetJid)
+
   const ids = [
     participant.id,
     participant.jid,
@@ -203,6 +205,63 @@ function formatDate(timestamp) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 📣 ENVIAR AVISO DE EXPULSIÓN
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+async function sendKickNotice(
+  conn,
+  groupJid,
+  removalJid,
+  reason
+) {
+  const text =
+`╭━━〔 *whatsapp-bot* 〕━━⬣
+┃
+┃ ⛔ *USUARIO ELIMINADO*
+┃
+┃ 👤 @${removalJid.split('@')[0]}
+┃ 📝 *Motivo:* ${safeText(reason, 120)}
+┃ 🛡️ *Sistema:* Lista negra global
+┃
+╰━━━━━━━━━━━━━━━━━━⬣`
+
+  // Primer intento: mensaje con mención.
+  try {
+    await conn.sendMessage(groupJid, {
+      text,
+      mentions: [removalJid]
+    })
+
+    return true
+  } catch (error) {
+    console.error(
+      `[whatsapp-bot] Falló el aviso con mención en ${groupJid}:`,
+      error?.message || error
+    )
+  }
+
+  // Segundo intento: mensaje simple, sin mención.
+  try {
+    await conn.sendMessage(groupJid, {
+      text:
+`⛔ *USUARIO ELIMINADO*
+👤 Usuario: ${removalJid.split('@')[0]}
+📝 Motivo: ${safeText(reason, 120)}
+🛡️ Sistema: Lista negra global`
+    })
+
+    return true
+  } catch (error) {
+    console.error(
+      `[whatsapp-bot] Fallaron los dos intentos de aviso en ${groupJid}:`,
+      error?.message || error
+    )
+
+    return false
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 🚫 EXPULSIÓN Y AVISO
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -214,6 +273,7 @@ async function kickUser(
   notify = true
 ) {
   const lockKey = `${groupJid}:${targetJid}`
+
   if (activeKicks.has(lockKey)) {
     return { ok: false, reason: 'En proceso' }
   }
@@ -223,6 +283,7 @@ async function kickUser(
   try {
     const metadata = await conn.groupMetadata(groupJid)
     const participants = metadata?.participants || []
+    const groupName = metadata?.subject || groupJid
 
     const participant = participants.find(
       p => participantMatches(p, targetJid)
@@ -232,11 +293,12 @@ async function kickUser(
       return {
         ok: false,
         reason: 'No estaba en el grupo',
-        groupName: metadata?.subject || groupJid
+        groupName
       }
     }
 
     const botJid = normalizeJid(conn.user?.id || conn.user?.jid)
+
     const botParticipant = participants.find(
       p => participantMatches(p, botJid)
     )
@@ -245,44 +307,60 @@ async function kickUser(
       return {
         ok: false,
         reason: 'El bot no es administrador',
-        groupName: metadata?.subject || groupJid
+        groupName
       }
     }
 
     const removalJid = getParticipantJid(participant)
+
     if (!removalJid) {
       return {
         ok: false,
         reason: 'No se pudo identificar al usuario',
-        groupName: metadata?.subject || groupJid
+        groupName
       }
     }
 
-    await conn.groupParticipantsUpdate(
+    // Expulsar al usuario.
+    const updateResult = await conn.groupParticipantsUpdate(
       groupJid,
       [removalJid],
       'remove'
     )
 
+    // Revisar si WhatsApp devolvió un error explícito.
+    const updateStatus = Array.isArray(updateResult)
+      ? updateResult[0]?.status
+      : updateResult?.status
+
+    if (
+      updateStatus &&
+      !['200', 200].includes(updateStatus)
+    ) {
+      return {
+        ok: false,
+        reason: `WhatsApp no confirmó la expulsión (estado ${updateStatus})`,
+        groupName
+      }
+    }
+
+    // Avisar después de la expulsión, con un segundo intento
+    // automático si falla el envío del mensaje.
+    let notificationSent = false
+
     if (notify) {
-      await conn.sendMessage(groupJid, {
-        text:
-`╭━━〔 *whatsapp-bot* 〕━━⬣
-┃
-┃ ⛔ *USUARIO ELIMINADO*
-┃
-┃ 👤 @${removalJid.split('@')[0]}
-┃ 📝 *Motivo:* ${safeText(reason, 120)}
-┃ 🛡️ *Sistema:* Lista negra global
-┃
-╰━━━━━━━━━━━━━━━━━━⬣`,
-        mentions: [removalJid]
-      }).catch(() => {})
+      notificationSent = await sendKickNotice(
+        conn,
+        groupJid,
+        removalJid,
+        reason
+      )
     }
 
     return {
       ok: true,
-      groupName: metadata?.subject || groupJid
+      groupName,
+      notificationSent
     }
   } catch (error) {
     console.error(
@@ -343,7 +421,7 @@ const handler = async (m, { conn, command, text = '' }) => {
   } catch {}
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📋 LISTA NEGRA — FORMATO TIPO DIRECTORIO
+  // 📋 VER LISTA NEGRA
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   if (cmd === 'vln') {
@@ -535,27 +613,31 @@ const handler = async (m, { conn, command, text = '' }) => {
     let absent = 0
     const failedGroups = []
 
-    await runWithConcurrency(groups, MAX_CONCURRENT_KICKS, async groupJid => {
-      const result = await kickUser(
-        conn,
-        groupJid,
-        storedJid,
-        reason,
-        true
-      )
+    await runWithConcurrency(
+      groups,
+      MAX_CONCURRENT_KICKS,
+      async groupJid => {
+        const result = await kickUser(
+          conn,
+          groupJid,
+          storedJid,
+          reason,
+          true
+        )
 
-      if (result.ok) {
-        kicked++
-      } else if (result.reason === 'No estaba en el grupo') {
-        absent++
-      } else {
-        failed++
-        failedGroups.push({
-          name: result.groupName || groupJid,
-          reason: result.reason || 'Error desconocido'
-        })
+        if (result.ok) {
+          kicked++
+        } else if (result.reason === 'No estaba en el grupo') {
+          absent++
+        } else {
+          failed++
+          failedGroups.push({
+            name: result.groupName || groupJid,
+            reason: result.reason || 'Error desconocido'
+          })
+        }
       }
-    })
+    )
 
     let report =
 `╭─「 *whatsapp-bot / seguridad* 」

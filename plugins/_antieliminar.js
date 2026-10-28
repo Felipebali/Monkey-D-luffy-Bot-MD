@@ -6,11 +6,21 @@
  * Comando: .antieliminar
  * Detecta: ProtocolMessage REVOKE
  *
+ * Funciones:
+ * - Identifica quién envió el mensaje original.
+ * - Identifica quién eliminó el mensaje.
+ * - Recupera el texto cuando está disponible.
+ * - Envía el aviso y el contenido en un solo mensaje.
+ *
  * Baileys ES Modules
  */
 
 const MAX_CACHE = 1000
 const CACHE_TTL = 24 * 60 * 60 * 1000
+
+// ============================================================
+// 🗃️ UTILIDADES
+// ============================================================
 
 function getChatData(m) {
   global.db.data.chats = global.db.data.chats || {}
@@ -46,6 +56,11 @@ function getMessageContent(message) {
       continue
     }
 
+    if (current.viewOnceMessageV2Extension?.message) {
+      current = current.viewOnceMessageV2Extension.message
+      continue
+    }
+
     if (current.documentWithCaptionMessage?.message) {
       current = current.documentWithCaptionMessage.message
       continue
@@ -57,7 +72,10 @@ function getMessageContent(message) {
     }
   }
 
-  return { type: 'normal', content: current }
+  return {
+    type: 'normal',
+    content: current || {}
+  }
 }
 
 function getText(message) {
@@ -71,6 +89,9 @@ function getText(message) {
     message.documentMessage?.caption ||
     message.documentWithCaptionMessage?.message
       ?.documentMessage?.caption ||
+    message.buttonsResponseMessage?.selectedDisplayText ||
+    message.listResponseMessage?.title ||
+    message.templateButtonReplyMessage?.selectedDisplayText ||
     ''
   )
 }
@@ -79,12 +100,16 @@ function getSender(key) {
   return key?.participant || key?.remoteJid || ''
 }
 
+function formatSender(jid) {
+  if (!jid) return 'Desconocido'
+  return `@${jid.split('@')[0].split(':')[0]}`
+}
+
 function isRevoke(protocol) {
   if (!protocol) return false
 
   const type = protocol.type
 
-  // En Baileys, REVOKE suele representarse con el valor 0.
   return (
     type === 0 ||
     type === 'REVOKE' ||
@@ -111,6 +136,7 @@ function cleanCache(cache) {
 
   while (cache.size > MAX_CACHE) {
     const oldestKey = cache.keys().next().value
+    if (!oldestKey) break
     cache.delete(oldestKey)
   }
 }
@@ -119,13 +145,63 @@ function cacheKey(chat, id) {
   return `${chat}:${id}`
 }
 
+function getMediaDescription(message) {
+  if (!message) return 'Contenido no disponible'
+
+  if (message.imageMessage) {
+    return '🖼️ Imagen'
+  }
+
+  if (message.videoMessage) {
+    return '🎥 Video'
+  }
+
+  if (message.audioMessage) {
+    return message.audioMessage.ptt
+      ? '🎤 Nota de voz'
+      : '🎵 Audio'
+  }
+
+  if (message.stickerMessage) {
+    return '🏷️ Sticker'
+  }
+
+  if (message.documentMessage) {
+    const fileName = message.documentMessage.fileName
+    return fileName
+      ? `📄 Documento: ${fileName}`
+      : '📄 Documento'
+  }
+
+  if (message.contactMessage || message.contactsArrayMessage) {
+    return '👤 Contacto'
+  }
+
+  if (message.locationMessage || message.liveLocationMessage) {
+    return '📍 Ubicación'
+  }
+
+  if (message.pollCreationMessage ||
+      message.pollCreationMessageV3) {
+    return '📊 Encuesta'
+  }
+
+  if (message.reactionMessage) {
+    return '😀 Reacción'
+  }
+
+  return '⚠️ No se pudo leer el contenido'
+}
+
 // ============================================================
 // ⚙️ COMANDO: ACTIVAR / DESACTIVAR
 // ============================================================
 
 const handler = async (m, { conn }) => {
   if (!m.isGroup) {
-    return m.reply('⚠️ Este comando solo funciona en grupos.')
+    return m.reply(
+      '⚠️ Este comando solo funciona en grupos.'
+    )
   }
 
   const chat = getChatData(m)
@@ -135,16 +211,17 @@ const handler = async (m, { conn }) => {
     return conn.sendMessage(m.chat, {
       text:
         '🛡️ *ANTI-ELIMINAR ACTIVADO* ✅\n\n' +
-        '👀 Detectaré eliminaciones mediante ProtocolMessage.\n' +
-        '📥 Intentaré recuperar mensajes guardados antes de su eliminación.\n\n' +
-        '⚠️ Solo se podrán recuperar mensajes que el bot haya recibido y guardado.'
+        '👀 Detectaré mensajes eliminados mediante ProtocolMessage.\n' +
+        '👤 Mostraré quién envió el mensaje y quién lo eliminó.\n' +
+        '💬 El aviso y el contenido recuperado se enviarán juntos.\n\n' +
+        '⚠️ Solo puedo recuperar mensajes que el bot haya recibido y guardado mientras esta función estaba activa.'
     })
   }
 
   return conn.sendMessage(m.chat, {
     text:
       '🛡️ *ANTI-ELIMINAR DESACTIVADO* ❌\n\n' +
-      'Ya no se avisarán ni recuperarán eliminaciones en este grupo.'
+      'Ya no se detectarán eliminaciones en este grupo.'
   })
 }
 
@@ -154,22 +231,26 @@ handler.command = ['antieliminar']
 handler.group = true
 
 // ============================================================
-// 🔍 ALMACENAR MENSAJES Y DETECTAR REVOKE
+// 🔍 GUARDAR MENSAJES Y DETECTAR ELIMINACIONES
 // ============================================================
 
 handler.all = async function (m) {
   if (!m?.chat || !m?.key) return
   if (m.fromMe || m.key.fromMe) return
+  if (!m.isGroup) return
 
   const chatData = global.db?.data?.chats?.[m.chat]
-  if (!m.isGroup || !chatData?.antieliminar) return
+  if (!chatData?.antieliminar) return
 
   const cache = getCache()
   cleanCache(cache)
 
   const extracted = getMessageContent(m.message || {})
 
-  // No guardar mensajes de protocolo como si fueran mensajes normales.
+  // ----------------------------------------------------------
+  // 🗑️ DETECTAR MENSAJE ELIMINADO
+  // ----------------------------------------------------------
+
   if (extracted.type === 'protocol') {
     const protocol = extracted.content
 
@@ -181,86 +262,70 @@ handler.all = async function (m) {
     const deletedChat = deletedKey.remoteJid || m.chat
     if (deletedChat !== m.chat) return
 
-    const stored = cache.get(cacheKey(deletedChat, deletedKey.id))
-    const deleter = getSender(m.key)
+    const stored = cache.get(
+      cacheKey(deletedChat, deletedKey.id)
+    )
 
-    let notice =
-      '🗑️ *MENSAJE ELIMINADO*\n\n' +
-      `👤 Eliminado por: @${deleter.split('@')[0]}\n`
+    const deleter = getSender(m.key)
+    const mentions = []
+
+    if (deleter) mentions.push(deleter)
+
+    let originalSender = ''
+    let content = '⚠️ No se encontró una copia del mensaje original.'
 
     if (stored) {
-      const originalSender = getSender(stored.key)
-      const originalContent = getMessageContent(stored.message).content
+      originalSender = getSender(stored.key)
+
+      if (originalSender) {
+        mentions.push(originalSender)
+      }
+
+      const originalExtracted =
+        getMessageContent(stored.message)
+
+      const originalContent = originalExtracted.content || {}
       const recoveredText = getText(originalContent)
 
-      notice +=
-        `✉️ Autor original: @${originalSender.split('@')[0]}\n` +
-        '♻️ Se encontró una copia del mensaje.'
-
-      try {
-        await this.sendMessage(m.chat, {
-          text: notice,
-          mentions: [...new Set([deleter, originalSender].filter(Boolean))]
-        })
-      } catch (error) {
-        console.error('[ANTIELIMINAR] Error enviando aviso:', error)
-      }
-
-      // Si es texto, mostrar el contenido recuperado.
       if (recoveredText) {
-        try {
-          await this.sendMessage(m.chat, {
-            text:
-              '📩 *Contenido recuperado:*\n\n' +
-              recoveredText,
-            mentions: originalSender ? [originalSender] : []
-          })
-        } catch (error) {
-          console.error('[ANTIELIMINAR] Error recuperando texto:', error)
-        }
+        content = recoveredText
       } else {
-        // Para multimedia, intentar reenviar el mensaje original.
-        try {
-          if (typeof this.copyNForward === 'function') {
-            await this.copyNForward(m.chat, stored, true)
-          } else {
-            await this.sendMessage(m.chat, {
-              text:
-                '📎 Se encontró el mensaje eliminado, pero esta versión ' +
-                'del bot no tiene copyNForward para reenviar su contenido.'
-            })
-          }
-        } catch (error) {
-          console.error(
-            '[ANTIELIMINAR] Error reenviando multimedia:',
-            error
-          )
-
-          await this.sendMessage(m.chat, {
-            text:
-              '⚠️ Encontré una copia del mensaje eliminado, ' +
-              'pero no pude reenviar su contenido multimedia.'
-          }).catch(() => {})
-        }
+        content = getMediaDescription(originalContent)
       }
+    }
 
-      cache.delete(cacheKey(deletedChat, deletedKey.id))
-    } else {
-      notice +=
-        '⚠️ No había una copia guardada del mensaje original.'
+    const uniqueMentions = [...new Set(mentions)]
 
+    const report =
+      '🗑️ *MENSAJE ELIMINADO*\n\n' +
+      `👤 *Enviado por:* ${formatSender(originalSender)}\n` +
+      `🚫 *Eliminado por:* ${formatSender(deleter)}\n\n` +
+      '💬 *Contenido del mensaje:*\n' +
+      content
+
+    try {
       await this.sendMessage(m.chat, {
-        text: notice,
-        mentions: deleter ? [deleter] : []
-      }).catch(error => {
-        console.error('[ANTIELIMINAR] Error enviando aviso:', error)
+        text: report,
+        mentions: uniqueMentions
       })
+    } catch (error) {
+      console.error(
+        '[ANTIELIMINAR] Error enviando el reporte:',
+        error
+      )
+    }
+
+    if (stored) {
+      cache.delete(cacheKey(deletedChat, deletedKey.id))
     }
 
     return
   }
 
-  // Guardar el mensaje original para poder encontrarlo si lo eliminan.
+  // ----------------------------------------------------------
+  // 💾 GUARDAR MENSAJE ORIGINAL
+  // ----------------------------------------------------------
+
   if (!m.key.id || !m.message) return
 
   cache.set(cacheKey(m.chat, m.key.id), {

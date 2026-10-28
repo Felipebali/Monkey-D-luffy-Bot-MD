@@ -1,5 +1,8 @@
-// 📂 plugins/grupo-configuracion.js
-// ⚙️ WHATSAPP-BOT — PANEL DE CONFIGURACIÓN DEL GRUPO
+
+/**
+ * 📂 plugins/grupo-configuracion.js
+ * ⚙️ WHATSAPP-BOT — PANEL DE CONFIGURACIÓN DEL GRUPO
+ */
 
 import fs from 'fs'
 import path from 'path'
@@ -17,6 +20,7 @@ const aliasMap = {
   evento: ['evento', 'detect'],
   antievento: ['antievento'],
   antilocation: ['antilocation'],
+  antieliminar: ['antieliminar'],
   onlyadmin: ['onlyadmin', 'onlyAdmin', 'soloAdmins', 'modoadmin'],
   nsfw: ['nsfw'],
   juegos: ['juegos', 'games'],
@@ -176,6 +180,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
   const antiencuesta = getChatValue(chat, 'antiencuesta')
   const antievento = getChatValue(chat, 'antievento')
   const antilocation = getChatValue(chat, 'antilocation')
+  const antieliminar = getChatValue(chat, 'antieliminar')
 
   const panel = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
@@ -219,6 +224,10 @@ const handler = async (m, { isAdmin, isOwner }) => {
 📊 AntiEncuesta
 └─ ${status(antiencuesta)}
    └─ *.antiencuesta*
+
+🗑️ AntiEliminar
+└─ ${status(antieliminar)}
+   └─ *.antieliminar*
 
 🎫 AntiEvento
 └─ ${status(antievento)}
@@ -276,6 +285,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🚨 .antiestado
 🚨 .antiestado2
 📊 .antiencuesta
+🗑️ .antieliminar
 🎫 .antievento
 📍 .antilocation
 📢 .anticanal
@@ -294,12 +304,12 @@ Los comandos funcionan como interruptor.
 
 Ejemplo:
 
-*.welcome*
+*.antieliminar*
 🟢 ACTIVADO
 
 Volvés a usar:
 
-*.welcome*
+*.antieliminar*
 🔴 DESACTIVADO
 
 ━━━━━━━━━━━━━━━━━━━━━━

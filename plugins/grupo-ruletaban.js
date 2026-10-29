@@ -1,36 +1,106 @@
-const ownerNumbers = ['59898719147'] // Reemplazá con los números del dueño sin "+"
 
 let handler = async (m, { conn, participants, isAdmin, isBotAdmin }) => {
-  if (!m.isGroup) return m.reply('❌ Este comando solo se puede usar en grupos.')
-  if (!isBotAdmin) return m.reply('❌ El bot necesita ser administrador para usar este comando.')
-
-  // Verifica si quien lo usa es admin o dueño
-  const senderID = m.sender.split('@')[0]
-  if (!isAdmin && !ownerNumbers.includes(senderID)) {
-    return m.reply('⛔ Este comando solo puede usarlo un administrador o el dueño del bot.')
+  if (!m.isGroup) {
+    return m.reply('❌ Este comando solo se puede usar en grupos.')
   }
 
-  // Filtrar solo usuarios normales (no admins, ni bot, ni dueños)
-  let kickables = participants.filter(p =>
-    !p.admin &&                            // no admin
-    !ownerNumbers.includes(p.id.split('@')[0]) && // no dueño
-    p.id !== conn.user.jid               // no el bot
-  )
+  if (!isBotAdmin) {
+    return m.reply('❌ El bot necesita ser administrador para usar este comando.')
+  }
 
-  if (kickables.length === 0) return m.reply('😅 No hay miembros normales disponibles para expulsar.')
+  // Obtener los owners desde la configuración global
+  const owners = Array.isArray(global.owners)
+    ? global.owners
+    : []
 
-  // Elegir uno al azar
-  let elegido = kickables[Math.floor(Math.random() * kickables.length)]
+  // Normalizar números: acepta números simples o JID
+  const normalizarNumero = (valor) =>
+    String(valor || '')
+      .split('@')[0]
+      .replace(/\D/g, '')
 
-  await conn.sendMessage(m.chat, {
-    text: `🎯 *Ruleta Ban Activada...*\n💣 ¡El elegido al azar fue @${elegido.id.split('@')[0]}!\n\n👋 ¡Hasta la próxima!`,
-    mentions: [elegido.id]
+  const ownerNumbers = owners
+    .map(owner => {
+      // Admite formato string o array [número, nombre]
+      const numero = Array.isArray(owner) ? owner[0] : owner
+      return normalizarNumero(numero)
+    })
+    .filter(Boolean)
+
+  const senderID = normalizarNumero(m.sender)
+
+  // Verificar si quien ejecuta es admin o owner
+  const esOwner = ownerNumbers.includes(senderID)
+
+  if (!isAdmin && !esOwner) {
+    return m.reply(
+      '⛔ Este comando solo puede usarlo un administrador o el dueño del bot.'
+    )
+  }
+
+  // Obtener el JID del bot normalizado
+  const botJid = conn.decodeJid
+    ? conn.decodeJid(conn.user.id)
+    : conn.user.id
+
+  // Filtrar miembros que se pueden expulsar:
+  // no admins, no owners y no el bot
+  const kickables = participants.filter(p => {
+    const id = p.id || p.jid
+    if (!id) return false
+
+    const numero = normalizarNumero(id)
+    const jidNormalizado = conn.decodeJid
+      ? conn.decodeJid(id)
+      : id
+
+    const esAdminParticipante = Boolean(p.admin)
+    const esOwnerParticipante = ownerNumbers.includes(numero)
+    const esBot = jidNormalizado === botJid
+
+    return !esAdminParticipante && !esOwnerParticipante && !esBot
   })
 
-  await new Promise(resolve => setTimeout(resolve, 3000)) // espera 3 segundos
+  if (kickables.length === 0) {
+    return m.reply(
+      '😅 No hay miembros normales disponibles para expulsar.'
+    )
+  }
 
-  await conn.groupParticipantsUpdate(m.chat, [elegido.id], 'remove') // expulsar
+  // Elegir un participante al azar
+  const elegido = kickables[
+    Math.floor(Math.random() * kickables.length)
+  ]
+
+  const elegidoJid = elegido.id || elegido.jid
+  const numeroElegido = normalizarNumero(elegidoJid)
+
+  await conn.sendMessage(m.chat, {
+    text:
+      `🎯 *RULETA BAN ACTIVADA* 🎯\n\n` +
+      `💣 El elegido al azar fue @${numeroElegido}!\n\n` +
+      `👋 ¡Hasta la próxima!`,
+    mentions: [elegidoJid]
+  })
+
+  // Dar tiempo para que el grupo vea el resultado
+  await new Promise(resolve => setTimeout(resolve, 3000))
+
+  try {
+    await conn.groupParticipantsUpdate(
+      m.chat,
+      [elegidoJid],
+      'remove'
+    )
+  } catch (error) {
+    console.error('[RULETABAN] Error al expulsar:', error)
+
+    await m.reply(
+      '❌ No se pudo expulsar al participante. Verificá los permisos del bot.'
+    )
+  }
 }
+
 handler.command = /^ruletaban$/i
 handler.group = true
 handler.admin = false

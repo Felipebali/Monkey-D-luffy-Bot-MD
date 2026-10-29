@@ -2,53 +2,39 @@
 /**
  * 📂 plugins/fortuna.js
  * 🥠 WHATSAPP-BOT — GALLETA DE LA FORTUNA
+ *
+ * Características:
+ * - Imagen y texto en un solo mensaje.
+ * - 40% fortuna rara.
+ * - 40% fortuna normal.
+ * - 20% fortuna mala.
+ * - Evita repetir frases hasta agotar cada categoría.
+ * - Guarda las frases utilizadas en un JSON.
+ * - Descarga la imagen con timeout y respaldo local.
+ * - Compatible con handlers ES Modules.
  */
 
 import fs from 'fs'
 import path from 'path'
 
-const dir = './database'
-const file = path.join(dir, 'fortunas.json')
+const DIR = './database'
+const FILE = path.join(DIR, 'fortunas.json')
+const IMAGE_URL = 'https://files.catbox.moe/xli6lh.jpg'
+const IMAGE_CACHE = path.join(DIR, 'fortuna.jpg')
+const IMAGE_TIMEOUT = 12000
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024
 
-if (!fs.existsSync(dir)) {
-  fs.mkdirSync(dir, { recursive: true })
+// ============================================================
+// 📁 PREPARAR CARPETA
+// ============================================================
+
+if (!fs.existsSync(DIR)) {
+  fs.mkdirSync(DIR, { recursive: true })
 }
 
-function loadDB() {
-  try {
-    if (!fs.existsSync(file)) {
-      return {
-        usadas: [],
-        usadasRaras: [],
-        usadasMalas: []
-      }
-    }
-
-    const db = JSON.parse(fs.readFileSync(file, 'utf8') || '{}')
-
-    if (!Array.isArray(db.usadas)) db.usadas = []
-    if (!Array.isArray(db.usadasRaras)) db.usadasRaras = []
-    if (!Array.isArray(db.usadasMalas)) db.usadasMalas = []
-
-    return db
-  } catch (error) {
-    console.error('[FORTUNA] Error leyendo la base de datos:', error)
-
-    return {
-      usadas: [],
-      usadasRaras: [],
-      usadasMalas: []
-    }
-  }
-}
-
-function saveDB(db) {
-  try {
-    fs.writeFileSync(file, JSON.stringify(db, null, 2))
-  } catch (error) {
-    console.error('[FORTUNA] Error guardando la base de datos:', error)
-  }
-}
+// ============================================================
+// 🥠 FORTUNAS
+// ============================================================
 
 const normales = [
   'Algo bueno está por llegar a tu vida.',
@@ -89,24 +75,132 @@ const malas = [
   '🪫 Tu energía estará baja… descansa.'
 ]
 
+// ============================================================
+// 💾 BASE DE DATOS
+// ============================================================
+
+function loadDB() {
+  const inicial = {
+    usadas: [],
+    usadasRaras: [],
+    usadasMalas: []
+  }
+
+  try {
+    if (!fs.existsSync(FILE)) return inicial
+
+    const data = JSON.parse(fs.readFileSync(FILE, 'utf8'))
+
+    for (const key of Object.keys(inicial)) {
+      if (!Array.isArray(data[key])) data[key] = []
+    }
+
+    return data
+  } catch (error) {
+    console.error('[FORTUNA] Error leyendo JSON:', error.message)
+    return inicial
+  }
+}
+
+function saveDB(db) {
+  try {
+    const temporal = `${FILE}.tmp`
+
+    fs.writeFileSync(
+      temporal,
+      JSON.stringify(db, null, 2),
+      'utf8'
+    )
+
+    fs.renameSync(temporal, FILE)
+  } catch (error) {
+    console.error('[FORTUNA] Error guardando JSON:', error.message)
+  }
+}
+
+// ============================================================
+// 🔮 ELEGIR FRASE SIN REPETIR
+// ============================================================
+
 function obtenerFrase(lista, clave, db) {
   if (!Array.isArray(db[clave])) db[clave] = []
 
-  // Reinicia la lista cuando todas las frases ya se utilizaron.
-  const disponibles = lista.filter(
-    frase => !db[clave].includes(frase)
-  )
+  const usadas = new Set(db[clave])
+  let disponibles = lista.filter(frase => !usadas.has(frase))
 
   if (disponibles.length === 0) {
     db[clave] = []
-    disponibles.push(...lista)
+    disponibles = [...lista]
   }
 
-  const frase = disponibles[Math.floor(Math.random() * disponibles.length)]
+  const indice = Math.floor(Math.random() * disponibles.length)
+  const frase = disponibles[indice]
+
   db[clave].push(frase)
 
   return frase
 }
+
+// ============================================================
+// 🖼️ PREPARAR IMAGEN
+// Intenta descargarla y guardar una copia local.
+// Si falla, utiliza la URL directamente.
+// ============================================================
+
+async function descargarImagen() {
+  if (
+    fs.existsSync(IMAGE_CACHE) &&
+    fs.statSync(IMAGE_CACHE).size > 0
+  ) {
+    return IMAGE_CACHE
+  }
+
+  if (typeof fetch !== 'function') {
+    throw new Error('Este Node.js no dispone de fetch global.')
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(
+    () => controller.abort(),
+    IMAGE_TIMEOUT
+  )
+
+  try {
+    const response = await fetch(IMAGE_URL, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 WhatsApp-Bot'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Catbox respondió HTTP ${response.status}`)
+    }
+
+    const contentType = response.headers.get('content-type') || ''
+
+    if (!contentType.startsWith('image/')) {
+      throw new Error('La URL no devolvió un archivo de imagen.')
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer())
+
+    if (!buffer.length || buffer.length > MAX_IMAGE_SIZE) {
+      throw new Error('La imagen está vacía o supera el tamaño permitido.')
+    }
+
+    fs.writeFileSync(IMAGE_CACHE, buffer)
+
+    console.log('[FORTUNA] Imagen guardada en caché.')
+    return IMAGE_CACHE
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+// ============================================================
+// 🎲 COMANDO PRINCIPAL
+// ============================================================
 
 const handler = async (m, { conn }) => {
   try {
@@ -116,45 +210,87 @@ const handler = async (m, { conn }) => {
     let frase
     let tipo
 
-    // 40% rara, 40% normal y 20% mala.
     if (rand < 0.40) {
-      tipo = '🍀 *FORTUNA RARA*'
+      tipo = '🍀 FORTUNA RARA'
       frase = obtenerFrase(raras, 'usadasRaras', db)
     } else if (rand < 0.80) {
-      tipo = '🥠 *FORTUNA NORMAL*'
+      tipo = '🥠 FORTUNA NORMAL'
       frase = obtenerFrase(normales, 'usadas', db)
     } else {
-      tipo = '💀 *FORTUNA MALA*'
+      tipo = '💀 FORTUNA MALA'
       frase = obtenerFrase(malas, 'usadasMalas', db)
     }
 
     saveDB(db)
 
-    const texto =
-`${tipo}
+    const texto = `${tipo}
 
 ╭━━━━━━━━━━━━━━━━━━╮
 ┃ 🔮 *Mensaje del destino*
 ┃
-┃ "${frase}"
+┃ ${frase}
 ╰━━━━━━━━━━━━━━━━━━╯
 
 ✨ El destino ha hablado... 🥠`
 
-    // Enviar únicamente texto, sin descargar ni adjuntar imágenes.
+    // Intentar preparar la imagen.
+    // La fortuna se envía una sola vez, con imagen y texto juntos.
+    let imagen
+
+    try {
+      imagen = await descargarImagen()
+    } catch (error) {
+      console.error(
+        '[FORTUNA] No se pudo descargar la imagen:',
+        error.message
+      )
+    }
+
+    // Primero se intenta enviar la imagen descargada.
+    // Si no está disponible, se intenta con la URL original.
+    if (imagen) {
+      await conn.sendMessage(
+        m.chat,
+        {
+          image: fs.readFileSync(imagen),
+          caption: texto
+        },
+        { quoted: m }
+      )
+
+      console.log(`[FORTUNA] ${tipo} enviada con imagen local.`)
+      return
+    }
+
+    // Respaldo: URL directa, siempre con el texto en el mismo mensaje.
     await conn.sendMessage(
       m.chat,
-      { text: texto },
+      {
+        image: { url: IMAGE_URL },
+        caption: texto
+      },
       { quoted: m }
     )
 
-  } catch (error) {
-    console.error('[FORTUNA] Error al enviar el mensaje:', error)
+    console.log(`[FORTUNA] ${tipo} enviada con imagen por URL.`)
 
+  } catch (error) {
+    console.error(
+      '[FORTUNA] Error enviando la fortuna:',
+      error
+    )
+
+    // No mandar otro mensaje con el texto automáticamente:
+    // evita duplicados si WhatsApp recibió el mensaje pero falló la respuesta.
     try {
-      await m.reply('❌ La galleta de la fortuna se rompió 😭🥠\nIntentá nuevamente.')
+      await m.reply(
+        '❌ No se pudo enviar la fortuna. Revisá la consola e intentá nuevamente. 🥠'
+      )
     } catch (replyError) {
-      console.error('[FORTUNA] Tampoco se pudo enviar el aviso:', replyError)
+      console.error(
+        '[FORTUNA] Error enviando aviso:',
+        replyError.message
+      )
     }
   }
 }

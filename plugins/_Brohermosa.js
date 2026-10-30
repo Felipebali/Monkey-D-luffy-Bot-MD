@@ -1,7 +1,8 @@
 
 // 📂 plugins/mejorbro.js
 // 🤖 WHATSAPP-BOT — La mejor bro del mundo 💖
-// ⏱️ Cooldown: 15 segundos por grupo
+// ⏱️ Cooldown: 1 minuto por grupo
+// 🎲 Frases aleatorias sin repetición
 
 const BRO_NUMBER = '59893491934'
 const BRO_JID = '59893491934@s.whatsapp.net'
@@ -14,63 +15,66 @@ const COOLDOWN = 60 * 1000
 const cooldowns = new Map()
 const procesados = new Set()
 
+// Control de frases sin repetición
+let frasesDisponibles = []
+let ultimaFrase = null
+
 const FRASES = [
+  `👑💖 ¡@BRO es la mejor bro que se puede tener!
 
-  // 👑 Realeza
-  `👑💖 ¡ATENCIÓN, QUE HA LLEGADO LA REALEZA!
+✨ Una amiga de oro, única e incondicional.
+🫶 ¡Una verdadera hermana de la vida!`,
 
-@BRO no necesita presentación.
-Tiene corona, categoría propia y un lugar reservado en la historia de este grupo.
+  `💎🌹 ¡@BRO es de esas personas que no se encuentran dos veces!
 
-✨ ¡Que alguien le cuide el trono!`,
+🤍 Vale más que mil amistades pasajeras.
+👑 ¡Una reina que merece todo lo bonito!`,
 
-  `📜🏰 Por decreto oficial de WHATSAPP-BOT:
+  `🫂💗 ¡Atención, grupo! @BRO es una bro de otro nivel.
 
-Se reconoce a @BRO como patrimonio de la amistad.
-Queda prohibido discutir su grandeza.
+🔥 Lealtad, buena vibra y un corazón enorme.
+🏆 ¡La mejor compañera que se puede tener!`,
 
-👑 Firmado: el bot que sabe reconocer leyendas.`,
+  `🌟👑 ¡@BRO no es una bro cualquiera, es una leyenda!
 
-  `🚨👑 ¡SE INTERRUMPEN LAS ACTIVIDADES DEL GRUPO!
+💖 De esas personas que hacen la diferencia.
+🤝 ¡Una verdadera hermana elegida por la vida!`,
 
-Tenemos una noticia importante:
-@BRO acaba de recordarles que las leyendas también mandan mensajes.
+  `💐💕 ¡Si hablamos de buenas amistades, hablamos de @BRO!
 
-💖 Continúen con sus actividades.`,
+✨ Una persona que vale oro.
+💎 ¡Inigualable, auténtica y especial!`,
 
-  // 💗 Emotivas
-  `🫂💗 Hay personas que llegan a tu vida y, sin darse cuenta, se convierten en familia.
+  `🛡️💖 ¡@BRO tiene el título oficial de MEJOR BRO!
 
-@BRO es de esas personas que merecen un lugar bonito en la vida.
+👑 Nadie le quita esa corona.
+🤝 ¡Amistad de la buena!`,
 
-🌷 Que nunca le falten motivos para ser feliz.`,
+  `🌈🫶 ¡La vida se disfruta más con una bro como @BRO!
 
-  `💌✨ Si pudiera darle un regalo a @BRO sería que la vida le devolviera multiplicado todo lo bonito que transmite.
+💗 Buena energía y una amistad especial.
+👑 ¡Una reina en su propia historia!`,
 
-💗 Porque las personas especiales también merecen cosas especiales.`,
+  `🚨👑 ¡COMUNICADO OFICIAL DE WHATSAPP-BOT!
 
-  `🌻💖 Recordatorio para @BRO:
+📢 @BRO ha sido reconocida como una de las mejores bros.
+💖 ¡El título es permanente!`,
 
-No hace falta ser perfecta para ser increíble.
-Tu forma de ser ya te hace especial.
+  `💫🌹 ¡Una amistad gigante para @BRO!
 
-🫶 Nunca pierdas esa esencia.`,
+🫂 Hay personas que llegan y se vuelven familia.
+💖 ¡Ella es una de esas personas!`,
 
-  `🌙💜 Ojalá todos los días de @BRO tengan un poquito de magia.
+  `🏆💗 ¡Premio a la mejor bro del universo para @BRO!
 
-Que encuentre tranquilidad en los días difíciles y motivos para reír incluso en los días normales.
+🥇 Por ser única.
+👑 ¡La campeona indiscutida de la amistad!`,
 
-✨ Se merece cosas bonitas.`,
+  `🐐🔥 ¡@BRO es la GOAT de las bros!
 
-  `🫂❤️ Algunas personas son compañía.
-Otras son confianza.
-Y algunas terminan siendo familia sin compartir apellido.
+👑 La número uno, la irrepetible, la legendaria.
+💖 ¡No hay ranking que le haga justicia!`,
 
-@BRO tiene ese algo especial.
-
-👑 ¡Una hermana elegida!`,
-
-  // 😂 Divertidas
   `📰 ÚLTIMO MOMENTO:
 
 Fuentes muy confiables (yo mismo) confirman que @BRO sigue siendo increíble.
@@ -132,7 +136,6 @@ La sentencia es definitiva:
 
 👑 Sin posibilidad de apelación.`,
 
-  // 🥹 Especiales
   `💗 Quizás @BRO no se dé cuenta de lo importante que puede ser para los demás.
 
 Pero hay personas cuya presencia hace que todo sea un poquito mejor.
@@ -164,7 +167,6 @@ A veces alcanza con estar, escuchar y compartir momentos.
 
 🫂 @BRO, nunca subestimes lo especial que podés ser.`,
 
-  // 🏆 Reconocimientos
   `🏅 ENTREGA DE PREMIOS OFICIAL:
 
 🥇 Mejor bro: @BRO
@@ -293,6 +295,7 @@ Invitados: todo el grupo.
 👑 ¡Que comiencen los festejos!`
 ]
 
+// Normalizar números y JID
 function normalizarNumero(valor = '') {
   return String(valor)
     .split('@')[0]
@@ -300,6 +303,7 @@ function normalizarNumero(valor = '') {
     .replace(/\D/g, '')
 }
 
+// Comprobar identidad
 function esLaBro(m, conn) {
   const sender = String(m.sender || '')
   const decoded = conn.decodeJid?.(sender) || sender
@@ -317,11 +321,41 @@ function esLaBro(m, conn) {
   )
 }
 
-function obtenerFrase() {
-  const indice = Math.floor(Math.random() * FRASES.length)
-  return FRASES[indice].replace(/@BRO/g, `@${BRO_NUMBER}`)
+// Mezclar frases
+function mezclarFrases(array) {
+  const copia = [...array]
+
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copia[i], copia[j]] = [copia[j], copia[i]]
+  }
+
+  return copia
 }
 
+// Obtener frase sin repetir
+function obtenerFrase() {
+  if (frasesDisponibles.length === 0) {
+    frasesDisponibles = mezclarFrases(FRASES)
+
+    // Evitar que la primera frase del nuevo ciclo
+    // sea igual a la última del ciclo anterior
+    if (
+      frasesDisponibles.length > 1 &&
+      frasesDisponibles[0] === ultimaFrase
+    ) {
+      ;[frasesDisponibles[0], frasesDisponibles[1]] =
+        [frasesDisponibles[1], frasesDisponibles[0]]
+    }
+  }
+
+  const frase = frasesDisponibles.shift()
+  ultimaFrase = frase
+
+  return frase.replace(/@BRO/g, `@${BRO_NUMBER}`)
+}
+
+// Ejecución principal
 async function ejecutarMejorBro(m, conn) {
   try {
     if (!m?.isGroup) return
@@ -329,10 +363,12 @@ async function ejecutarMejorBro(m, conn) {
     if (!esLaBro(m, conn)) return
 
     const messageId = m.key?.id
+
     if (!messageId || procesados.has(messageId)) return
 
     procesados.add(messageId)
 
+    // Limitar memoria de mensajes procesados
     if (procesados.size > 1000) {
       const antiguos = [...procesados].slice(0, 500)
       antiguos.forEach(id => procesados.delete(id))
@@ -342,6 +378,7 @@ async function ejecutarMejorBro(m, conn) {
     const ahora = Date.now()
     const ultimoMensaje = cooldowns.get(chat) || 0
 
+    // Un mensaje por minuto por grupo
     if (ahora - ultimoMensaje < COOLDOWN) return
 
     // Registrar antes del envío

@@ -1,9 +1,11 @@
+
 // 📂 plugins/mejorbro.js
 // 🤖 WHATSAPP-BOT — La mejor bro del mundo 💖
 // 🔒 Exclusivo para OWNERS
 
 const BRO_NUMBER = '59893491934'
 const BRO_JID = `${BRO_NUMBER}@s.whatsapp.net`
+const BRO_LID = '181080552378538@lid'
 
 const FRASES = [
   `👑💖 ¡@BRO es la mejor bro que se puede tener! 💖👑
@@ -137,8 +139,12 @@ function normalizarNumero(valor = '') {
     .replace(/\D/g, '')
 }
 
+function normalizarJid(valor = '', conn) {
+  return conn.decodeJid?.(String(valor)) || String(valor)
+}
+
 function esOwner(m, conn) {
-  const sender = conn.decodeJid?.(m.sender || '') || m.sender || ''
+  const sender = normalizarJid(m.sender || '', conn)
   const numero = normalizarNumero(sender)
 
   const owners = Array.isArray(global.owner) ? global.owner : []
@@ -179,16 +185,25 @@ function obtenerMenciones(m) {
 
 async function ejecutarMejorBro(m, conn) {
   try {
-    if (!m?.isGroup || m.fromMe) return
+    if (!m?.isGroup || m.fromMe || m.key?.fromMe) return
     if (!esOwner(m, conn)) return
 
     const texto = obtenerTexto(m)
 
+    // Detectar número escrito en el mensaje
     const numeroEscrito = normalizarNumero(texto).includes(BRO_NUMBER)
 
-    const mencionada = obtenerMenciones(m).some(jid => {
-      const normalizado = conn.decodeJid?.(jid || '') || jid || ''
-      return normalizarNumero(normalizado) === BRO_NUMBER
+    // Detectar menciones reales por número o por LID
+    const menciones = obtenerMenciones(m)
+
+    const mencionada = menciones.some(jid => {
+      const id = normalizarJid(jid, conn)
+
+      return (
+        id === BRO_LID ||
+        id === BRO_JID ||
+        normalizarNumero(id) === BRO_NUMBER
+      )
     })
 
     if (!numeroEscrito && !mencionada) return
@@ -199,8 +214,9 @@ async function ejecutarMejorBro(m, conn) {
 
     await conn.sendMessage(m.chat, {
       text: frase,
-      mentions: [BRO_JID]
-    })
+      mentions: [BRO_JID, BRO_LID]
+    }, { quoted: m })
+
   } catch (error) {
     console.error('[MEJOR BRO] Error:', error)
   }
@@ -210,7 +226,7 @@ const handler = async (m, { conn }) => {
   return ejecutarMejorBro(m, conn)
 }
 
-// Detectar mensajes sin necesidad de escribir un comando.
+// Detectar mensajes sin necesidad de escribir un comando
 handler.all = async function (m) {
   return ejecutarMejorBro(m, this)
 }

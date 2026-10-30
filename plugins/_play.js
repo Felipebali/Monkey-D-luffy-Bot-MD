@@ -1,110 +1,37 @@
-// 📂 plugins/play.js — whatsapp-bot 🐾
-// 🎵 YouTube → Audio
-// Comandos: .play / .playaudio / .audio
-// ⏳ Cooldown de 2 minutos para usuarios
-// 👑 Admins y owners sin cooldown
-// 😀 Reacciones automáticas
+
+/**
+ * 📂 plugins/play.js
+ * 🎵 WHATSAPP-BOT — YOUTUBE → AUDIO
+ *
+ * Comandos:
+ * .play
+ * .playaudio
+ * .audio
+ */
 
 import yts from 'yt-search'
 import axios from 'axios'
+
+const MAX_DURATION_SECONDS = 7 * 60
 
 // ============================================================
 // ⚙️ CONFIGURACIÓN
 // ============================================================
 
-const MAX_DURATION_SECONDS = 7 * 60
-const COOLDOWN_SECONDS = 300
+const API_TIMEOUT = 15000
 
-// Cooldown individual por usuario
-const cooldowns = new Map()
-
-// ============================================================
-// 👑 VERIFICAR OWNER
-// ============================================================
-
-const isOwner = (m, conn) => {
-  const owners = global.owner || []
-
-  const sender = (m.sender || '')
-    .split('@')[0]
-    .split(':')[0]
-
-  const ownerNumbers = owners.map(owner => {
-    const number = Array.isArray(owner) ? owner[0] : owner
-    return String(number).replace(/\D/g, '')
-  })
-
-  const botNumber = (conn.user?.id || '')
-    .split(':')[0]
-    .split('@')[0]
-
-  return (
-    ownerNumbers.includes(sender) ||
-    sender === botNumber ||
-    m.fromMe === true
-  )
-}
-
-// ============================================================
-// 🛡️ VERIFICAR ADMINISTRADOR
-// ============================================================
-
-const isAdminOrOwner = async (m, conn) => {
-  if (isOwner(m, conn)) return true
-
-  if (!m.isGroup) return false
-
-  try {
-    const metadata = await conn.groupMetadata(m.chat)
-
-    const sender = (m.sender || '').split(':')[0]
-
-    const participant = metadata.participants?.find(p => {
-      const id = (p.id || p.jid || '').split(':')[0]
-      return id === sender
-    })
-
-    return Boolean(
-      participant?.admin === 'admin' ||
-      participant?.admin === 'superadmin' ||
-      participant?.isAdmin ||
-      participant?.isSuperAdmin
-    )
-  } catch (e) {
-    console.error('⚠️ Error verificando administrador:', e)
-    return false
-  }
-}
-
-// ============================================================
-// 😀 REACCIONAR AL MENSAJE
-// ============================================================
-
-const react = async (conn, m, emoji) => {
-  try {
-    await conn.sendMessage(m.chat, {
-      react: {
-        text: emoji,
-        key: m.key
-      }
-    })
-  } catch (e) {
-    console.log('⚠️ No se pudo enviar la reacción:', e.message)
-  }
-}
+const USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36'
 
 // ============================================================
 // 🧹 LIMPIAR TEXTO
 // ============================================================
 
-const cleanText = (text) => {
+function cleanText(text) {
   if (!text) return ''
 
-  if (typeof text === 'string')
-    return text.trim()
-
-  if (typeof text === 'number')
-    return String(text)
+  if (typeof text === 'string') return text.trim()
+  if (typeof text === 'number') return String(text)
 
   return String(text).trim()
 }
@@ -113,221 +40,198 @@ const cleanText = (text) => {
 // 👁️ FORMATEAR VISTAS
 // ============================================================
 
-const formatViews = (v) => {
-  v = Number(v) || 0
+function formatViews(views) {
+  const v = Number(views) || 0
 
-  if (v >= 1e9)
-    return (v / 1e9).toFixed(1) + 'B'
-
-  if (v >= 1e6)
-    return (v / 1e6).toFixed(1) + 'M'
-
-  if (v >= 1e3)
-    return (v / 1e3).toFixed(1) + 'K'
-
-  return String(v)
+  return v >= 1e9
+    ? (v / 1e9).toFixed(1) + 'B'
+    : v >= 1e6
+      ? (v / 1e6).toFixed(1) + 'M'
+      : v >= 1e3
+        ? (v / 1e3).toFixed(1) + 'K'
+        : String(v)
 }
 
 // ============================================================
-// 🔎 EXTRAER URL DE DESCARGA
+// 📊 PROGRESO
 // ============================================================
 
-const extractDownloadUrl = (data) => {
-  const candidate =
-    data?.data?.download ||
-    data?.download ||
-    data?.dl ||
-    data?.data?.dl_url ||
-    data?.data?.download?.url ||
-    data?.datos?.url ||
-    data?.result?.download ||
-    data?.result?.dl ||
-    data?.result?.url ||
-    data?.result?.link ||
-    data?.data?.dl ||
-    data?.data?.url ||
-    data?.data?.link ||
-    (
-      typeof data?.download === 'object'
-        ? data?.download?.url ||
-          data?.download?.link
-        : null
-    ) ||
-    data?.url ||
-    data?.link
+function emitProgress(msgId, step, extraData = {}) {
+  if (!msgId) return
 
-  return (
-    typeof candidate === 'string' &&
-    candidate.startsWith('http')
-  ) ? candidate : ''
+  queueMicrotask(() => {
+    try {
+      global.broadcast?.('cmd_progress', {
+        id: msgId,
+        step,
+        ...extraData
+      })
+    } catch (error) {
+      console.error('[PLAY] Error en progreso:', error)
+    }
+  })
+}
+
+// ============================================================
+// 🔗 EXTRAER URL DE DESCARGA
+// ============================================================
+
+function extractDownloadUrl(data) {
+  const candidates = [
+    data?.data?.download,
+    data?.download,
+    data?.dl,
+    data?.data?.dl_url,
+    data?.data?.download?.url,
+    data?.datos?.url,
+    data?.result?.download,
+    data?.result?.dl,
+    data?.result?.url,
+    data?.result?.link,
+    data?.data?.dl,
+    data?.data?.url,
+    data?.data?.link,
+    data?.download?.url,
+    data?.download?.link,
+    data?.url,
+    data?.link
+  ]
+
+  for (const candidate of candidates) {
+    const url = typeof candidate === 'string'
+      ? candidate
+      : candidate?.url || candidate?.link
+
+    if (
+      typeof url === 'string' &&
+      /^https?:\/\//i.test(url)
+    ) {
+      return url
+    }
+  }
+
+  return ''
 }
 
 // ============================================================
 // 🌐 CONSULTAR API
 // ============================================================
 
-const fetchApiUrl = async (apiUrl) => {
-  const res = await axios.get(apiUrl, {
-    timeout: 10000,
+async function fetchApiUrl(apiUrl) {
+  const response = await axios.get(apiUrl, {
+    timeout: API_TIMEOUT,
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      'User-Agent': USER_AGENT
     }
   })
 
-  const dlUrl = extractDownloadUrl(res.data)
+  const downloadUrl = extractDownloadUrl(response.data)
 
-  if (!dlUrl)
-    throw new Error('Sin URL de descarga')
+  if (!downloadUrl) {
+    throw new Error('La API no devolvió una URL de descarga.')
+  }
 
-  return dlUrl
+  return downloadUrl
 }
 
 // ============================================================
-// 🔄 OBTENER AUDIO CON FALLBACK
+// 🔄 OBTENER AUDIO CON REINTENTOS
 // ============================================================
 
-const getAudioUrlWithRetry = async (videoUrl) => {
+async function getAudioUrlWithRetry(videoUrl) {
   const encoded = encodeURIComponent(videoUrl)
 
   const apis = [
-    `https://api.delirius.online/download/ytmp3?url=${encoded}`,
-    `https://api.starlights.uk/api/download/ytmp3?url=${encoded}`,
-    `https://api.starlights.uk/api/download/ytmp3v2?url=${encoded}`
+    `https://api.ryuzei.xyz/download/ytmp3/v4?url=${encoded}`,
+    `https://api.ryuzei.xyz/download/ytmp3/v2?url=${encoded}`,
+    `https://api.ryuzei.xyz/download/ytmp3/v3?url=${encoded}`
   ]
 
-  for (const api of apis) {
+  let lastError
+
+  for (let i = 0; i < apis.length; i++) {
     try {
-      const url = await fetchApiUrl(api)
+      console.log(`[PLAY] Probando API ${i + 1}/3...`)
 
-      if (url)
-        return url
+      const url = await fetchApiUrl(apis[i])
 
-    } catch (e) {
-      console.log('⚠️ API de audio falló:', api)
+      console.log(`[PLAY] API ${i + 1} respondió correctamente.`)
+
+      return url
+    } catch (error) {
+      lastError = error
+
+      console.error(
+        `[PLAY] API ${i + 1} falló:`,
+        error.message
+      )
     }
   }
 
-  throw new Error('Todas las APIs de descarga fallaron.')
+  throw lastError || new Error('Todas las APIs fallaron.')
 }
 
 // ============================================================
-// 🎵 HANDLER
+// 🔎 VALIDAR ENLACE DE YOUTUBE
 // ============================================================
 
-let handler = async (m, { conn, text }) => {
-  const query = String(text || '').trim()
+function extractYoutubeId(text) {
+  const match = text.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/|v\/))([a-zA-Z0-9_-]{11})/
+  )
 
-  // ==========================================================
-  // ❌ SIN BÚSQUEDA
-  // ==========================================================
+  return match ? match[1] : null
+}
 
-  if (!query) {
-    return conn.sendMessage(
-      m.chat,
-      {
-        text:
-          'ꕤ *Ingresá el título o enlace de YouTube que querés buscar.*'
-      },
-      { quoted: m }
-    )
-  }
+// ============================================================
+// 🎵 HANDLER PRINCIPAL
+// ============================================================
 
-  // ==========================================================
-  // 🎧 REACCIÓN INICIAL
-  // ==========================================================
+const handler = async (m, { conn, text, usedPrefix, command }) => {
+  try {
+    const query = cleanText(text)
 
-  await react(conn, m, '🎧')
-
-  // ==========================================================
-  // 👑 VERIFICAR ADMINISTRADOR U OWNER
-  // ==========================================================
-
-  const privileged = await isAdminOrOwner(m, conn)
-
-  const senderId = m.sender || m.participant || m.chat
-
-  // ==========================================================
-  // ⏳ COOLDOWN DE 2 MINUTOS
-  // ==========================================================
-
-  if (!privileged) {
-    const now = Date.now()
-    const expiresAt = cooldowns.get(senderId) || 0
-
-    if (now < expiresAt) {
-      const remaining = Math.ceil((expiresAt - now) / 1000)
-      const minutes = Math.floor(remaining / 60)
-      const seconds = remaining % 60
-
-      await react(conn, m, '⏳')
-
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-            `⏳ *¡No atomices! JAJAJA* 🐾\n\n` +
-            `ꕤ Ya usaste este comando recientemente.\n` +
-            `ꕤ Volvé a intentarlo en *${minutes > 0 ? `${minutes} min ` : ''}${seconds} seg*.\n\n` +
-            `ׅ  ׄ  ✿ *Cooldown:* 5 minutos.`
-        },
-        { quoted: m }
+    if (!query) {
+      return m.reply(
+        `ꕤ *Ingresá el título o enlace de YouTube que querés escuchar.*\n\n` +
+        `Ejemplo: ${usedPrefix || '.'}play Morat No se va`
       )
     }
 
-    // Activar cooldown individual
-    cooldowns.set(
-      senderId,
-      now + COOLDOWN_SECONDS * 1000
-    )
-  }
+    const msgId = m.key?.id
 
-  try {
+    emitProgress(msgId, 'search_started', {
+      query
+    })
+
     // ========================================================
     // 🔎 BUSCAR VIDEO
     // ========================================================
 
-    let searchQuery = query
+    console.log('[PLAY] Buscando:', query)
 
-    const urlMatch = query.match(
-      /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/|v\/))([a-zA-Z0-9_-]{11})/
-    )
+    const youtubeId = extractYoutubeId(query)
 
-    if (urlMatch) {
-      searchQuery = `https://youtu.be/${urlMatch[1]}`
-    }
+    const searchQuery = youtubeId
+      ? `https://youtu.be/${youtubeId}`
+      : query
 
     const searchResult = await yts(searchQuery)
 
     if (!searchResult?.videos?.length) {
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-            `✿ No se encontraron resultados para *${query}*.`
-        },
-        { quoted: m }
+      emitProgress(msgId, 'no_results', { query })
+
+      return m.reply(
+        `✿ No se encontraron resultados para: *${query}*`
       )
     }
 
-    // ========================================================
-    // 🎬 PRIMER RESULTADO
-    // ========================================================
-
     const video = searchResult.videos[0]
 
-    const videoId =
-      video.videoId ||
-      (urlMatch ? urlMatch[1] : '')
+    const videoId = video.videoId || youtubeId
 
     if (!videoId) {
-      return conn.sendMessage(
-        m.chat,
-        {
-          text: '❌ No pude obtener el ID del video.'
-        },
-        { quoted: m }
-      )
+      return m.reply('❌ No se pudo identificar el video.')
     }
 
     const videoUrl = `https://youtu.be/${videoId}`
@@ -338,52 +242,47 @@ let handler = async (m, { conn, text }) => {
       video.author?.name || video.author
     ) || 'Desconocido'
 
-    const views =
-      typeof video.views === 'number'
-        ? video.views
-        : 0
+    const views = Number(video.views) || 0
 
     const duration = cleanText(
-      video.timestamp || video.duration
-    ) || ''
+      video.timestamp || video.duration?.timestamp ||
+      video.duration
+    )
+
+    const seconds = Number(video.seconds) || 0
 
     // ========================================================
     // ⏱️ LÍMITE DE DURACIÓN
     // ========================================================
 
-    if (
-      video.seconds &&
-      video.seconds > MAX_DURATION_SECONDS
-    ) {
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-            `✿ El audio dura *${duration}*, superando el límite permitido de *7 minutos*.`
-        },
-        { quoted: m }
+    if (seconds > MAX_DURATION_SECONDS) {
+      emitProgress(msgId, 'duration_exceeded', {
+        duration
+      })
+
+      return m.reply(
+        `✿ El audio dura *${duration || 'más de 7 minutos'}*.\n\n` +
+        `⏱️ El límite permitido es de *7 minutos*.`
       )
     }
 
     // ========================================================
-    // 🖼️ MINIATURA
+    // 🖼️ INFORMACIÓN DEL VIDEO
     // ========================================================
 
     const thumbnail =
       `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
 
     const caption =
-`﹒𝜗ৎ ࣪ *${title}*
-
-ׅ  ׄ  ✿ *Canal* » ${channel}
-ׅ  ׄ  ✿ *Vistas* » ${formatViews(views)}
-ׅ  ׄ  ✿ *Tiempo* » ${duration}
-ׅ  ׄ  ✿ *Link* » ${videoUrl}
-
-ׅ  ׄ  ✿ *Descargando audio...*`
+      `﹒𝜗ৎ      ࣪  *${title}*\n\n` +
+      `ׅ  ׄ  ✿ *Canal* » ${channel}\n` +
+      `ׅ  ׄ  ✿ *Vistas* » ${formatViews(views)}\n` +
+      `ׅ  ׄ  ✿ *Tiempo* » ${duration || 'Desconocido'}\n` +
+      `ׅ  ׄ  ✿ *Link* » ${videoUrl}\n\n` +
+      `ׅ  ׄ  ✿ *Descargando audio...*`
 
     // ========================================================
-    // 🖼️ ENVIAR MINIATURA
+    // 📸 ENVIAR MINIATURA
     // ========================================================
 
     try {
@@ -395,75 +294,71 @@ let handler = async (m, { conn, text }) => {
         },
         { quoted: m }
       )
-    } catch (e) {
-      console.log('⚠️ No se pudo enviar la miniatura:', e)
+    } catch (error) {
+      console.error(
+        '[PLAY] Error enviando miniatura:',
+        error.message
+      )
+
+      await m.reply(caption)
     }
 
     // ========================================================
-    // 🎵 OBTENER AUDIO
+    // 🎧 DESCARGAR AUDIO
     // ========================================================
 
-    const downloadUrl =
-      await getAudioUrlWithRetry(videoUrl)
+    emitProgress(msgId, 'fetching_audio_stream')
 
-    if (!downloadUrl)
-      throw new Error('No se obtuvo URL de audio.')
+    console.log('[PLAY] Obteniendo enlace de audio...')
+
+    const downloadUrl = await getAudioUrlWithRetry(videoUrl)
 
     // ========================================================
     // 📤 ENVIAR AUDIO
     // ========================================================
+
+    emitProgress(msgId, 'sending_audio_to_whatsapp')
+
+    console.log('[PLAY] Enviando audio...')
 
     await conn.sendMessage(
       m.chat,
       {
         audio: { url: downloadUrl },
         mimetype: 'audio/mpeg',
-        fileName: `${title}.mp3`,
+        fileName: `${title.replace(/[\\/:*?"<>|]/g, '_')}.mp3`,
         ptt: false
       },
       { quoted: m }
     )
 
-    // ========================================================
-    // ✅ REACCIÓN DE ÉXITO
-    // ========================================================
+    emitProgress(msgId, 'completed')
 
-    await react(conn, m, '✅')
+    console.log('[PLAY] Audio enviado correctamente.')
 
-  } catch (e) {
-    console.error('❌ Error en play:', e)
-
-    await react(conn, m, '❌')
-
-    return conn.sendMessage(
-      m.chat,
-      {
-        text:
-          '❌ No pude descargar el audio. Intentá nuevamente en unos segundos.'
-      },
-      { quoted: m }
+  } catch (error) {
+    console.error(
+      '[PLAY] Error general:',
+      error?.response?.data || error.message || error
     )
+
+    emitProgress(m.key?.id, 'error', {
+      message: error.message
+    })
+
+    await m.reply(
+      '❌ No se pudo descargar o enviar el audio.\n\n' +
+      'Intentá nuevamente dentro de unos minutos.'
+    ).catch(() => {})
   }
 }
 
 // ============================================================
-// 📋 CONFIGURACIÓN
+// 📌 CONFIGURACIÓN DEL COMANDO
 // ============================================================
 
-handler.help = [
-  'play <texto>',
-  'playaudio <texto>',
-  'audio <texto>'
-]
-
+handler.help = ['play <canción>', 'playaudio <canción>', 'audio <canción>']
 handler.tags = ['download']
-
-handler.command = [
-  'play',
-  'playaudio',
-  'audio'
-]
-
-handler.group = true
+handler.command = ['play', 'playaudio', 'audio']
 
 export default handler

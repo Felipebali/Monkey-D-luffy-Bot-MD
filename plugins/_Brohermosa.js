@@ -1,6 +1,11 @@
 
+// 📂 plugins/mejorbro.js
+// 🤖 WHATSAPP-BOT — La mejor bro del mundo 💖
+// 🔒 Exclusivo para OWNERS
+
 const BRO_NUMBER = '59893491934'
-const BRO_JID = `${BRO_NUMBER}@s.whatsapp.net`
+const BRO_JID = '59893491934@s.whatsapp.net'
+
 const BRO_LID = '181080552378538@lid'
 const BRO_LID_NUMBER = '181080552378538'
 
@@ -179,7 +184,7 @@ function obtenerMenciones(m) {
 function esLaBro(m, conn) {
   const texto = obtenerTexto(m)
 
-  // Detectar número o LID escrito en el texto
+  // Detectar número o LID escrito manualmente
   const textoNormalizado = normalizarNumero(texto)
 
   if (
@@ -212,7 +217,6 @@ async function ejecutarMejorBro(m, conn) {
   try {
     if (!m?.isGroup || m.fromMe || m.key?.fromMe) return
     if (!esOwner(m, conn)) return
-
     if (!esLaBro(m, conn)) return
 
     const frase = FRASES[

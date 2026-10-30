@@ -1,426 +1,119 @@
+import yts from 'yt-search';
+import axios from 'axios';
+import config from '#config';
 
-import fetch from 'node-fetch'
-import axios from 'axios'
-import yts from 'yt-search'
+const MAX_DURATION_SECONDS = 7 * 60;
 
-// Carga opcional: si la librería no está instalada o falla,
-// el comando igual carga.
-const { youtubedl, youtubedlv2 } = await import('@bochilteam/scraper').catch(() => ({}))
+const cleanText = (text: any): string => {
+    if (!text) return '';
+    if (typeof text === 'string') return text.trim();
+    if (typeof text === 'number') return String(text);
+    return String(text).trim();
+};
 
-import ytdl from 'ytdl-core'
-import { bestFormat, getUrlDl } from '../lib/y2dl.js'
-import YTDL from '../lib/ytdll.js'
-import fs from 'fs'
+const formatViews = (v: number) => 
+    v >= 1e9 ? (v / 1e9).toFixed(1) + 'B' : 
+    v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : 
+    v >= 1e3 ? (v / 1e3).toFixed(1) + 'K' : String(v);
 
-let limit1 = 100
-let limit2 = 400
-let limit_a1 = 50
-let limit_a2 = 400
+const emitProgress = (msgId: string, step: string, extraData: Record<string, any> = {}) => {
+    queueMicrotask(() => {
+        global.broadcast?.('cmd_progress', { id: msgId, step, ...extraData });
+    });
+};
 
-const handler = async (m, { conn, command, args, text, usedPrefix }) => {
-  if (!text) {
-    throw `> ⓘ 𝙄𝙣𝙜𝙧𝙚𝙨𝙚 𝙚𝙡 𝙣𝙤𝙢𝙗𝙧𝙚 𝙙𝙚 𝙡𝙖 𝙘𝙖𝙣𝙘𝙞𝙤𝙣 𝙦𝙪𝙚 𝙦𝙪𝙞𝙚𝙧𝙚`
-  }
+const extractDownloadUrl = (data: any): string => {
+    const candidate = data?.data?.download || data?.download || data?.dl || data?.data?.dl_url || 
+                      data?.data?.download?.url || data?.datos?.url || data?.result?.download || 
+                      data?.result?.dl || data?.result?.url || data?.result?.link || 
+                      data?.data?.dl || data?.data?.url || data?.data?.link || 
+                      (typeof data?.download === 'object' ? data?.download?.url || data?.download?.link : null) || 
+                      data?.url || data?.link;
+    return (typeof candidate === 'string' && candidate.startsWith('http')) ? candidate : '';
+};
 
-  try {
-    const yt_play = await search(args.join(' '))
+const fetchApiUrl = (apiUrl: string): Promise<string> => {
+    return axios.get(apiUrl, { 
+        timeout: 10000,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    }).then(res => {
+        const dlUrl = extractDownloadUrl(res.data);
+        if (!dlUrl) throw new Error('Sin URL');
+        return dlUrl;
+    });
+};
 
-    if (!yt_play.length) {
-      throw '> ⓘ No se encontraron resultados.'
+const getAudioUrlWithRetry = (videoUrl: string): Promise<string> => {
+    const encoded = encodeURIComponent(videoUrl);
+    const apis = [
+        `https://api.ryuzei.xyz/download/ytmp3/v4?url=${encoded}`,
+        `https://api.ryuzei.xyz/download/ytmp3/v2?url=${encoded}`,
+        `https://api.ryuzei.xyz/download/ytmp3/v3?url=${encoded}`
+    ];
+
+    return fetchApiUrl(apis[0])
+        .catch(() => fetchApiUrl(apis[1]))
+        .catch(() => fetchApiUrl(apis[2]));
+};
+
+export default {
+    command: ['play', 'playaudio', 'audio'],
+    description: 'Descarga y envía audio de YouTube.',
+    category: 'download',
+    group: true,
+    run: (ctx: any) => {
+        const { sock, msg, chat, args, usedPrefix, prefix } = ctx;
+        const p = usedPrefix || prefix || config.prefix;
+        const msgId = msg?.id || msg?.key?.id;
+
+        const query = args.join(" ").trim();
+        if (!query) {
+            return sock.sendMessage(chat, { text: `ꕤ *Ingresa el título o enlace a buscar* ✰` }, { quoted: msg });
+        }
+
+        emitProgress(msgId, 'search_started', { query });
+
+        const urlMatch = query.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/|v\/))([a-zA-Z0-9_-]{11})/);
+        const searchQuery = urlMatch ? `https://youtu.be/${urlMatch[1]}` : query;
+
+        yts(searchQuery)
+            .then(searchResult => {
+                if (!searchResult?.videos?.length) {
+                    emitProgress(msgId, 'no_results', { query });
+                    return sock.sendMessage(chat, { text: `   ׄ  ✿ No se encontraron resultados para **${query}**.` }, { quoted: msg });
+                }
+
+                const video = searchResult.videos[0];
+                const videoId = video.videoId || (urlMatch ? urlMatch[1] : '');
+                const videoUrl = `https://youtu.be/${videoId}`;
+                const title = cleanText(video.title) || 'Sin título';
+                const channel = cleanText(video.author?.name || video.author) || "Desconocido";
+                const views = typeof video.views === 'number' ? video.views : 0;
+                const duration = cleanText(video.timestamp || video.duration) || "";
+
+                if (video.seconds && video.seconds > MAX_DURATION_SECONDS) {
+                    return sock.sendMessage(chat, { 
+                        text: `   ׄ  ✿ El audio dura **${duration}**, superando el límite permitido de **7 minutos**.` 
+                    }, { quoted: msg });
+                }
+
+                const mqThumbUrl = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+                const caption = `﹒𝜗ৎ      ࣪  *${title}*\n\nׅ  ׄ  ✿ *Canal* » ${channel}\nׅ  ׄ  ✿ *Vistas* » ${formatViews(views)}\nׅ  ׄ  ✿ *Tiempo* » ${duration}\nׅ  ׄ  ✿ *Link* » ${videoUrl}\n\nׅ  ׄ  ✿ *Descargando audio...*`;
+
+                sock.sendMessage(chat, { image: { url: mqThumbUrl }, caption }, { quoted: msg }).catch(() => {});
+
+                emitProgress(msgId, 'fetching_audio_stream');
+
+                return getAudioUrlWithRetry(videoUrl).then(downloadUrl => {
+                    emitProgress(msgId, 'sending_audio_to_whatsapp');
+                    return sock.sendMessage(chat, { 
+                        audio: { url: downloadUrl }, 
+                        mimetype: "audio/mpeg", 
+                        fileName: `${title}.mp3`, 
+                        ptt: false 
+                    }, { quoted: msg });
+                });
+            })
+            .catch(() => {});
     }
-
-    let additionalText = ''
-
-    if (command === 'play') {
-      additionalText = 'audio'
-    } else if (command === 'youtube') {
-      additionalText = 'video'
-    }
-
-    await conn.sendMessage(m.chat, {
-      react: {
-        text: '✅',
-        key: m.key
-      }
-    })
-
-    const texto1 = `♡₊˚ ₊✧♡₊˚ 📎・₊✧★🎸🎧°⋆♡₊˚ 🛰️
-> ⓘ 𝙏𝙄𝙏𝙐𝙇𝙊/𝙉𝙊𝙈𝘽𝙍𝙀:
-> • ${yt_play[0].title}
-> •┄┄┄┄┄┄┄┄┄┄┄┄•
-> ⓘ 𝙋𝙐𝘽𝙇𝙄𝘾𝘼𝘿𝙊 𝙀𝙉:
-> • ${yt_play[0].ago}
-> •┄┄┄┄┄┄┄┄┄┄┄┄•
-> ⓘ 𝙇𝙄𝙉𝙆/𝙀𝙉𝙇𝘼𝘾𝙀:
-> • ${yt_play[0].url}
-♡₊˚ 🛰️₊✧♡₊˚ 📎・₊✧★🎸🎧°⋆♡₊˚ 📎
-01:06 ======⬤------------------------- ${secondString(yt_play[0].duration.seconds)}
-               ⇆ㅤ ◁ㅤ❚❚ㅤ▷ㅤ ↻
-
-> *_Enviando ${additionalText}, Aguarde Un Momento..._*`
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        image: { url: yt_play[0].thumbnail },
-        caption: texto1
-      },
-      { quoted: m }
-    )
-
-    // ========================================================
-    // 🎵 DESCARGAR AUDIO
-    // ========================================================
-
-    if (command === 'play') {
-      try {
-        const q = '128kbps'
-        const v = yt_play[0].url
-
-        const yt = await youtubedl(v).catch(
-          async () => await youtubedlv2(v)
-        )
-
-        const dl_url = await yt.audio[q].download()
-        const ttl = await yt.title
-
-        const sex = await getBuffer(dl_url)
-
-        const fileSizeInBytes = sex.byteLength
-        const fileSizeInKB = fileSizeInBytes / 1024
-        const fileSizeInMB = fileSizeInKB / 1024
-        const size = fileSizeInMB.toFixed(2)
-
-        if (size >= limit_a2) {
-          await conn.sendMessage(
-            m.chat,
-            {
-              text: `> ⓘ 𝙋𝙪𝙚𝙙𝙚 𝙙𝙚𝙨𝙘𝙖𝙧𝙜𝙖𝙧 𝙨𝙪 𝙖𝙪𝙙𝙞𝙤 𝙚𝙣: ${dl_url}*`
-            },
-            { quoted: m }
-          )
-          return
-        }
-
-        if (size >= limit_a1 && size <= limit_a2) {
-          await conn.sendMessage(
-            m.chat,
-            {
-              document: sex,
-              mimetype: 'audio/mpeg',
-              fileName: ttl + '.mp3'
-            },
-            { quoted: m }
-          )
-          return
-        } else {
-          await conn.sendMessage(
-            m.chat,
-            {
-              audio: sex,
-              mimetype: 'audio/mpeg',
-              fileName: ttl + '.mp3'
-            },
-            { quoted: m }
-          )
-          return
-        }
-
-      } catch (error) {
-        console.log('[PLAY] Primer método falló:', error)
-
-        try {
-          const info = await ytdl.getInfo(yt_play[0].videoId)
-
-          const format = ytdl.chooseFormat(info.formats, {
-            quality: 'highestaudio'
-          })
-
-          const stream = ytdl.downloadFromInfo(info, {
-            format
-          })
-
-          const bufs = []
-
-          stream.on('data', chunk => {
-            bufs.push(chunk)
-          })
-
-          stream.on('end', async () => {
-            try {
-              const buff = Buffer.concat(bufs)
-
-              await conn.sendMessage(
-                m.chat,
-                {
-                  audio: buff,
-                  fileName: yt_play[0].title + '.mp3',
-                  mimetype: 'audio/mpeg'
-                },
-                { quoted: m }
-              )
-            } catch (err) {
-              console.error('[PLAY] Error enviando audio:', err)
-            }
-          })
-
-          stream.on('error', async error => {
-            console.error('[PLAY] Error en stream:', error)
-
-            try {
-              await YTDL.mp3(yt_play[0].url).then(async s => {
-                await conn.sendMessage(
-                  m.chat,
-                  {
-                    audio: fs.readFileSync(s.path),
-                    mimetype: 'audio/mpeg',
-                    fileName: `${s.meta.title || '-'}.mp3`
-                  },
-                  { quoted: m }
-                )
-
-                await fs.promises.unlink(s.path)
-              })
-            } catch (err) {
-              console.error('[PLAY] Último método falló:', err)
-              await m.reply('❌ No fue posible descargar el audio.')
-            }
-          })
-
-        } catch (error2) {
-          console.log('[PLAY] Segundo método falló:', error2)
-
-          try {
-            const s = await YTDL.mp3(yt_play[0].url)
-
-            await conn.sendMessage(
-              m.chat,
-              {
-                audio: fs.readFileSync(s.path),
-                mimetype: 'audio/mpeg',
-                fileName: `${s.meta.title || '-'}.mp3`
-              },
-              { quoted: m }
-            )
-
-            await fs.promises.unlink(s.path)
-
-          } catch (error3) {
-            console.error('[PLAY] Error final:', error3)
-            await m.reply('❌ No fue posible descargar el audio.')
-          }
-        }
-      }
-    }
-
-    // ========================================================
-    // 🎥 DESCARGAR VIDEO
-    // ========================================================
-
-    if (command === 'youtube') {
-      try {
-        const qu = '360'
-        const q = qu + 'p'
-        const v = yt_play[0].url
-
-        const yt = await youtubedl(v).catch(
-          async () => await youtubedlv2(v)
-        )
-
-        const dl_url = await yt.video[q].download()
-        const ttl = await yt.title
-
-        const sex = await getBuffer(dl_url)
-
-        const fileSizeInBytes = sex.byteLength
-        const fileSizeInKB = fileSizeInBytes / 1024
-        const fileSizeInMB = fileSizeInKB / 1024
-        const size = fileSizeInMB.toFixed(2)
-
-        if (size >= limit2) {
-          await conn.sendMessage(
-            m.chat,
-            {
-              text: `> ⓘ 𝙋𝙪𝙚𝙙𝙚 𝙙𝙚𝙨𝙘𝙖𝙧𝙜𝙖𝙧 𝙨𝙪 𝙫𝙞𝙙𝙚𝙤 𝙚𝙣: ${dl_url}*`
-            },
-            { quoted: m }
-          )
-          return
-        }
-
-        if (size >= limit1 && size <= limit2) {
-          await conn.sendMessage(
-            m.chat,
-            {
-              document: sex,
-              mimetype: 'video/mp4',
-              fileName: ttl + '.mp4'
-            },
-            { quoted: m }
-          )
-          return
-        } else {
-          await conn.sendMessage(
-            m.chat,
-            {
-              video: sex,
-              mimetype: 'video/mp4',
-              fileName: ttl + '.mp4'
-            },
-            { quoted: m }
-          )
-          return
-        }
-
-      } catch (error) {
-        console.log('[YOUTUBE] Primer método falló:', error)
-
-        try {
-          const formats = await bestFormat(
-            yt_play[0].url,
-            'video'
-          )
-
-          const buff = await getBuffer(formats.url)
-
-          const ttl_1 = yt_play[0].title
-            ? yt_play[0].title
-            : 'Tu_video_descargado'
-
-          await conn.sendMessage(
-            m.chat,
-            {
-              video: buff,
-              fileName: ttl_1 + '.mp4',
-              mimetype: 'video/mp4'
-            },
-            { quoted: m }
-          )
-
-        } catch (error2) {
-          console.error('[YOUTUBE] Segundo método falló:', error2)
-
-          await m.reply(
-            '❌ No fue posible descargar el video.'
-          )
-        }
-      }
-    }
-
-  } catch (error) {
-    console.log('[PLAY/YOUTUBE] Error:', error)
-
-    throw '> ⓘ 𝙊𝙘𝙪𝙧𝙧𝙞𝙤 𝙪𝙣 𝙚𝙧𝙧𝙤𝙧 𝙚𝙣 𝙡𝙖 𝙙𝙚𝙨𝙘𝙖𝙧𝙜𝙖, 𝙥𝙤𝙧 𝙛𝙖𝙫𝙤𝙧, 𝙫𝙪𝙚𝙡𝙫𝙖 𝙖 𝙞𝙣𝙩𝙚𝙣𝙩𝙖𝙧𝙡𝙤.'
-  }
-}
-
-// ============================================================
-// ⚙️ CONFIGURACIÓN DEL HANDLER
-// ============================================================
-
-handler.help = ['play', 'youtube'].map(v => v + ' <busqueda>')
-handler.tags = ['downloader']
-handler.command = /^(play|youtube)$/i
-handler.register = true
-
-export default handler
-
-// ============================================================
-// 🔎 BUSCAR EN YOUTUBE
-// ============================================================
-
-async function search(query, options = {}) {
-  const result = await yts.search({
-    query,
-    hl: 'es',
-    gl: 'ES',
-    ...options
-  })
-
-  return result.videos
-}
-
-// ============================================================
-// 🔢 FORMATEAR NÚMEROS
-// ============================================================
-
-function MilesNumber(number) {
-  const exp = /(\d)(?=(\d{3})+(?!\d))/g
-  const rep = '$1.'
-  const arr = number.toString().split('.')
-
-  arr[0] = arr[0].replace(exp, rep)
-
-  return arr[1] ? arr.join('.') : arr[0]
-}
-
-// ============================================================
-// ⏱️ FORMATEAR DURACIÓN
-// ============================================================
-
-function secondString(seconds) {
-  seconds = Number(seconds)
-
-  const d = Math.floor(seconds / (3600 * 24))
-  const h = Math.floor((seconds % (3600 * 24)) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = Math.floor(seconds % 60)
-
-  const dDisplay = d > 0
-    ? d + (d == 1 ? ' día, ' : ' días, ')
-    : ''
-
-  const hDisplay = h > 0
-    ? h + (h == 1 ? ' hora, ' : ' horas, ')
-    : ''
-
-  const mDisplay = m > 0
-    ? m + (m == 1 ? ' minuto, ' : ' minutos, ')
-    : ''
-
-  const sDisplay = s > 0
-    ? s + (s == 1 ? ' segundo' : ' segundos')
-    : ''
-
-  return dDisplay + hDisplay + mDisplay + sDisplay
-}
-
-// ============================================================
-// 📦 FORMATEAR TAMAÑO
-// ============================================================
-
-function bytesToSize(bytes) {
-  return new Promise((resolve, reject) => {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-
-    if (bytes === 0) return resolve('n/a')
-
-    const i = parseInt(
-      Math.floor(Math.log(bytes) / Math.log(1024)),
-      10
-    )
-
-    if (i === 0) resolve(`${bytes} ${sizes[i]}`)
-
-    resolve(`${(bytes / (1024 ** i)).toFixed(1)} ${sizes[i]}`)
-  })
-}
-
-// ============================================================
-// 📥 OBTENER BUFFER
-// ============================================================
-
-const getBuffer = async (url, options) => {
-  const res = await axios({
-    method: 'get',
-    url,
-    headers: {
-      DNT: 1,
-      'Upgrade-Insecure-Request': 1
-    },
-    ...options,
-    responseType: 'arraybuffer'
-  })
-
-  return res.data
-}
+};

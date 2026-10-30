@@ -18,6 +18,8 @@ const formatViews = (v) =>
     String(v)
 
 const emitProgress = (msgId, step, extraData = {}) => {
+    if (!msgId) return
+
     queueMicrotask(() => {
         global.broadcast?.('cmd_progress', {
             id: msgId,
@@ -27,46 +29,73 @@ const emitProgress = (msgId, step, extraData = {}) => {
     })
 }
 
+// ============================================================
+// EXTRAER URL DE DESCARGA
+// ============================================================
+
 const extractDownloadUrl = (data) => {
-    const candidate =
-        data?.data?.download ||
-        data?.download ||
-        data?.dl ||
-        data?.data?.dl_url ||
-        data?.data?.download?.url ||
-        data?.datos?.url ||
-        data?.result?.download ||
-        data?.result?.dl ||
-        data?.result?.url ||
-        data?.result?.link ||
-        data?.data?.dl ||
-        data?.data?.url ||
-        data?.data?.link ||
-        (typeof data?.download === 'object'
-            ? data?.download?.url || data?.download?.link
-            : null) ||
-        data?.url ||
+    if (!data || typeof data !== 'object') return ''
+
+    const candidates = [
+        data?.data?.download,
+        data?.download,
+        data?.dl,
+        data?.data?.dl_url,
+        data?.data?.download?.url,
+        data?.datos?.url,
+        data?.result?.download,
+        data?.result?.dl,
+        data?.result?.url,
+        data?.result?.link,
+        data?.data?.dl,
+        data?.data?.url,
+        data?.data?.link,
+        data?.download?.url,
+        data?.download?.link,
+        data?.url,
         data?.link
+    ]
 
-    return typeof candidate === 'string' && candidate.startsWith('http')
-        ? candidate
-        : ''
-}
+    for (const candidate of candidates) {
+        const url = typeof candidate === 'string'
+            ? candidate
+            : candidate?.url || candidate?.link
 
-const fetchApiUrl = (apiUrl) => {
-    return axios.get(apiUrl, {
-        timeout: 10000,
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+            return url
         }
-    }).then(res => {
-        const dlUrl = extractDownloadUrl(res.data)
-        if (!dlUrl) throw new Error('Sin URL')
-        return dlUrl
-    })
+    }
+
+    return ''
 }
 
-const getAudioUrlWithRetry = (videoUrl) => {
+// ============================================================
+// CONSULTAR API
+// ============================================================
+
+const fetchApiUrl = async (apiUrl) => {
+    const { data } = await axios.get(apiUrl, {
+        timeout: 15000,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            Accept: 'application/json'
+        }
+    })
+
+    const downloadUrl = extractDownloadUrl(data)
+
+    if (!downloadUrl) {
+        throw new Error('La API no devolvió una URL de descarga válida')
+    }
+
+    return downloadUrl
+}
+
+// ============================================================
+// OBTENER AUDIO CON REINTENTOS
+// ============================================================
+
+const getAudioUrlWithRetry = async (videoUrl) => {
     const encoded = encodeURIComponent(videoUrl)
 
     const apis = [
@@ -75,21 +104,47 @@ const getAudioUrlWithRetry = (videoUrl) => {
         `https://api.ryuzei.xyz/download/ytmp3/v3?url=${encoded}`
     ]
 
-    return fetchApiUrl(apis[0])
-        .catch(() => fetchApiUrl(apis[1]))
-        .catch(() => fetchApiUrl(apis[2]))
+    let lastError
+
+    for (const api of apis) {
+        try {
+            const downloadUrl = await fetchApiUrl(api)
+
+            // Comprobar que el enlace realmente responda.
+            await axios.get(downloadUrl, {
+                timeout: 20000,
+                responseType: 'stream',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0'
+                }
+            }).then(response => {
+                response.data.destroy()
+            })
+
+            return downloadUrl
+
+        } catch (error) {
+            lastError = error
+            console.error('[PLAY] API fallida:', error.message)
+        }
+    }
+
+    throw lastError || new Error('Ninguna API pudo generar el audio')
 }
+
+// ============================================================
+// HANDLER
+// ============================================================
 
 const handler = async (m, { conn, args, text }) => {
     const msgId = m?.key?.id
-
     const query = (text || args.join(' ')).trim()
 
     if (!query) {
         return conn.sendMessage(
             m.chat,
             {
-                text: `ꕤ *Ingresa el título o enlace a buscar* ✰`
+                text: 'ꕤ *Ingresa el título o enlace a buscar* ✰'
             },
             { quoted: m }
         )
@@ -106,6 +161,7 @@ const handler = async (m, { conn, args, text }) => {
         : query
 
     try {
+        // BUSCAR VIDEO
         const searchResult = await yts(searchQuery)
 
         if (!searchResult?.videos?.length) {
@@ -114,7 +170,7 @@ const handler = async (m, { conn, args, text }) => {
             return conn.sendMessage(
                 m.chat,
                 {
-                    text: `   ׄ  ✿ No se encontraron resultados para **${query}**.`
+                    text: `   ׄ  ✿ No se encontraron resultados para *${query}*.`
                 },
                 { quoted: m }
             )
@@ -122,24 +178,29 @@ const handler = async (m, { conn, args, text }) => {
 
         const video = searchResult.videos[0]
         const videoId = video.videoId || (urlMatch ? urlMatch[1] : '')
-        const videoUrl = `https://youtu.be/${videoId}`
 
+        if (!videoId) {
+            throw new Error('No se pudo obtener el ID del video')
+        }
+
+        const videoUrl = `https://youtu.be/${videoId}`
         const title = cleanText(video.title) || 'Sin título'
         const channel = cleanText(video.author?.name || video.author) || 'Desconocido'
         const views = typeof video.views === 'number' ? video.views : 0
         const duration = cleanText(video.timestamp || video.duration) || ''
 
+        // COMPROBAR DURACIÓN
         if (video.seconds && video.seconds > MAX_DURATION_SECONDS) {
             return conn.sendMessage(
                 m.chat,
                 {
-                    text: `   ׄ  ✿ El audio dura **${duration}**, superando el límite permitido de **7 minutos**.`
+                    text: `   ׄ  ✿ El audio dura *${duration}*, superando el límite permitido de *7 minutos*.`
                 },
                 { quoted: m }
             )
         }
 
-        const mqThumbUrl = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+        const thumbnail = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
 
         const caption = `﹒𝜗ৎ      ࣪  *${title}*
 
@@ -150,22 +211,34 @@ const handler = async (m, { conn, args, text }) => {
 
 ׅ  ׄ  ✿ *Descargando audio...*`
 
-        conn.sendMessage(
-            m.chat,
-            {
-                image: { url: mqThumbUrl },
-                caption
-            },
-            { quoted: m }
-        ).catch(() => {})
+        // ENVIAR MINIATURA
+        try {
+            await conn.sendMessage(
+                m.chat,
+                {
+                    image: { url: thumbnail },
+                    caption
+                },
+                { quoted: m }
+            )
+        } catch (error) {
+            console.error('[PLAY] Error enviando miniatura:', error.message)
+            await conn.sendMessage(
+                m.chat,
+                { text: caption },
+                { quoted: m }
+            )
+        }
 
+        // DESCARGAR AUDIO
         emitProgress(msgId, 'fetching_audio_stream')
 
         const downloadUrl = await getAudioUrlWithRetry(videoUrl)
 
         emitProgress(msgId, 'sending_audio_to_whatsapp')
 
-        return conn.sendMessage(
+        // ENVIAR AUDIO
+        await conn.sendMessage(
             m.chat,
             {
                 audio: { url: downloadUrl },
@@ -177,8 +250,15 @@ const handler = async (m, { conn, args, text }) => {
         )
 
     } catch (error) {
-        console.error('[PLAY] Error:', error)
-        return m.reply('❌ Ocurrió un error al buscar o descargar el audio.')
+        console.error('[PLAY] Error:', error.message || error)
+
+        return conn.sendMessage(
+            m.chat,
+            {
+                text: '❌ No se pudo descargar el audio. El servidor de descarga puede estar temporalmente fuera de servicio. Inténtalo nuevamente más tarde.'
+            },
+            { quoted: m }
+        )
     }
 }
 

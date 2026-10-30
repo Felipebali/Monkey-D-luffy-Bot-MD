@@ -1,70 +1,74 @@
-import fetch from 'node-fetch';
+import fetch from 'node-fetch'
+import * as baileysMod from '@whiskeysockets/baileys'
+import config from '../../config.js'
 
-var handler = async (m, { conn, args, usedPrefix, command }) => {
-  if (!args[0]) {
-    return conn.reply(
-      m.chat,
-      `${emoji} 𝙿𝚘𝚛 𝚏𝚊𝚟𝚘𝚛, 𝚒𝚗𝚐𝚛𝚎𝚜𝚊 𝚞𝚗 𝚎𝚗𝚕𝚊𝚌𝚎 𝚍𝚎 𝚃𝚒𝚔𝚃𝚘𝚔.\n\n📌 *Ejemplo:* ${usedPrefix + command} https://vm.tiktok.com/...`,
-      m
-    );
-  }
+const pkg = baileysMod.default && Object.keys(baileysMod).length === 1 ? baileysMod.default : baileysMod
+const { generateWAMessageFromContent, generateWAMessage } = pkg
 
+const handler = async (m, { conn, text, usedPrefix, command }) => {
+  if (!text) return m.reply(`*『 ✙ 』ENLACE INVÁLIDO.*\n> Enviá un enlace válido de TikTok.`)
+  if (!/tiktok\.com|vt\.tiktok\.com/i.test(text)) return m.reply(`*『 ✙ 』ENLACE INVÁLIDO.*\n> Asegurate de que sea de TikTok.`)
+
+  const chatId = m.chat
+  await m.reply(`*『 📥 』Descargando de TikTok...*`)
+  
   try {
-    await conn.reply(m.chat, `${emoji} 𝙴𝚜𝚙𝚎𝚛𝚎 𝚞𝚗 𝚖𝚘𝚖𝚎𝚗𝚝𝚘, 𝚘𝚋𝚝𝚎𝚗𝚒𝚎𝚗𝚍𝚘 𝚎𝚕 𝚟𝚒𝚍𝚎𝚘...`, m);
+    const response = await fetch(`https://luxinfinity.vercel.app/api/tiktok?url=${encodeURIComponent(text)}`)
+    const json = await response.json()
 
-    const tiktokData = await tiktokdl(args[0]);
-    const result = tiktokData?.data;
+    if (!json.status || !json.data) return m.reply(`*『 ❌ 』ERROR.*\n> No se pudo obtener respuesta del servidor.`)
 
-    if (!result?.play) {
-      return conn.reply(m.chat, "❌ 𝙴𝚛𝚛𝚘𝚛: 𝙽𝚘 𝚜𝚎 𝚙𝚞𝚍𝚘 𝚘𝚋𝚝𝚎𝚗𝚎𝚛 𝚎𝚕 𝚟𝚒𝚍𝚎𝚘.", m);
+    const data     = json.data
+    const title    = data.title    || ''
+    const author   = data.author   || data.music?.author || 'Anónimo'
+    const music    = data.music?.title || 'Sonido original'
+    const likes    = (data.likes    || 0).toLocaleString()
+    const comments = (data.comments || 0).toLocaleString()
+    const shares   = (data.shares   || 0).toLocaleString()
+    const plays    = (data.plays    || 0).toLocaleString()
+    
+    if (Array.isArray(data.images) && data.images.length > 0) {
+      const caption = `*『 🖼️ 』TIKTOK · ${data.images.length} IMÁGENES*\n> 👤 *${author}*\n> 📝 ${title}\n> 🎵 ${music}\n> ❤️ ${likes} · 💬 ${comments} · 🔁 ${shares} · 👁️ ${plays}`
+      
+      const album = generateWAMessageFromContent(chatId, {
+        albumMessage: { expectedImageCount: data.images.length, contextInfo: { stanzaId: m.key.id, participant: m.key.participant || m.key.remoteJid, quotedMessage: m.message } }
+      }, {})
+      await conn.relayMessage(chatId, album.message, { messageId: album.key.id })
+
+      await Promise.all(data.images.map(async (imgUrl, i) => {
+        try {
+          const imgBuf = Buffer.from(await (await fetch(imgUrl, { timeout: 60000 })).arrayBuffer())
+          const msg = await generateWAMessage(chatId, {
+            image: imgBuf,
+            caption: i === 0 ? caption : ''
+          }, { upload: conn.waUploadToServer })
+          msg.message.messageContextInfo = { messageAssociation: { associationType: 1, parentMessageKey: album.key } }
+          await conn.relayMessage(chatId, msg.message, { messageId: msg.key.id })
+        } catch (err) { }
+      }))
+      
+      if (data.audio) {
+        const mp3Buf = Buffer.from(await (await fetch(data.audio, { timeout: 30000 })).arrayBuffer())
+        await conn.sendMessage(chatId, { audio: mp3Buf, mimetype: 'audio/mpeg', ptt: false }, { quoted: m })
+      }
+    } else {
+      if (!data?.nowatermark) return m.reply(`*『 ✙ 』SIN VIDEO.*\n> No se encontró video en ese enlace.`)
+      
+      const captionVid = `*『 🎵 』TIKTOK*\n> 👤 *${author}*\n> 📝 ${title}\n> 🎵 ${music}\n> ❤️ ${likes} · 💬 ${comments} · 🔁 ${shares} · 👁️ ${plays}`
+      const buf = Buffer.from(await (await fetch(data.nowatermark, { timeout: 60000 })).arrayBuffer())
+      
+      await conn.sendMessage(chatId, { video: buf, mimetype: 'video/mp4', caption: captionVid }, { quoted: m })
     }
+    
 
-    const caption = `
-  *T I K T O K  -  D O W N L O A D*
-
-\`${result.title || 'Sin título'}\`
-
-01:43 ━━━━●───── 04:40
-⇆ㅤ ◁ㅤ ❚❚ ㅤ▷ ㅤ ↻
-               ılıılıılıılıılıılı
-𝚅𝙾𝙻𝚄𝙼𝙴 : ▮▮▮▮▮▮▮▮▮▮
-
-❐  *Autor* : ${result.author?.nickname || 'Desconocido'}
-❐  *Duración* : ${result.duration || 0} segundos
-❐  *Vistas* : ${result.play_count || 0}
-❐  *Likes* : ${result.digg_count || 0}
-❐  *Comentarios* : ${result.comment_count || 0}
-❐  *Compartidos* : ${result.share_count || 0}
-❐  *Publicado* : ${formatDate(result.create_time)}
-❐  *Descargas* : ${result.download_count || 0}
-`.trim();
-
-    await conn.sendFile(m.chat, result.play, 'tiktok.mp4', caption, m);
-    await m.react('✅');
-  } catch (error) {
-    console.error(error);
-    return conn.reply(m.chat, `❌ 𝙴𝚛𝚛𝚘𝚛 𝚊𝚕 𝚍𝚎𝚜𝚌𝚊𝚛𝚐𝚊𝚛: ${error.message}`, m);
+  } catch (e) { 
+    console.error(e)
+    m.reply(`*『 ❌ 』ERROR.*\n> Ocurrió un error inesperado. Intentá de nuevo.`) 
   }
-};
-
-handler.help = ['tiktok', 'tt'].map(v => v + ' *<link>*');
-handler.tags = ['descargas'];
-handler.command = ['tiktok', 'tt', 'tiktokdl', 'ttdl'];
-handler.group = true;
-handler.register = true;
-handler.coin = 2;
-handler.limit = true;
-
-export default handler;
-
-async function tiktokdl(url) {
-  const api = `https://www.tikwm.com/api/?url=${url}&hd=1`;
-  const res = await fetch(api);
-  const json = await res.json();
-  return json;
 }
 
-function formatDate(timestamp) {
-  const date = new Date(timestamp * 1000);
-  return date.toLocaleString('es-ES', { timeZone: 'America/Mexico_City' });
-}
+handler.help = ['tt <link>']
+handler.command = ['ttkdl', 'tt', 'tiktok', 'tiktokdl', 'ttk']
+handler.tags = ['descargas']
+
+export default handler

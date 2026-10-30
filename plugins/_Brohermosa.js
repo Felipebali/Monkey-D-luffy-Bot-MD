@@ -9,7 +9,7 @@ const BRO_JID = '59893491934@s.whatsapp.net'
 const BRO_LID = '181080552378538@lid'
 const BRO_LID_NUMBER = '181080552378538'
 
-const COOLDOWN = 15 * 1000
+const COOLDOWN = 60 * 1000
 
 const cooldowns = new Map()
 const procesados = new Set()

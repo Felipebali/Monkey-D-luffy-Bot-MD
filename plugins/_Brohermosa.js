@@ -1,67 +1,296 @@
 
 // 📂 plugins/mejorbro.js
 // 🤖 WHATSAPP-BOT — La mejor bro del mundo 💖
+// ⏱️ Cooldown: 15 segundos por grupo
 
 const BRO_NUMBER = '59893491934'
-const BRO_LID = '181080552378538@lid'
-
 const BRO_JID = '59893491934@s.whatsapp.net'
 
+const BRO_LID = '181080552378538@lid'
+const BRO_LID_NUMBER = '181080552378538'
+
+const COOLDOWN = 15 * 1000
+
+const cooldowns = new Map()
+const procesados = new Set()
+
 const FRASES = [
-  `👑💖 ¡@BRO es la mejor bro que se puede tener!
 
-✨ Una amiga de oro, única e incondicional.
-🫶 ¡Una verdadera hermana de la vida!`,
+  // 👑 Realeza
+  `👑💖 ¡ATENCIÓN, QUE HA LLEGADO LA REALEZA!
 
-  `💎🌹 ¡@BRO es de esas personas que no se encuentran dos veces!
+@BRO no necesita presentación.
+Tiene corona, categoría propia y un lugar reservado en la historia de este grupo.
 
-🤍 Vale más que mil amistades pasajeras.
-👑 ¡Una reina que merece todo lo bonito!`,
+✨ ¡Que alguien le cuide el trono!`,
 
-  `🫂💗 ¡Atención, grupo! @BRO es una bro de otro nivel.
+  `📜🏰 Por decreto oficial de WHATSAPP-BOT:
 
-🔥 Lealtad, buena vibra y un corazón enorme.
-🏆 ¡La mejor compañera que se puede tener!`,
+Se reconoce a @BRO como patrimonio de la amistad.
+Queda prohibido discutir su grandeza.
 
-  `🌟👑 ¡@BRO no es una bro cualquiera, es una leyenda!
+👑 Firmado: el bot que sabe reconocer leyendas.`,
 
-💖 De esas personas que hacen la diferencia.
-🤝 ¡Una verdadera hermana elegida por la vida!`,
+  `🚨👑 ¡SE INTERRUMPEN LAS ACTIVIDADES DEL GRUPO!
 
-  `💐💕 ¡Si hablamos de buenas amistades, hablamos de @BRO!
+Tenemos una noticia importante:
+@BRO acaba de recordarles que las leyendas también mandan mensajes.
 
-✨ Una persona que vale oro.
-💎 ¡Inigualable, auténtica y especial!`,
+💖 Continúen con sus actividades.`,
 
-  `🛡️💖 ¡@BRO tiene el título oficial de MEJOR BRO!
+  // 💗 Emotivas
+  `🫂💗 Hay personas que llegan a tu vida y, sin darse cuenta, se convierten en familia.
 
-👑 Nadie le quita esa corona.
-🤝 ¡Amistad de la buena!`,
+@BRO es de esas personas que merecen un lugar bonito en la vida.
 
-  `🌈🫶 ¡La vida se disfruta más con una bro como @BRO!
+🌷 Que nunca le falten motivos para ser feliz.`,
 
-💗 Buena energía y una amistad especial.
-👑 ¡Una reina en su propia historia!`,
+  `💌✨ Si pudiera darle un regalo a @BRO sería que la vida le devolviera multiplicado todo lo bonito que transmite.
 
-  `🚨👑 ¡COMUNICADO OFICIAL DE WHATSAPP-BOT!
+💗 Porque las personas especiales también merecen cosas especiales.`,
 
-📢 @BRO ha sido reconocida como una de las mejores bros.
-💖 ¡El título es permanente!`,
+  `🌻💖 Recordatorio para @BRO:
 
-  `💫🌹 ¡Una amistad gigante para @BRO!
+No hace falta ser perfecta para ser increíble.
+Tu forma de ser ya te hace especial.
 
-🫂 Hay personas que llegan y se vuelven familia.
-💖 ¡Ella es una de esas personas!`,
+🫶 Nunca pierdas esa esencia.`,
 
-  `🏆💗 ¡Premio a la mejor bro del universo para @BRO!
+  `🌙💜 Ojalá todos los días de @BRO tengan un poquito de magia.
 
-🥇 Por ser única.
-👑 ¡La campeona indiscutida de la amistad!`,
+Que encuentre tranquilidad en los días difíciles y motivos para reír incluso en los días normales.
 
-  `🐐🔥 ¡@BRO es la GOAT de las bros!
+✨ Se merece cosas bonitas.`,
 
-👑 La número uno, la irrepetible, la legendaria.
-💖 ¡No hay ranking que le haga justicia!`
+  `🫂❤️ Algunas personas son compañía.
+Otras son confianza.
+Y algunas terminan siendo familia sin compartir apellido.
+
+@BRO tiene ese algo especial.
+
+👑 ¡Una hermana elegida!`,
+
+  // 😂 Divertidas
+  `📰 ÚLTIMO MOMENTO:
+
+Fuentes muy confiables (yo mismo) confirman que @BRO sigue siendo increíble.
+
+📊 Los estudios no fueron necesarios.
+👑 El resultado era evidente.`,
+
+  `🤖 Error 404:
+
+No se encontró ninguna bro que supere a @BRO.
+
+🔎 Búsqueda finalizada.
+💖 Resultado permanente.`,
+
+  `📢 ¡ATENCIÓN, @BRO!
+
+Se informa que su nivel de grandeza está causando problemas en los servidores.
+
+⚠️ Por favor, continúe siendo increíble con moderación.`,
+
+  `🐐 ¡EL SISTEMA HA DETECTADO UNA LEYENDA!
+
+Nombre: @BRO
+Categoría: irrepetible.
+Nivel: máximo.
+Posibilidad de reemplazo: no encontrada.
+
+🏆 Fin del informe.`,
+
+  `💻 Analizando a @BRO...
+
+✔️ Buena persona.
+✔️ Amistad especial.
+✔️ Personalidad única.
+✔️ Nivel legendario.
+
+🤖 Conclusión: no hay actualizaciones disponibles, ya viene perfecta de fábrica.`,
+
+  `🎮 ¡NUEVO LOGRO DESBLOQUEADO!
+
+🏆 @BRO ha conseguido:
+«Ser una persona inolvidable».
+
+⭐ Rareza: legendaria.
+💎 Valor: incalculable.
+❤️ Estado: permanente.`,
+
+  `🚀 Atención, tripulación:
+
+@BRO acaba de entrar al chat.
+Se recomienda ajustar los niveles de buena energía.
+
+🌟 ¡La misión continúa!`,
+
+  `⚖️ El tribunal de la amistad ha deliberado.
+
+La sentencia es definitiva:
+@BRO es culpable de ser una bro increíble.
+
+👑 Sin posibilidad de apelación.`,
+
+  // 🥹 Especiales
+  `💗 Quizás @BRO no se dé cuenta de lo importante que puede ser para los demás.
+
+Pero hay personas cuya presencia hace que todo sea un poquito mejor.
+
+🫶 Y ella es una de esas personas.`,
+
+  `🌌 De todas las casualidades que tiene la vida, algunas terminan convirtiéndose en amistades que uno quiere conservar.
+
+@BRO es una de esas casualidades bonitas.
+
+💜 ¡Que la vida cuide esa amistad!`,
+
+  `🎁 Si hoy el universo tuviera que elegir a alguien para sorprender con cosas bonitas...
+
+Yo ya tengo mi candidata: @BRO.
+
+🌷 ¡Que le sobren razones para sonreír!`,
+
+  `🧸💖 Mensaje especial para @BRO:
+
+Que nunca tenga que cambiar su esencia para encajar en ningún lugar.
+Las personas auténticas no necesitan convertirse en alguien más.
+
+👑 ¡Siga siendo única!`,
+
+  `✨ Hay personas que no necesitan hacer demasiado para dejar una huella.
+
+A veces alcanza con estar, escuchar y compartir momentos.
+
+🫂 @BRO, nunca subestimes lo especial que podés ser.`,
+
+  // 🏆 Reconocimientos
+  `🏅 ENTREGA DE PREMIOS OFICIAL:
+
+🥇 Mejor bro: @BRO
+💎 Personalidad: única.
+👑 Categoría: legendaria.
+❤️ Vigencia: de por vida.
+
+¡Gracias por participar, aunque no había competencia!`,
+
+  `📣 ¡SE BUSCA!
+
+Una persona capaz de superar a @BRO en la categoría mejor bro.
+
+🔍 Recompensa: una corona.
+📌 Estado de la búsqueda: sin resultados.
+
+😂 ¡Seguiremos intentando!`,
+
+  `👑 @BRO acaba de recibir una actualización:
+
++1000 puntos de amistad.
++500 puntos de buena energía.
++9999 puntos de autenticidad.
+
+🔥 ¡Nivel máximo alcanzado!`,
+
+  `🌟 No todas las estrellas están en el cielo.
+
+Algunas aparecen en un grupo de WhatsApp y se llaman @BRO.
+
+💖 ¡Que nunca se apague esa luz!`,
+
+  `📖 Si la amistad fuera un libro, @BRO tendría un capítulo especial.
+
+De esos que uno vuelve a leer porque siempre dejan algo bonito.
+
+💗 ¡Una persona para valorar!`,
+
+  `🔔 Notificación importante:
+
+El universo te recuerda, @BRO, que sos mucho más valiosa de lo que a veces imaginás.
+
+🫶 Fin de la notificación.
+👑 Atentamente: WhatsApp-Bot.`,
+
+  `🛡️ Se activa el protocolo de protección de amistades especiales.
+
+Objetivo: @BRO.
+Misión: que nunca le falten respeto, cariño y buenas personas.
+
+💖 Protocolo activado.`,
+
+  `🎬 ¡Y en el episodio de hoy de este grupo...!
+
+La protagonista vuelve a aparecer:
+@BRO.
+
+⭐ Género: comedia, amistad y momentos inolvidables.
+🏆 Calificación: cinco estrellas.`,
+
+  `💐 Una pequeña pausa para decir algo:
+
+@BRO merece amistades que la cuiden tanto como ella puede cuidar a los demás.
+
+❤️ Que nunca le falte gente sincera a su alrededor.`,
+
+  `🔮 Predicción del día:
+
+@BRO recibirá buenas noticias, tendrá motivos para reír y encontrará alguna sorpresa bonita.
+
+✨ ¿La fuente? Mis circuitos tienen buenas vibras.`,
+
+  `👑 No es favoritismo, es reconocimiento institucional.
+
+@BRO tiene un lugar especial en este grupo y el bot se encarga de recordarlo.
+
+💖 Caso cerrado.`,
+
+  `🌈 Que @BRO nunca pierda esa capacidad de disfrutar las pequeñas cosas.
+
+Porque muchas veces la felicidad está en los momentos más simples.
+
+🫶 ¡Un abrazo de parte del bot!`,
+
+  `🚨 ALERTA: exceso de grandeza detectado.
+
+La presencia de @BRO ha superado los niveles permitidos de buena onda.
+
+🤖 Reiniciando sistema...
+💗 Resultado: sigue siendo increíble.`,
+
+  `📡 Transmisión especial para @BRO:
+
+Desde este pequeño rincón digital se informa que hay personas que hacen más lindo cualquier lugar al que llegan.
+
+💖 Y vos sos una de ellas.`,
+
+  `🏆 Si existiera un ranking mundial de amistades que vale la pena cuidar...
+
+@BRO tendría un lugar reservado.
+
+🥇 No por competir, sino por ser ella misma.`,
+
+  `💜 Un recordatorio que no ocupa mucho espacio:
+
+@BRO no tiene que demostrarle nada a nadie para merecer cariño, respeto y cosas bonitas.
+
+🌷 Que nunca lo olvide.`,
+
+  `🤖 Informe confidencial:
+
+Se ha detectado una persona con características extraordinarias.
+
+Nombre: @BRO.
+Debilidad: ninguna detectada.
+Fortaleza: ser ella misma.
+
+🔒 Informe archivado.`,
+
+  `🎉 ¡FIESTA NACIONAL EN EL SERVIDOR!
+
+Motivo: @BRO escribió un mensaje.
+Duración: hasta nuevo aviso.
+Invitados: todo el grupo.
+
+👑 ¡Que comiencen los festejos!`
 ]
 
 function normalizarNumero(valor = '') {
@@ -75,39 +304,67 @@ function esLaBro(m, conn) {
   const sender = String(m.sender || '')
   const decoded = conn.decodeJid?.(sender) || sender
 
+  const numero = normalizarNumero(sender)
+  const numeroDecoded = normalizarNumero(decoded)
+
   return (
     sender === BRO_LID ||
     decoded === BRO_LID ||
-    normalizarNumero(sender) === BRO_NUMBER ||
-    normalizarNumero(decoded) === BRO_NUMBER ||
-    normalizarNumero(sender) === '181080552378538'
+    numero === BRO_NUMBER ||
+    numeroDecoded === BRO_NUMBER ||
+    numero === BRO_LID_NUMBER ||
+    numeroDecoded === BRO_LID_NUMBER
   )
 }
 
-const handler = async (m, { conn }) => {
-  try {
-    if (!m.isGroup) return
-    if (m.fromMe || m.key?.fromMe) return
+function obtenerFrase() {
+  const indice = Math.floor(Math.random() * FRASES.length)
+  return FRASES[indice].replace(/@BRO/g, `@${BRO_NUMBER}`)
+}
 
-    // Solo responde cuando habla ella
+async function ejecutarMejorBro(m, conn) {
+  try {
+    if (!m?.isGroup) return
+    if (m.fromMe || m.key?.fromMe) return
     if (!esLaBro(m, conn)) return
 
-    const frase = FRASES[
-      Math.floor(Math.random() * FRASES.length)
-    ].replace(/@BRO/g, `@${BRO_NUMBER}`)
+    const messageId = m.key?.id
+    if (!messageId || procesados.has(messageId)) return
 
-    await conn.sendMessage(m.chat, {
-      text: frase,
+    procesados.add(messageId)
+
+    if (procesados.size > 1000) {
+      const antiguos = [...procesados].slice(0, 500)
+      antiguos.forEach(id => procesados.delete(id))
+    }
+
+    const chat = m.chat
+    const ahora = Date.now()
+    const ultimoMensaje = cooldowns.get(chat) || 0
+
+    if (ahora - ultimoMensaje < COOLDOWN) return
+
+    // Registrar antes del envío
+    cooldowns.set(chat, ahora)
+
+    await conn.sendMessage(chat, {
+      text: obtenerFrase(),
       mentions: [BRO_JID]
-    }, { quoted: m })
+    }, {
+      quoted: m
+    })
 
   } catch (error) {
     console.error('[MEJOR BRO] Error:', error)
   }
 }
 
+const handler = async (m, { conn }) => {
+  return ejecutarMejorBro(m, conn)
+}
+
 handler.all = async function (m) {
-  return handler(m, { conn: this })
+  return ejecutarMejorBro(m, this)
 }
 
 handler.help = ['mejorbro']

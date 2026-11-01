@@ -249,8 +249,7 @@ let handler = async (m, { conn, isAdmin }) => {
 // ============================================================
 
 handler.help = [
-    "ap",
-    "aprobar"
+    "ap"
 ]
 
 handler.tags = [
@@ -258,8 +257,7 @@ handler.tags = [
 ]
 
 handler.command = [
-    "ap",
-    "aprobar"
+    "ap"
 ]
 
 handler.group = true

@@ -1,11 +1,10 @@
 
 // 📂 plugins/antiestado2.js
 // 🛡️ WHATSAPP-BOT — ANTIESTADO 2
-// 🚫 Detecta GroupStatusMessageV2
-// 🗑️ Intenta eliminar el mensaje detectado
-// ⚠️ Advierte mencionando al usuario
-// 👥 Incluye administradores y owners
-// ============================================================
+// • Detecta GroupStatusMessageV2
+// • Intenta eliminar usando la clave original
+// • Advierte mencionando al usuario
+// • Incluye administradores y owners
 
 function getChatData(chatId) {
     if (!global.db) global.db = {}
@@ -31,31 +30,15 @@ function getSender(m) {
 function isGroupStatusMessageV2(m) {
     if (!m) return false
 
-    if (
-        String(m.mtype || '').toLowerCase() ===
-        'groupstatusmessagev2'
-    ) {
-        return true
-    }
+    const type = String(m.mtype || '').toLowerCase()
+
+    if (type === 'groupstatusmessagev2') return true
 
     const message = m.message || m.msg || {}
 
-    if (
-        Object.keys(message).some(
-            key => key.toLowerCase() === 'groupstatusmessagev2'
-        )
-    ) {
-        return true
-    }
-
-    if (
-        String(m.messageStubType || '').toLowerCase() ===
-        'groupstatusmessagev2'
-    ) {
-        return true
-    }
-
-    return false
+    return Object.keys(message).some(
+        key => key.toLowerCase() === 'groupstatusmessagev2'
+    )
 }
 
 function getMentionText(jid) {
@@ -64,14 +47,12 @@ function getMentionText(jid) {
 }
 
 // ============================================================
-// 📡 COMANDO: .antiestado2
+// COMANDO
 // ============================================================
 
 const handler = async (m, { conn }) => {
     if (!m.isGroup) {
-        return conn.sendMessage(m.chat, {
-            text: '⚠️ Este comando solo se puede utilizar en grupos.'
-        })
+        return m.reply('⚠️ Este comando solo se puede utilizar en grupos.')
     }
 
     const chatData = getChatData(m.chat)
@@ -79,22 +60,30 @@ const handler = async (m, { conn }) => {
     chatData.antiestado2 = !chatData.antiestado2
 
     const message = chatData.antiestado2
-        ? '╭━━〔 🛡️ *ANTIESTADO 2* 〕━━╮\n\n' +
-          '✅ *Protección activada*\n\n' +
-          '🚫 No está permitido compartir estados en este grupo mediante GroupStatusMessageV2.\n\n' +
-          '⚠️ La regla se aplica a todos los miembros, incluidos administradores y owners.\n' +
-          '🗑️ El bot intentará eliminar los mensajes detectados y avisará al responsable.\n\n' +
-          '╰━━━━━━━━━━━━━━━━━━╯'
-        : '╭━━〔 🛡️ *ANTIESTADO 2* 〕━━╮\n\n' +
-          '🔓 *Protección desactivada*\n\n' +
-          'La detección de GroupStatusMessageV2 quedó desactivada para este grupo.\n\n' +
-          '╰━━━━━━━━━━━━━━━━━━╯'
+        ? `╭━━〔 🛡️ *ANTIESTADO 2* 〕━━╮
+
+✅ *Protección activada*
+
+🚫 No está permitido compartir estados en este grupo.
+
+⚠️ La regla se aplica a todos los miembros, incluidos administradores y owners.
+
+🗑️ El bot intentará eliminar los mensajes detectados.
+
+╰━━━━━━━━━━━━━━━━━━╯`
+        : `╭━━〔 🛡️ *ANTIESTADO 2* 〕━━╮
+
+🔓 *Protección desactivada*
+
+La detección quedó desactivada.
+
+╰━━━━━━━━━━━━━━━━━━╯`
 
     return conn.sendMessage(m.chat, { text: message })
 }
 
 // ============================================================
-// 🔍 DETECTOR DE ESTADOS COMPARTIDOS
+// DETECTOR
 // ============================================================
 
 handler.all = async function (m) {
@@ -109,55 +98,74 @@ handler.all = async function (m) {
         const conn = this
         const sender = getSender(m)
 
-        // Intentar eliminar el mensaje compartido.
-        let deleted = false
+        console.log('[ANTIESTADO2] Estado detectado:', {
+            chat: m.chat,
+            sender,
+            id: m.key?.id,
+            remoteJid: m.key?.remoteJid
+        })
 
-        if (m.key?.id && m.key?.remoteJid) {
+        // Intentar eliminar el mensaje original.
+        let deleteRequested = false
+
+        const originalKey = m.key
+
+        if (
+            originalKey?.id &&
+            originalKey?.remoteJid &&
+            originalKey?.participant
+        ) {
             try {
-                await conn.sendMessage(m.chat, {
-                    delete: m.key
-                })
+                await conn.sendMessage(
+                    m.chat,
+                    { delete: originalKey }
+                )
 
-                deleted = true
+                deleteRequested = true
+
+                console.log('[ANTIESTADO2] Solicitud de eliminación enviada.')
             } catch (error) {
                 console.error(
-                    '[ANTIESTADO2] Error al eliminar el mensaje:',
-                    error
+                    '[ANTIESTADO2] No se pudo solicitar eliminación:',
+                    error.message || error
                 )
             }
+        } else {
+            console.log('[ANTIESTADO2] Clave incompleta:', originalKey)
         }
-
-        const mention = getMentionText(sender)
 
         const warning =
-            '╭━━〔 🚨 *AVISO DE MODERACIÓN* 〕━━╮\n\n' +
-            (sender ? `👤 *Usuario:* ${mention}\n\n` : '') +
-            '🚫 *No está permitido compartir estados en este grupo.*\n\n' +
-            '📌 Se detectó un mensaje del tipo `GroupStatusMessageV2`.\n\n' +
-            (
-                deleted
-                    ? '🗑️ Se solicitó la eliminación del mensaje.'
-                    : '⚠️ No se pudo confirmar la eliminación del mensaje.'
-            ) +
-            '\n\nPor favor, respetá las reglas del grupo para evitar nuevas advertencias.\n\n' +
-            '╰━━━━━━━━━━━━━━━━━━╯'
+            `╭━━〔 🚨 *AVISO DE MODERACIÓN* 〕━━╮
 
-        const messageOptions = {
-            text: warning
-        }
+${sender ? `👤 *Usuario:* ${getMentionText(sender)}` : ''}
+
+🚫 *No está permitido compartir estados en este grupo.*
+
+📌 Se detectó un mensaje GroupStatusMessageV2.
+
+${deleteRequested
+    ? '🗑️ Se solicitó la eliminación del mensaje.'
+    : '⚠️ No se pudo solicitar la eliminación del mensaje.'}
+
+Por favor, respetá las reglas del grupo.
+
+╰━━━━━━━━━━━━━━━━━━╯`
+
+        const options = { text: warning }
 
         if (sender) {
-            messageOptions.mentions = [sender]
+            options.mentions = [sender]
         }
 
-        await conn.sendMessage(m.chat, messageOptions)
+        await conn.sendMessage(m.chat, options)
+
     } catch (error) {
         console.error('[ANTIESTADO2] Error:', error)
     }
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN DEL PLUGIN
+// CONFIGURACIÓN
 // ============================================================
 
 handler.help = ['antiestado2']

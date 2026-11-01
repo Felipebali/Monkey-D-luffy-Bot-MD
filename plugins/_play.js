@@ -1,49 +1,51 @@
 // 📂 plugins/_play.js
+// 🎵 YouTube Play - Audio y Video
 
 import fetch from 'node-fetch'
 import yts from 'yt-search'
 
 let handler = async (m, { conn, args, text, usedPrefix, command }) => {
 
-  // 🔎 VALIDAR BÚSQUEDA
   if (!text) {
     throw `❌ Escribí el nombre de una canción o video.\n\nEjemplo:\n${usedPrefix + command} nombre de la canción`
   }
-
-  const tipo = command === 'play' ? 'audio' : 'vídeo'
 
   // 🔍 BUSCAR EN YOUTUBE
   let result
 
   try {
-    result = await search(args.join(' '))
+    const searchRes = await yts.search({
+      query: args.join(' '),
+      hl: 'es',
+      gl: 'UY'
+    })
+
+    result = searchRes.videos?.[0]
+
   } catch (error) {
     console.error('❌ Error buscando en YouTube:', error)
-    return conn.reply(m.chat, '❌ No se pudo realizar la búsqueda en YouTube.', m)
+    return conn.reply(m.chat, '❌ No se pudo realizar la búsqueda.', m)
   }
 
   if (!result) {
     return conn.reply(m.chat, '❌ No se encontraron resultados.', m)
   }
 
-  const videoUrl = `https://youtube.com/watch?v=${result.videoId}`
+  const videoUrl = result.url
 
-  // 📋 INFORMACIÓN DEL VIDEO
+  // 📋 INFORMACIÓN
   const body = `
 🎵 Título: ${result.title}
 📅 Publicado: ${result.ago}
 ⏱️ Duración: ${result.duration.timestamp}
-👁️ Visualizaciones: ${formatNumber(result.views)}
+👁️ Visualizaciones: ${Number(result.views || 0).toLocaleString('es-UY')}
 👤 Autor: ${result.author.name}
 🆔 ID: ${result.videoId}
-📂 Tipo: ${result.type}
-🔗 URL: ${result.url}
-🌐 Canal: ${result.author.url}
+🔗 URL: ${videoUrl}
 
-⏳ Descargando ${tipo}...
+⏳ Procesando ${command === 'play' ? 'audio' : 'vídeo'}...
 `.trim()
 
-  // 🖼️ ENVIAR INFORMACIÓN
   await conn.sendMessage(
     m.chat,
     {
@@ -53,106 +55,63 @@ let handler = async (m, { conn, args, text, usedPrefix, command }) => {
     { quoted: m }
   )
 
-  // 🎵 DESCARGAR AUDIO
+  // 📥 DESCARGAR AUDIO
   if (command === 'play') {
     try {
-      const audiodlp = await tools.downloader.ytmp3(videoUrl)
-      const downloader = audiodlp?.download
+      const api = `https://ruby-core.vercel.app/api/download/youtube/mp3?url=${encodeURIComponent(videoUrl)}`
 
-      if (!downloader) {
-        throw new Error('No se recibió el enlace de descarga')
+      const response = await fetch(api)
+      const ruby = await response.json()
+
+      if (!response.ok || !ruby?.status || !ruby?.download?.url) {
+        throw new Error('La API no devolvió un enlace válido')
       }
 
       await conn.sendMessage(
         m.chat,
         {
-          audio: { url: downloader },
-          mimetype: 'audio/mpeg'
+          audio: { url: ruby.download.url },
+          mimetype: 'audio/mpeg',
+          fileName: `${result.title}.mp3`
         },
         { quoted: m }
       )
 
     } catch (error) {
-      console.log('❌ Error descargando MP3, intentando Ruby-core:', error)
-
-      try {
-        const response = await fetch(
-          `https://ruby-core.vercel.app/api/download/youtube/mp3?url=${encodeURIComponent(videoUrl)}`
-        )
-
-        const ruby = await response.json()
-
-        if (ruby?.status && ruby?.download?.url) {
-          await conn.sendMessage(
-            m.chat,
-            {
-              audio: { url: ruby.download.url },
-              mimetype: 'audio/mpeg'
-            },
-            { quoted: m }
-          )
-        } else {
-          await conn.reply(m.chat, '❌ No se pudo descargar el audio.', m)
-        }
-
-      } catch (err2) {
-        console.log('❌ Error en Ruby-core MP3:', err2)
-        await conn.reply(m.chat, '❌ Fallaron los métodos de descarga de audio.', m)
-      }
+      console.error('❌ Error descargando MP3:', error)
+      await conn.reply(m.chat, '❌ No se pudo descargar el audio. Intentá nuevamente más tarde.', m)
     }
   }
 
-  // 🎬 DESCARGAR VIDEO
+  // 📥 DESCARGAR VIDEO
   if (command === 'play2') {
     try {
-      const videodlp = await tools.downloader.ytmp4(videoUrl)
-      const downloader = videodlp?.download
+      const api = `https://ruby-core.vercel.app/api/download/youtube/mp4?url=${encodeURIComponent(videoUrl)}`
 
-      if (!downloader) {
-        throw new Error('No se recibió el enlace de descarga')
+      const response = await fetch(api)
+      const ruby = await response.json()
+
+      if (!response.ok || !ruby?.status || !ruby?.download?.url) {
+        throw new Error('La API no devolvió un enlace válido')
       }
 
       await conn.sendMessage(
         m.chat,
         {
-          video: { url: downloader },
-          mimetype: 'video/mp4'
+          video: { url: ruby.download.url },
+          mimetype: 'video/mp4',
+          fileName: `${result.title}.mp4`
         },
         { quoted: m }
       )
 
     } catch (error) {
-      console.log('❌ Error descargando MP4, intentando Ruby-core:', error)
-
-      try {
-        const response = await fetch(
-          `https://ruby-core.vercel.app/api/download/youtube/mp4?url=${encodeURIComponent(videoUrl)}`
-        )
-
-        const ruby = await response.json()
-
-        if (ruby?.status && ruby?.download?.url) {
-          await conn.sendMessage(
-            m.chat,
-            {
-              video: { url: ruby.download.url },
-              mimetype: 'video/mp4'
-            },
-            { quoted: m }
-          )
-        } else {
-          await conn.reply(m.chat, '❌ No se pudo descargar el video.', m)
-        }
-
-      } catch (err2) {
-        console.log('❌ Error en Ruby-core MP4:', err2)
-        await conn.reply(m.chat, '❌ Fallaron los métodos de descarga de video.', m)
-      }
+      console.error('❌ Error descargando MP4:', error)
+      await conn.reply(m.chat, '❌ No se pudo descargar el vídeo. Intentá nuevamente más tarde.', m)
     }
   }
 }
 
-// ⚙️ CONFIGURACIÓN
 handler.help = ['play', 'play2']
 handler.tags = ['downloader']
 handler.command = ['play', 'play2']
@@ -164,14 +123,9 @@ async function search(query, options = {}) {
   const searchRes = await yts.search({
     query,
     hl: 'es',
-    gl: 'ES',
+    gl: 'UY',
     ...options
   })
 
   return searchRes.videos?.[0] || null
-}
-
-// 🔢 FORMATEAR NÚMEROS
-function formatNumber(num) {
-  return Number(num || 0).toLocaleString('es-UY')
 }

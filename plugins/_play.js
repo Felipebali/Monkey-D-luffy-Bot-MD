@@ -1,441 +1,98 @@
-// 📂 plugins/play.js — whatsapp-bot 🐾
-// 🎵 YouTube → Audio
-// Comandos: .play / .playaudio / .audio
-// ⏳ Cooldown: 5 minutos para usuarios
-// 👑 Admins y owners sin cooldown
-// 😀 Reacciones automáticas
-
+import fs from 'fs'
+import fetch from 'node-fetch'
 import yts from 'yt-search'
-import axios from 'axios'
 
-// ============================================================
-// ⚙️ CONFIGURACIÓN
-// ============================================================
+let handler = async (m, { conn, args, text, usedPrefix, command }) => {
+  const datas = global;
+  const idioma = datas.db.data.users[m.sender].language || global.defaultLenguaje;
+  const _translate = JSON.parse(fs.readFileSync(`./src/languages/${idioma}.json`));
+  const tradutor = _translate.plugins.descargas_play
 
-const MAX_DURATION_SECONDS = 7 * 60
-const COOLDOWN_SECONDS = 300
-
-const cooldowns = new Map()
-
-// ============================================================
-// 👑 VERIFICAR OWNER
-// ============================================================
-
-const isOwner = (m, conn) => {
-  const owners = global.owner || []
-
-  const sender = (m.sender || '')
-    .split('@')[0]
-    .split(':')[0]
-
-  const ownerNumbers = owners.map(owner => {
-    const number = Array.isArray(owner) ? owner[0] : owner
-    return String(number).replace(/\D/g, '')
-  })
-
-  const botNumber = (conn.user?.id || '')
-    .split(':')[0]
-    .split('@')[0]
-
-  return (
-    ownerNumbers.includes(sender) ||
-    sender === botNumber ||
-    m.fromMe === true
-  )
-}
-
-// ============================================================
-// 🛡️ VERIFICAR ADMINISTRADOR
-// ============================================================
-
-const isAdminOrOwner = async (m, conn) => {
-  if (isOwner(m, conn)) return true
-  if (!m.isGroup) return false
-
-  try {
-    const metadata = await conn.groupMetadata(m.chat)
-    const sender = (m.sender || '').split(':')[0]
-
-    const participant = metadata.participants?.find(p => {
-      const id = (p.id || p.jid || '').split(':')[0]
-      return id === sender
-    })
-
-    return Boolean(
-      participant?.admin === 'admin' ||
-      participant?.admin === 'superadmin' ||
-      participant?.isAdmin ||
-      participant?.isSuperAdmin
-    )
-  } catch (e) {
-    console.error('⚠️ Error verificando administrador:', e)
-    return false
+  if (!text) throw `${tradutor.texto1[0]} ${usedPrefix + command} ${tradutor.texto1[1]}`;      
+  let additionalText = '';
+  if (['play'].includes(command)) {
+    additionalText = 'audio';
+  } else if (['play2'].includes(command)) {
+    additionalText = 'vídeo';
   }
-}
 
-// ============================================================
-// 😀 REACCIONES
-// ============================================================
+  const regex = "https://youtube.com/watch?v="
+  const result = await search(args.join(' '))
+  const body = `${tradutor.texto2[0]} ${result.title}\n${tradutor.texto2[1]} ${result.ago}\n${tradutor.texto2[2]} ${result.duration.timestamp}\n${tradutor.texto2[3]} ${formatNumber(result.views)}\n${tradutor.texto2[4]} ${result.author.name}\n${tradutor.texto2[5]} ${result.videoId}\n${tradutor.texto2[6]} ${result.type}\n${tradutor.texto2[7]} ${result.url}\n${tradutor.texto2[8]} ${result.author.url}\n\n${tradutor.texto2[9]} ${additionalText}, ${tradutor.texto2[10]}`.trim();
+  conn.sendMessage(m.chat, { image: { url: result.thumbnail }, caption: body }, { quoted: m });
 
-const react = async (conn, m, emoji) => {
-  try {
-    await conn.sendMessage(m.chat, {
-      react: {
-        text: emoji,
-        key: m.key
+  if (command === 'play') {
+    try {
+      const audiodlp = await tools.downloader.ytmp3(regex + result.videoId);
+      const downloader = audiodlp.download;
+      conn.sendMessage(m.chat, { audio: { url: downloader }, mimetype: "audio/mpeg" }, { quoted: m });
+    } catch (error) {
+      console.log('❌ Error en tools.downloader.ytmp3, intentando Ruby-core fallback...', error);
+      try {
+        const ruby = await (
+          await fetch(
+            `https://ruby-core.vercel.app/api/download/youtube/mp3?url=${encodeURIComponent(regex + result.videoId)}`
+          )
+        ).json();
+        if (ruby?.status && ruby?.download?.url) {
+          const audioLink = ruby.download.url;
+          await conn.sendMessage(
+            m.chat,
+            { audio: { url: audioLink }, mimetype: "audio/mpeg" },
+            { quoted: m }
+          );
+        } else {
+          conn.reply(m.chat, tradutor.texto6, m);
+        }
+      } catch (err2) {
+        console.log('❌ Falla en fallback Ruby-core mp3:', err2);
+        conn.reply(m.chat, tradutor.texto6, m);
       }
-    })
-  } catch (e) {
-    console.log('⚠️ Error enviando reacción:', e.message)
-  }
-}
-
-// ============================================================
-// 🧹 LIMPIAR TEXTO
-// ============================================================
-
-const cleanText = (text) => {
-  if (!text) return ''
-  if (typeof text === 'string') return text.trim()
-  if (typeof text === 'number') return String(text)
-  return String(text).trim()
-}
-
-// ============================================================
-// 👁️ FORMATEAR VISTAS
-// ============================================================
-
-const formatViews = (v) => {
-  v = Number(v) || 0
-
-  if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B'
-  if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M'
-  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K'
-
-  return String(v)
-}
-
-// ============================================================
-// 🔎 EXTRAER URL DE DESCARGA
-// ============================================================
-
-const extractDownloadUrl = (data) => {
-  const candidate =
-    data?.data?.download ||
-    data?.download ||
-    data?.dl ||
-    data?.data?.dl_url ||
-    data?.data?.download?.url ||
-    data?.datos?.url ||
-    data?.result?.download ||
-    data?.result?.dl ||
-    data?.result?.url ||
-    data?.result?.link ||
-    data?.data?.dl ||
-    data?.data?.url ||
-    data?.data?.link ||
-    (
-      typeof data?.download === 'object'
-        ? data?.download?.url || data?.download?.link
-        : null
-    ) ||
-    data?.url ||
-    data?.link
-
-  return (
-    typeof candidate === 'string' &&
-    candidate.startsWith('http')
-  ) ? candidate : ''
-}
-
-// ============================================================
-// 🌐 CONSULTAR API
-// ============================================================
-
-const fetchApiUrl = async (apiUrl) => {
-  const res = await axios.get(apiUrl, {
-    timeout: 10000,
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
     }
-  })
+  }
 
-  const dlUrl = extractDownloadUrl(res.data)
-
-  if (!dlUrl) throw new Error('Sin URL de descarga')
-
-  return dlUrl
-}
-
-// ============================================================
-// 🔄 OBTENER AUDIO CON FALLBACK
-// ============================================================
-
-const getAudioUrlWithRetry = async (videoUrl) => {
-  const encoded = encodeURIComponent(videoUrl)
-
-  const apis = [
-    `https://api.delirius.online/download/ytmp3?url=${encoded}`,
-    `https://api.starlights.uk/api/download/ytmp3?url=${encoded}`,
-    `https://api.starlights.uk/api/download/ytmp3v2?url=${encoded}`
-  ]
-
-  for (const api of apis) {
+  if (command === 'play2') {
     try {
-      const url = await fetchApiUrl(api)
-      if (url) return url
-    } catch (e) {
-      console.log('⚠️ API de audio falló:', api)
+      const videodlp = await tools.downloader.ytmp4(regex + result.videoId);
+      const downloader = videodlp.download;
+      conn.sendMessage(m.chat, { video: { url: downloader }, mimetype: "video/mp4" }, { quoted: m });
+    } catch (error) {
+      console.log('❌ Error en tools.downloader.ytmp4, intentando Ruby-core fallback...', error);
+      try {
+        const ruby = await (
+          await fetch(
+            `https://ruby-core.vercel.app/api/download/youtube/mp4?url=${encodeURIComponent(regex + result.videoId)}`
+          )
+        ).json();
+        if (ruby?.status && ruby?.download?.url) {
+          const videoLink = ruby.download.url;
+          await conn.sendMessage(
+            m.chat,
+            { video: { url: videoLink }, mimetype: "video/mp4" },
+            { quoted: m }
+          );
+        } else {
+          conn.reply(m.chat, tradutor.texto6, m);
+        }
+      } catch (err2) {
+        console.log('❌ Falla en fallback Ruby-core mp4:', err2);
+        conn.reply(m.chat, tradutor.texto6, m);
+      }
     }
   }
+};
 
-  throw new Error('Todas las APIs de descarga fallaron.')
+handler.help = ['play', 'play2'];
+handler.tags = ['downloader'];
+//handler.command = ['play', 'play2'];
+
+export default handler;
+
+async function search(query, options = {}) {
+  const searchRes = await yts.search({ query, hl: 'es', gl: 'ES', ...options });
+  return searchRes.videos[0];
 }
 
-// ============================================================
-// 🎵 HANDLER
-// ============================================================
-
-let handler = async (m, { conn, text }) => {
-  const query = String(text || '').trim()
-
-  // ==========================================================
-  // ❌ SIN BÚSQUEDA
-  // ==========================================================
-
-  if (!query) {
-    return conn.sendMessage(
-      m.chat,
-      {
-        text:
-          'ꕤ *Ingresá el título o enlace de YouTube que querés buscar.*'
-      },
-      { quoted: m }
-    )
-  }
-
-  // ==========================================================
-  // 👑 VERIFICAR ADMINISTRADOR U OWNER
-  // ==========================================================
-
-  const privileged = await isAdminOrOwner(m, conn)
-  const senderId = m.sender || m.participant || m.chat
-
-  // ==========================================================
-  // ⏳ COOLDOWN DE 5 MINUTOS
-  // ==========================================================
-
-  if (!privileged) {
-    const now = Date.now()
-    const expiresAt = cooldowns.get(senderId) || 0
-
-    if (now < expiresAt) {
-      const remaining = Math.ceil((expiresAt - now) / 1000)
-      const minutes = Math.floor(remaining / 60)
-      const seconds = remaining % 60
-
-      await react(conn, m, '⏳')
-
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-            `⏳ *¡No atomices! JAJAJA* 🐾\n\n` +
-            `ꕤ Ya usaste este comando recientemente.\n` +
-            `ꕤ Volvé a intentarlo en *${minutes > 0 ? `${minutes} min ` : ''}${seconds} seg*.\n\n` +
-            `ׅ  ׄ  ✿ *Cooldown:* 5 minutos.`
-        },
-        { quoted: m }
-      )
-    }
-
-    cooldowns.set(
-      senderId,
-      now + COOLDOWN_SECONDS * 1000
-    )
-  }
-
-  // ==========================================================
-  // 🎧 REACCIÓN INICIAL
-  // ==========================================================
-
-  await react(conn, m, '🎧')
-
-  try {
-    // ========================================================
-    // 🔎 BUSCAR VIDEO
-    // ========================================================
-
-    let searchQuery = query
-
-    const urlMatch = query.match(
-      /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/|v\/))([a-zA-Z0-9_-]{11})/
-    )
-
-    if (urlMatch) {
-      searchQuery = `https://youtu.be/${urlMatch[1]}`
-    }
-
-    const searchResult = await yts(searchQuery)
-
-    if (!searchResult?.videos?.length) {
-      return conn.sendMessage(
-        m.chat,
-        {
-          text: `✿ No se encontraron resultados para *${query}*.`
-        },
-        { quoted: m }
-      )
-    }
-
-    // ========================================================
-    // 🎬 PRIMER RESULTADO
-    // ========================================================
-
-    const video = searchResult.videos[0]
-
-    const videoId =
-      video.videoId ||
-      (urlMatch ? urlMatch[1] : '')
-
-    if (!videoId) {
-      throw new Error('No pude obtener el ID del video.')
-    }
-
-    const videoUrl = `https://youtu.be/${videoId}`
-
-    const title = cleanText(video.title) || 'Sin título'
-
-    const channel = cleanText(
-      video.author?.name || video.author
-    ) || 'Desconocido'
-
-    const views =
-      typeof video.views === 'number' ? video.views : 0
-
-    const duration = cleanText(
-      video.timestamp || video.duration
-    ) || ''
-
-    // ========================================================
-    // ⏱️ LÍMITE DE DURACIÓN
-    // ========================================================
-
-    if (
-      video.seconds &&
-      video.seconds > MAX_DURATION_SECONDS
-    ) {
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-            `✿ El audio dura *${duration}*, superando el límite permitido de *7 minutos*.`
-        },
-        { quoted: m }
-      )
-    }
-
-    // ========================================================
-    // 🖼️ MINIATURA
-    // ========================================================
-
-    const thumbnail =
-      `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
-
-    const caption =
-`﹒𝜗ৎ ࣪ *${title}*
-
-ׅ  ׄ  ✿ *Canal* » ${channel}
-ׅ  ׄ  ✿ *Vistas* » ${formatViews(views)}
-ׅ  ׄ  ✿ *Tiempo* » ${duration}
-ׅ  ׄ  ✿ *Link* » ${videoUrl}
-
-ׅ  ׄ  ✿ *Descargando audio...*`
-
-    // ========================================================
-    // 🖼️ ENVIAR MINIATURA
-    // ========================================================
-
-    try {
-      await conn.sendMessage(
-        m.chat,
-        {
-          image: { url: thumbnail },
-          caption
-        },
-        { quoted: m }
-      )
-    } catch (e) {
-      console.log('⚠️ No se pudo enviar la miniatura:', e)
-    }
-
-    // ========================================================
-    // 🎵 OBTENER AUDIO
-    // ========================================================
-
-    const downloadUrl =
-      await getAudioUrlWithRetry(videoUrl)
-
-    if (!downloadUrl) {
-      throw new Error('No se obtuvo URL de audio.')
-    }
-
-    // ========================================================
-    // 📤 ENVIAR AUDIO
-    // ========================================================
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        audio: { url: downloadUrl },
-        mimetype: 'audio/mpeg',
-        fileName: `${title}.mp3`,
-        ptt: false
-      },
-      { quoted: m }
-    )
-
-    // ========================================================
-    // ✅ REACCIÓN DE ÉXITO
-    // ========================================================
-
-    await react(conn, m, '✅')
-
-  } catch (e) {
-    console.error('❌ Error en play:', e)
-
-    await react(conn, m, '❌')
-
-    return conn.sendMessage(
-      m.chat,
-      {
-        text:
-          '❌ No pude descargar el audio. Intentá nuevamente en unos segundos.'
-      },
-      { quoted: m }
-    )
-  }
+function formatNumber(num) {
+  return num.toLocaleString();
 }
-
-// ============================================================
-// 📋 CONFIGURACIÓN
-// ============================================================
-
-handler.help = [
-  'play <texto>',
-  'playaudio <texto>',
-  'audio <texto>'
-]
-
-handler.tags = ['download']
-
-handler.command = [
-  'play',
-  'playaudio',
-  'audio'
-]
-
-handler.group = true
-
-export default handler

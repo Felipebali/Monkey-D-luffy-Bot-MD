@@ -1,9 +1,8 @@
 // 📂 plugins/_play.js
 // 🎵 Buscador de YouTube
+// Compatible con ES Modules
 
-import fs from 'fs'
-import fetch from 'node-fetch'
-import { youtubeSearch } from '@bochilteam/scraper'
+import yts from 'yt-search'
 
 let handler = async (m, { conn, command, text, usedPrefix }) => {
 
@@ -15,63 +14,46 @@ ${usedPrefix + command} Good Feeling - Flo Rida`
   }
 
   try {
-    const resultado = await youtubeSearch(text)
-    const vid = resultado?.video?.[0]
+    const resultado = await yts.search({
+      query: text,
+      hl: 'es',
+      gl: 'UY'
+    })
+
+    const vid = resultado.videos?.[0]
 
     if (!vid) {
       return m.reply('❌ No se encontraron resultados.')
     }
 
-    const {
-      title,
-      description,
-      thumbnail,
-      videoId,
-      durationH,
-      viewH,
-      publishedTime
-    } = vid
-
-    const url = `https://www.youtube.com/watch?v=${videoId}`
+    const url = vid.url
 
     const caption = `
-📌 *TÍTULO:* ${title}
-📇 *DESCRIPCIÓN:* ${description || 'Sin descripción'}
-📆 *PUBLICADO:* ${publishedTime || 'Desconocido'}
-⌚ *DURACIÓN:* ${durationH || 'Desconocida'}
-👀 *VISTAS:* ${viewH || 'Desconocidas'}
+📌 *TÍTULO:* ${vid.title}
+📆 *PUBLICADO:* ${vid.ago || 'Desconocido'}
+⌚ *DURACIÓN:* ${vid.duration?.timestamp || 'Desconocida'}
+👀 *VISTAS:* ${Number(vid.views || 0).toLocaleString('es-UY')}
+👤 *CANAL:* ${vid.author?.name || 'Desconocido'}
 🔗 *URL:* ${url}
 
-🎧 Para descargar el audio:
+🎧 *AUDIO:* 
 .play ${url}
 
-🎬 Para descargar el video:
+🎬 *VIDEO:*
 .play2 ${url}
 `.trim()
-
-    let imagen
-
-    try {
-      const response = await fetch(thumbnail)
-      imagen = Buffer.from(await response.arrayBuffer())
-    } catch {
-      imagen = fs.readFileSync('./src/logo.png')
-    }
 
     await conn.sendMessage(
       m.chat,
       {
-        image: imagen,
+        image: { url: vid.thumbnail },
         caption,
-        mentions: [m.sender],
         contextInfo: {
-          mentionedJid: [m.sender],
           externalAdReply: {
-            showAdAttribution: true,
-            mediaType: 1,
             title: '🎵 YouTube Music',
             body: 'Buscador de canciones',
-            thumbnail: fs.readFileSync('./src/logo.png'),
+            mediaType: 1,
+            thumbnailUrl: vid.thumbnail,
             sourceUrl: url
           }
         }
@@ -81,7 +63,7 @@ ${usedPrefix + command} Good Feeling - Flo Rida`
 
   } catch (error) {
     console.error('Error en _play.js:', error)
-    m.reply('❌ Ocurrió un error al buscar el video. Intentá nuevamente.')
+    m.reply('❌ Error al buscar en YouTube. Intentá nuevamente.')
   }
 }
 

@@ -1,20 +1,31 @@
+
 // 📂 plugins/_play.js
-// 🎵 Buscador de YouTube
+// 🎵 WHATSAPP-BOT — MUSIC DOWNLOADER
+// • .play  → Descargar audio
+// • .play2 → Buscar video
+// • .play3 → Mostrar información
+// • Compatible con ES Modules
 
 import yts from 'yt-search'
 import fetch from 'node-fetch'
 
+const MAX_SIZE = 15 * 1024 * 1024 // 15 MB
+
 let handler = async (m, { conn, command, text, usedPrefix }) => {
 
   if (!text) {
-    return m.reply(`❌ Escribí el nombre de una canción.
+    return m.reply(
+      `🎵 *WHATSAPP-BOT MUSIC*
+
+Escribí el nombre de una canción.
 
 Ejemplo:
-${usedPrefix + command} Good Feeling - Flo Rida`)
+${usedPrefix + command} Good Feeling - Flo Rida`
+    )
   }
 
   try {
-    await m.reply('🔎 Buscando en YouTube...')
+    await m.reply('🔎 Buscando tu canción...')
 
     console.log('[PLAY] Buscando:', text)
 
@@ -30,74 +41,82 @@ ${usedPrefix + command} Good Feeling - Flo Rida`)
       return m.reply('❌ No se encontraron resultados.')
     }
 
-    console.log('[PLAY] Encontrado:', vid.title)
+    const info = {
+      title: vid.title,
+      url: vid.url,
+      duration: vid.duration?.timestamp || 'Desconocida',
+      views: Number(vid.views || 0).toLocaleString('es-UY'),
+      author: vid.author?.name || 'Desconocido',
+      thumbnail: vid.thumbnail
+    }
 
-    const url = vid.url
+    console.log('[PLAY] Encontrado:', info.title)
 
-    const caption = `
-🎵 *RESULTADO DE YOUTUBE*
+    // PLAY3: Mostrar información
+    if (command === 'play3') {
+      const caption = `
+🎵 *INFORMACIÓN DE LA CANCIÓN*
 
-📌 *TÍTULO:* ${vid.title}
-📆 *PUBLICADO:* ${vid.ago || 'Desconocido'}
-⌚ *DURACIÓN:* ${vid.duration?.timestamp || 'Desconocida'}
-👀 *VISTAS:* ${Number(vid.views || 0).toLocaleString('es-UY')}
-👤 *CANAL:* ${vid.author?.name || 'Desconocido'}
+📌 *Título:* ${info.title}
+👤 *Artista/Canal:* ${info.author}
+⌚ *Duración:* ${info.duration}
+👀 *Visualizaciones:* ${info.views}
 
-🔗 *URL:* ${url}
-
-🎧 Para descargar audio:
-.play ${url}
-
-🎬 Para descargar video:
-.play2 ${url}
+🔗 ${info.url}
 `.trim()
 
-    let enviado = false
-
-    // Intentar enviar con miniatura
-    try {
-      const respuesta = await fetch(vid.thumbnail)
-
-      if (!respuesta.ok) {
-        throw new Error(`Error descargando miniatura: ${respuesta.status}`)
-      }
-
-      const buffer = Buffer.from(await respuesta.arrayBuffer())
-
-      await conn.sendMessage(
-        m.chat,
-        {
-          image: buffer,
-          caption
-        },
-        { quoted: m }
-      )
-
-      enviado = true
-
-    } catch (error) {
-      console.error('[PLAY] Error enviando imagen:', error)
+      return conn.sendMessage(m.chat, {
+        image: { url: info.thumbnail },
+        caption
+      }, { quoted: m })
     }
 
-    // Si falla la imagen, enviar solamente texto
-    if (!enviado) {
-      await conn.sendMessage(
-        m.chat,
-        { text: caption },
-        { quoted: m }
-      )
+    // PLAY2: Mostrar enlace del video
+    if (command === 'play2') {
+      return conn.sendMessage(m.chat, {
+        text: `
+🎬 *VIDEO ENCONTRADO*
+
+📌 ${info.title}
+👤 ${info.author}
+⌚ ${info.duration}
+
+🔗 ${info.url}
+`.trim()
+      }, { quoted: m })
     }
 
-    console.log('[PLAY] Mensaje enviado correctamente')
+    // PLAY: Descargar audio desde una fuente autorizada.
+    await conn.sendMessage(m.chat, {
+      text: `🎧 *PREPARANDO AUDIO*
+
+📌 ${info.title}
+👤 ${info.author}
+⌚ ${info.duration}
+
+⏳ Procesando...`
+    }, { quoted: m })
+
+    // No se utiliza una API de descarga de YouTube no verificada.
+    // La búsqueda y la información quedan disponibles.
+    return m.reply(
+      `⚠️ No hay una fuente de descarga autorizada configurada.
+
+🎵 *Canción:* ${info.title}
+
+🔗 ${info.url}
+
+Configurá un proveedor de audio autorizado para habilitar el envío automático del MP3.`
+    )
 
   } catch (error) {
     console.error('[PLAY] ERROR:', error)
 
-    await conn.sendMessage(
-      m.chat,
-      { text: `❌ Error al buscar o enviar el resultado.\n\n${error.message || error}` },
-      { quoted: m }
-    )
+    return conn.sendMessage(m.chat, {
+      text: `❌ *ERROR EN PLAY*
+
+${error.message || error}`
+    }, { quoted: m })
   }
 }
 

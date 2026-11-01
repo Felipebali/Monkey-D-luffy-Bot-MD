@@ -1,51 +1,16 @@
 // 📂 plugins/_play.js
 
-import fs from 'fs'
 import fetch from 'node-fetch'
 import yts from 'yt-search'
 
 let handler = async (m, { conn, args, text, usedPrefix, command }) => {
-  // 🌐 SISTEMA DE IDIOMA
-  const user = global.db?.data?.users?.[m.sender] || {}
-  const idioma = user.language || global.defaultLenguaje || 'es'
-
-  const idiomasDisponibles = [
-    idioma,
-    global.defaultLenguaje,
-    'es',
-    'es-ES'
-  ].filter(Boolean)
-
-  const archivoIdioma = [...new Set(idiomasDisponibles)]
-    .map(lang => `./src/languages/${lang}.json`)
-    .find(path => fs.existsSync(path))
-
-  if (!archivoIdioma) {
-    throw new Error('No se encontró ningún archivo de idioma válido en ./src/languages/')
-  }
-
-  const _translate = JSON.parse(
-    fs.readFileSync(archivoIdioma, 'utf8')
-  )
-
-  const tradutor = _translate?.plugins?.descargas_play
-
-  if (!tradutor) {
-    throw new Error(`Falta plugins.descargas_play en ${archivoIdioma}`)
-  }
 
   // 🔎 VALIDAR BÚSQUEDA
   if (!text) {
-    throw `${tradutor.texto1[0]} ${usedPrefix + command} ${tradutor.texto1[1]}`
+    throw `❌ Escribí el nombre de una canción o video.\n\nEjemplo:\n${usedPrefix + command} nombre de la canción`
   }
 
-  let additionalText = ''
-
-  if (command === 'play') {
-    additionalText = 'audio'
-  } else if (command === 'play2') {
-    additionalText = 'vídeo'
-  }
+  const tipo = command === 'play' ? 'audio' : 'vídeo'
 
   // 🔍 BUSCAR EN YOUTUBE
   let result
@@ -53,30 +18,29 @@ let handler = async (m, { conn, args, text, usedPrefix, command }) => {
   try {
     result = await search(args.join(' '))
   } catch (error) {
-    console.error('Error buscando en YouTube:', error)
-    return conn.reply(m.chat, tradutor.texto6, m)
+    console.error('❌ Error buscando en YouTube:', error)
+    return conn.reply(m.chat, '❌ No se pudo realizar la búsqueda en YouTube.', m)
   }
 
   if (!result) {
-    return conn.reply(m.chat, tradutor.texto6, m)
+    return conn.reply(m.chat, '❌ No se encontraron resultados.', m)
   }
 
-  const regex = 'https://youtube.com/watch?v='
-  const videoUrl = regex + result.videoId
+  const videoUrl = `https://youtube.com/watch?v=${result.videoId}`
 
   // 📋 INFORMACIÓN DEL VIDEO
   const body = `
-${tradutor.texto2[0]} ${result.title}
-${tradutor.texto2[1]} ${result.ago}
-${tradutor.texto2[2]} ${result.duration.timestamp}
-${tradutor.texto2[3]} ${formatNumber(result.views)}
-${tradutor.texto2[4]} ${result.author.name}
-${tradutor.texto2[5]} ${result.videoId}
-${tradutor.texto2[6]} ${result.type}
-${tradutor.texto2[7]} ${result.url}
-${tradutor.texto2[8]} ${result.author.url}
+🎵 Título: ${result.title}
+📅 Publicado: ${result.ago}
+⏱️ Duración: ${result.duration.timestamp}
+👁️ Visualizaciones: ${formatNumber(result.views)}
+👤 Autor: ${result.author.name}
+🆔 ID: ${result.videoId}
+📂 Tipo: ${result.type}
+🔗 URL: ${result.url}
+🌐 Canal: ${result.author.url}
 
-${tradutor.texto2[9]} ${additionalText}, ${tradutor.texto2[10]}
+⏳ Descargando ${tipo}...
 `.trim()
 
   // 🖼️ ENVIAR INFORMACIÓN
@@ -96,7 +60,7 @@ ${tradutor.texto2[9]} ${additionalText}, ${tradutor.texto2[10]}
       const downloader = audiodlp?.download
 
       if (!downloader) {
-        throw new Error('El descargador no devolvió un enlace de audio')
+        throw new Error('No se recibió el enlace de descarga')
       }
 
       await conn.sendMessage(
@@ -128,12 +92,12 @@ ${tradutor.texto2[9]} ${additionalText}, ${tradutor.texto2[10]}
             { quoted: m }
           )
         } else {
-          await conn.reply(m.chat, tradutor.texto6, m)
+          await conn.reply(m.chat, '❌ No se pudo descargar el audio.', m)
         }
 
       } catch (err2) {
         console.log('❌ Error en Ruby-core MP3:', err2)
-        await conn.reply(m.chat, tradutor.texto6, m)
+        await conn.reply(m.chat, '❌ Fallaron los métodos de descarga de audio.', m)
       }
     }
   }
@@ -145,7 +109,7 @@ ${tradutor.texto2[9]} ${additionalText}, ${tradutor.texto2[10]}
       const downloader = videodlp?.download
 
       if (!downloader) {
-        throw new Error('El descargador no devolvió un enlace de video')
+        throw new Error('No se recibió el enlace de descarga')
       }
 
       await conn.sendMessage(
@@ -177,25 +141,25 @@ ${tradutor.texto2[9]} ${additionalText}, ${tradutor.texto2[10]}
             { quoted: m }
           )
         } else {
-          await conn.reply(m.chat, tradutor.texto6, m)
+          await conn.reply(m.chat, '❌ No se pudo descargar el video.', m)
         }
 
       } catch (err2) {
         console.log('❌ Error en Ruby-core MP4:', err2)
-        await conn.reply(m.chat, tradutor.texto6, m)
+        await conn.reply(m.chat, '❌ Fallaron los métodos de descarga de video.', m)
       }
     }
   }
 }
 
-// ⚙️ CONFIGURACIÓN DEL PLUGIN
+// ⚙️ CONFIGURACIÓN
 handler.help = ['play', 'play2']
 handler.tags = ['downloader']
 handler.command = ['play', 'play2']
 
 export default handler
 
-// 🔎 FUNCIÓN DE BÚSQUEDA
+// 🔍 BUSCADOR
 async function search(query, options = {}) {
   const searchRes = await yts.search({
     query,

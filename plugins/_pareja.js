@@ -116,7 +116,12 @@ function registerMarriageNotifier(conn) {
   let revisando = false
 
   const revisarAvisos = async () => {
+    // Evitar revisiones simultáneas.
     if (revisando) return
+
+    // No intentar enviar mensajes si Baileys está desconectado.
+    if (!conn?.ws || conn.ws.isOpen !== true) return
+
     revisando = true
 
     try {
@@ -166,8 +171,7 @@ function registerMarriageNotifier(conn) {
         if (!Number.isFinite(fecha) || fecha <= 0) continue
         if (ahora - fecha < TRES_DIAS) continue
 
-        // Compatibilidad con versiones anteriores que podían marcar
-        // el aviso como enviado antes de confirmar el envío.
+        // Compatibilidad con versiones anteriores.
         if (
           usuario.avisoCasarseEnviado &&
           !usuario.avisoCasarseEnviadoEn
@@ -234,10 +238,26 @@ function registerMarriageNotifier(conn) {
             `[PAREJAS] Aviso de matrimonio enviado al grupo ${grupo}`
           )
         } catch (errorEnvio) {
-          console.error(
-            '[PAREJAS] Falló el aviso de matrimonio; se reintentará:',
-            errorEnvio
+          const mensajeError = String(
+            errorEnvio?.message || errorEnvio || ''
           )
+
+          // Si se cerró la conexión, dejar pendiente el aviso.
+          if (
+            mensajeError.includes('Connection Closed') ||
+            errorEnvio?.output?.statusCode === 428 ||
+            errorEnvio?.data?.statusCode === 428
+          ) {
+            console.warn(
+              '[PAREJAS] WhatsApp está desconectado. ' +
+              'El aviso de matrimonio queda pendiente para el próximo intento.'
+            )
+          } else {
+            console.error(
+              '[PAREJAS] Falló el aviso de matrimonio; se reintentará:',
+              errorEnvio
+            )
+          }
         }
       }
     } catch (error) {
@@ -327,8 +347,7 @@ ${text}
 
   const findUserId = jid => buscarUsuario(db, jid) || jid
 
-  // Si una relación nació por privado, registrar el primer grupo
-  // donde alguno de los dos use un comando del sistema.
+  // Registrar el primer grupo donde alguno use el sistema.
   if (typeof m.chat === 'string' && m.chat.endsWith('@g.us')) {
     const idActual = findUserId(sender)
     const usuarioActual = db[idActual]
@@ -465,6 +484,7 @@ detalles y momentos especiales contigo. 💗
 
     user.avisoCasarseEnviado = false
     proposerUser.avisoCasarseEnviado = false
+
     delete user.avisoCasarseEnviadoEn
     delete proposerUser.avisoCasarseEnviadoEn
 
@@ -538,6 +558,7 @@ A veces los corazones sienten distinto, y está bien. 🤍`
 
     const pareja = findUserId(user.pareja)
     const estado = user.matrimonioFecha ? '💍 Casados' : '💑 Novios'
+
     const tiempoJuntos = user.relacionFecha
       ? tiempo(ahora - Number(user.relacionFecha))
       : 'Desconocido'
@@ -800,7 +821,6 @@ todavía los registra como novios. 💞`
   // ============================================================
   // 💕 ACCIONES ROMÁNTICAS
   // .amor .besar .abrazar .flores .regalo .cita
-  // Aceptan mención o respuesta a un mensaje.
   // ============================================================
 
   if (['amor', 'besar', 'abrazar', 'flores', 'regalo', 'cita'].includes(command)) {
@@ -925,6 +945,7 @@ ${tag(parejaSender)}. La acción fue cancelada. ❤️`
 
       const pareja = db[idPareja]
       const estado = user.matrimonioFecha ? '💍 Casados' : '💑 Novios'
+
       const juntos = user.relacionFecha
         ? tiempo(ahora - Number(user.relacionFecha))
         : 'Desconocido'

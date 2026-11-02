@@ -19,7 +19,7 @@ const handler = async (m, { conn }) => {
     .replace(/:\d+$/g, '')
     .replace(/\D/g, '')
 
-  // Se asume: global.owner[0] = Pipe y global.owner[1] = Angee.
+  // Se asume: global.owner[1] = Pipe y global.owner[0] = Angee.
   const pipeNumero = normalizar(
     Array.isArray(global.owner[0]) ? global.owner[0][0] : global.owner[0]
   )

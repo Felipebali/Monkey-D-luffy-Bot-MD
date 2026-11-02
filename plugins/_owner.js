@@ -71,7 +71,7 @@ const handler = async (m, { conn }) => {
     )
   }
 
-  if (tarjetas.length !== 2) {
+  if (tarjetas.length !== 1) {
     return m.reply(
       '❌ *No se pudieron validar los dos propietarios.*\n' +
       'Revisá los números y el orden en global.owner.'

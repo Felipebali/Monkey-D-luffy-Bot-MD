@@ -1,4 +1,3 @@
-
 /**
  * 📂 plugins/media-admin.js
  * 🤖 WHATSAPP-BOT — SISTEMA COMPLETO DE MEDIOS
@@ -416,15 +415,6 @@ async function saveIncomingMedia(m, conn) {
 async function sendMediaToGroup(conn, chatId, item, filepath) {
     const buffer = fs.readFileSync(filepath)
 
-    const id = item.id
-
-    const caption =
-        '╭━━〔 ✅ *MEDIO RECUPERADO* 〕━━╮\n\n' +
-        '📂 *Media N.º ' + id + ' recuperada correctamente.*\n' +
-        '📦 *Tipo:* ' + item.type + '\n' +
-        '📄 *Archivo:* ' + item.filename + '\n\n' +
-        '╰━━━━━━━━━━━━━━━━━━╯'
-
     const mimetype =
         item.mimetype ||
         (
@@ -438,7 +428,12 @@ async function sendMediaToGroup(conn, chatId, item, filepath) {
         return conn.sendMessage(chatId, {
             image: buffer,
             mimetype: mimetype,
-            caption: caption
+            caption:
+                '╭━━〔 ✅ *MEDIO RECUPERADO* 〕━━╮\n\n' +
+                '📂 *Media N.º ' + item.id + ' recuperada correctamente.*\n' +
+                '📦 *Tipo:* ' + item.type + '\n' +
+                '📄 *Archivo:* ' + item.filename + '\n\n' +
+                '╰━━━━━━━━━━━━━━━━━━╯'
         })
     }
 
@@ -446,29 +441,34 @@ async function sendMediaToGroup(conn, chatId, item, filepath) {
         return conn.sendMessage(chatId, {
             video: buffer,
             mimetype: mimetype,
-            caption: caption
+            caption:
+                '╭━━〔 ✅ *MEDIO RECUPERADO* 〕━━╮\n\n' +
+                '📂 *Media N.º ' + item.id + ' recuperada correctamente.*\n' +
+                '📦 *Tipo:* ' + item.type + '\n' +
+                '📄 *Archivo:* ' + item.filename + '\n\n' +
+                '╰━━━━━━━━━━━━━━━━━━╯'
         })
     }
 
+    // AUDIO: SOLAMENTE ENVÍA EL AUDIO
     if (item.type === 'audio') {
-        await conn.sendMessage(chatId, {
+        return conn.sendMessage(chatId, {
             audio: buffer,
             mimetype: mimetype,
             ptt: item.ptt === true
         })
-
-        await conn.sendMessage(chatId, {
-            text: caption
-        })
-
-        return
     }
 
     return conn.sendMessage(chatId, {
         document: buffer,
         mimetype: mimetype,
         fileName: item.filename || 'archivo',
-        caption: caption
+        caption:
+            '╭━━〔 ✅ *MEDIO RECUPERADO* 〕━━╮\n\n' +
+            '📂 *Media N.º ' + item.id + ' recuperada correctamente.*\n' +
+            '📦 *Tipo:* ' + item.type + '\n' +
+            '📄 *Archivo:* ' + item.filename + '\n\n' +
+            '╰━━━━━━━━━━━━━━━━━━╯'
     })
 }
 
@@ -481,10 +481,6 @@ const handler = async function (m, context) {
         const conn = context.conn
         const args = context.args
         const text = context.text
-
-        // ----------------------------------------------------
-        // 👑 SEGURIDAD: SOLO OWNERS
-        // ----------------------------------------------------
 
         if (!isOwner(m, conn)) return
 
@@ -559,10 +555,8 @@ const handler = async function (m, context) {
         if (
             ['clear', 'clean', 'wipe', 'limpiar'].includes(cmd)
         ) {
-            const deletedFiles = 0
             let failedFiles = 0
 
-            // Primero guardar la base de datos vacía.
             if (!saveMediaDB([])) {
                 return conn.reply(
                     m.chat,
@@ -580,10 +574,7 @@ const handler = async function (m, context) {
                     fs.unlinkSync(filepath)
                 } catch (error) {
                     failedFiles++
-                    console.error(
-                        '[MEDIA] Error eliminando:',
-                        error
-                    )
+                    console.error('[MEDIA] Error eliminando:', error)
                 }
             }
 
@@ -665,11 +656,12 @@ const handler = async function (m, context) {
             let deleted = 0
             const notFound = []
             const filesToDelete = []
-            const originalList = list.slice()
 
-            for (const id of [...new Set(ids)].sort(function (a, b) {
+            const uniqueIds = Array.from(new Set(ids)).sort(function (a, b) {
                 return b - a
-            })) {
+            })
+
+            for (const id of uniqueIds) {
                 const index = list.findIndex(function (item) {
                     return Number(item.id) === id
                 })
@@ -703,7 +695,6 @@ const handler = async function (m, context) {
                 )
             }
 
-            // Eliminar archivos después de actualizar la DB.
             let failed = 0
 
             for (const filepath of filesToDelete) {

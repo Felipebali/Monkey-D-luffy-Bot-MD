@@ -1,32 +1,81 @@
-
 // 📂 plugins/owner.js
 // 👑 WHATSAPP-BOT — OWNERS PREMIUM
 // 🧸🩷 Angee | 🥶 Pipe
 
 const handler = async (m, { conn }) => {
-  if (!Array.isArray(global.owner) || global.owner.length < 2) {
+  // ============================================================
+  // 🔧 OBTENER OWNERS DESDE global.owner
+  // ============================================================
+
+  const normalizarOwner = (owner) => {
+    if (!owner) return ''
+
+    let valor = owner
+
+    if (Array.isArray(valor)) {
+      valor = valor[0]
+    }
+
+    if (typeof valor === 'object' && valor !== null) {
+      valor =
+        valor.id ||
+        valor.jid ||
+        valor.number ||
+        valor.numero ||
+        valor.phone ||
+        ''
+    }
+
+    return String(valor)
+      .trim()
+      .replace(/@s\.whatsapp\.net/gi, '')
+      .replace(/@c\.us/gi, '')
+      .replace(/@lid/gi, '')
+      .replace(/:\d+$/g, '')
+      .replace(/\D/g, '')
+  }
+
+  const owners = Array.isArray(global.owner)
+    ? global.owner
+    : []
+
+  if (owners.length < 2) {
     return m.reply(
       '⚠️ *Faltan propietarios en la configuración.*\n\n' +
       'Configurá a Pipe y Angee en global.owner.'
     )
   }
 
-  const normalizar = (valor) => String(valor || '')
-    .trim()
-    .replace(/@s\.whatsapp\.net/gi, '')
-    .replace(/@c\.us/gi, '')
-    .replace(/@lid/gi, '')
-    .replace(/:\d+$/g, '')
-    .replace(/\D/g, '')
+  // Respeta el orden de global.owner:
+  // [0] = Angee
+  // [1] = Pipe
 
-  // Se asume: global.owner[1] = Pipe y global.owner[0] = Angee.
-  const pipeNumero = normalizar(
-    Array.isArray(global.owner[0]) ? global.owner[0][0] : global.owner[0]
-  )
+  const angeeNumero = normalizarOwner(owners[0])
+  const pipeNumero = normalizarOwner(owners[1])
 
-  const angeeNumero = normalizar(
-    Array.isArray(global.owner[1]) ? global.owner[1][0] : global.owner[1]
-  )
+  if (
+    !angeeNumero ||
+    !pipeNumero ||
+    angeeNumero.length < 7 ||
+    pipeNumero.length < 7
+  ) {
+    return m.reply(
+      '❌ *No se pudieron validar los propietarios.*\n\n' +
+      `Angee: ${angeeNumero || 'Inválido'}\n` +
+      `Pipe: ${pipeNumero || 'Inválido'}\n\n` +
+      'Revisá los números configurados en global.owner.'
+    )
+  }
+
+  if (angeeNumero === pipeNumero) {
+    return m.reply(
+      '⚠️ Los dos propietarios tienen el mismo número.'
+    )
+  }
+
+  // ============================================================
+  // 👑 INFORMACIÓN DE LOS OWNERS
+  // ============================================================
 
   const personas = [
     {
@@ -49,53 +98,54 @@ const handler = async (m, { conn }) => {
   const tarjetas = []
 
   for (const persona of personas) {
-    if (
-      !persona.numero ||
-      persona.numero.length < 7 ||
-      persona.numero.length > 15
-    ) continue
+    const jid = `${persona.numero}@s.whatsapp.net`
 
-    mentions.push(`${persona.numero}@s.whatsapp.net`)
+    mentions.push(jid)
 
     tarjetas.push(
-      `╭━━━〔 ${persona.emoji} 〕━━━╮\n` +
-      `┃\n` +
-      `┃ ✨ *${persona.nombre}*\n` +
-      `┃ 🛡️ ${persona.rol}\n` +
-      `┃ 📱 @${persona.numero}\n` +
-      `┃\n` +
-      `┃ 💬 *Una frase para vos:*\n` +
-      `┃ _${persona.frase}_\n` +
-      `┃\n` +
-      `╰━━━━━━━━━━━━━━━━━━━━╯`
+      `╭━━━〔 ${persona.emoji} 〕━━━╮
+┃
+┃ ✨ *${persona.nombre}*
+┃ 🛡️ ${persona.rol}
+┃ 📱 @${persona.numero}
+┃
+┃ 💬 *Una frase para vos:*
+┃ _${persona.frase}_
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
     )
   }
 
-  if (tarjetas.length !== 1) {
-    return m.reply(
-      '❌ *No se pudieron validar los dos propietarios.*\n' +
-      'Revisá los números y el orden en global.owner.'
-    )
-  }
+  // ============================================================
+  // 💜 MENSAJE FINAL
+  // ============================================================
 
   const texto =
-    `╭━━━〔 👑 WHATSAPP-BOT 〕━━━╮\n` +
-    `┃\n` +
-    `┃ 💜 *NUESTRO EQUIPO*\n` +
-    `┃ Dos owners, dos estilos\n` +
-    `┃ Una misma familia de bot\n` +
-    `┃\n` +
-    `╰━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-    tarjetas.join('\n\n') +
-    `\n\n╭━━━〔 💠 SISTEMA 〕━━━╮\n` +
-    `┃ 👥 Propietarios: *2*\n` +
-    `┃ 🔐 Estado: *Configuración activa*\n` +
-    `╰━━━━━━━━━━━━━━━━━━━━━━╯`
+    `╭━━━〔 👑 WHATSAPP-BOT 〕━━━╮
+┃
+┃ 💜 *NUESTRO EQUIPO*
+┃ Dos owners, dos estilos
+┃ Una misma familia de bot
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-  return conn.sendMessage(m.chat, {
-    text: texto,
-    mentions
-  }, { quoted: m })
+${tarjetas.join('\n\n')}
+
+╭━━━〔 💠 SISTEMA 〕━━━╮
+┃ 👥 Propietarios: *2*
+┃ 🔐 Estado: *Configuración activa*
+╰━━━━━━━━━━━━━━━━━━━━━━╯`
+
+  return conn.sendMessage(
+    m.chat,
+    {
+      text: texto,
+      mentions
+    },
+    {
+      quoted: m
+    }
+  )
 }
 
 handler.command = /^owner$/i

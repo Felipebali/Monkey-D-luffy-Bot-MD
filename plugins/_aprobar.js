@@ -6,6 +6,12 @@
  * .aprobar
  * .desaprobar
  *
+ * Funciones:
+ * - Activa la aprobación de miembros.
+ * - Aprueba solicitudes nuevas automáticamente.
+ * - Procesa solicitudes pendientes al activarse.
+ * - Guarda la configuración por grupo.
+ *
  * Baileys ES Modules
  */
 
@@ -13,16 +19,16 @@
 // 🗃️ UTILIDADES
 // ============================================================
 
-function getChatData(m) {
+function getChatData(chat) {
   global.db.data.chats = global.db.data.chats || {}
-  global.db.data.chats[m.chat] =
-    global.db.data.chats[m.chat] || {}
+  global.db.data.chats[chat] =
+    global.db.data.chats[chat] || {}
 
-  return global.db.data.chats[m.chat]
+  return global.db.data.chats[chat]
 }
 
 // ============================================================
-// ⚙️ ACTIVAR APROBACIÓN
+// ⚙️ COMANDO: ACTIVAR / DESACTIVAR
 // ============================================================
 
 const handler = async (m, { conn, command, isAdmin, isOwner }) => {
@@ -32,7 +38,7 @@ const handler = async (m, { conn, command, isAdmin, isOwner }) => {
   if (!isAdmin && !isOwner)
     return m.reply('⛔ Solo administradores pueden utilizarlo.')
 
-  const chat = getChatData(m)
+  const chat = getChatData(m.chat)
 
   // ----------------------------------------------------------
   // ❌ DESACTIVAR
@@ -48,9 +54,8 @@ const handler = async (m, { conn, command, isAdmin, isOwner }) => {
         text:
           '🤖 *APROBACIÓN AUTOMÁTICA DESACTIVADA* ❌\n\n' +
           '🔓 La aprobación de miembros está desactivada.\n' +
-          '🛑 Ya no se aprobarán solicitudes automáticamente.'
+          '🛑 El bot dejará de aprobar solicitudes automáticamente.'
       })
-
     } catch (error) {
       console.error('[APROBAR] Error desactivando:', error)
       return m.reply('❌ No se pudo desactivar la aprobación.')
@@ -68,8 +73,8 @@ const handler = async (m, { conn, command, isAdmin, isOwner }) => {
 
     let aprobados = 0
 
-    // Procesar solicitudes pendientes
-    const requests = await conn.groupRequestParticipantsList(m.chat)
+    const requests =
+      await conn.groupRequestParticipantsList(m.chat)
 
     for (const request of requests || []) {
       const jid = request.jid || request.participant
@@ -93,7 +98,7 @@ const handler = async (m, { conn, command, isAdmin, isOwner }) => {
       text:
         '🤖 *APROBACIÓN AUTOMÁTICA ACTIVADA* ✅\n\n' +
         '🔐 Aprobación de miembros activada.\n' +
-        '👥 Las solicitudes pendientes serán procesadas.\n' +
+        '👥 Se procesarán las solicitudes pendientes.\n' +
         '⚡ Las nuevas solicitudes se aprobarán automáticamente.\n\n' +
         `✅ Solicitudes procesadas: ${aprobados}`
     })
@@ -120,7 +125,7 @@ handler.command = /^(aprobar|desaprobar)$/i
 handler.group = true
 
 // ============================================================
-// 🔍 EVENTO: APROBACIÓN AUTOMÁTICA
+// 🔍 DETECTAR SOLICITUDES NUEVAS
 // ============================================================
 
 handler.all = async function (m) {
@@ -132,11 +137,9 @@ handler.all = async function (m) {
 
   const requests = m.message?.groupParticipantRequest
 
-  if (!requests) return
+  if (!requests?.participant) return
 
   const jid = requests.participant
-
-  if (!jid) return
 
   try {
     await this.groupRequestParticipantsUpdate(
@@ -146,7 +149,7 @@ handler.all = async function (m) {
     )
 
     console.log(
-      `[APROBAR] Solicitud aprobada: ${jid}`
+      `[APROBAR] Solicitud aprobada automáticamente: ${jid}`
     )
 
   } catch (error) {

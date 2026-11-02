@@ -1,26 +1,49 @@
 
 // 📂 plugins/noadmin.js
 // 🤖 WHATSAPP-BOT — NO SE DA ADMIN 😂
-// 🔒 Si un usuario NO OWNER pide admin, responde automáticamente.
 
-const FRASES = [
-  '😂 No hay admin y no se da admin jajajaj.',
-  '🤖 ¿Admin? Acá no regalamos poderes 😂',
-  '🤣 No hay admin disponible, vuelva mañana.',
-  '😎 El admin no se pide, se sueña jajajaj.',
-  '💀 Seguí participando, capaz algún día.',
-  '😂 No se da admin, no insista jajaja.',
-  '🤖 Solicitud rechazada automáticamente.',
-  '🙄 ¿Otra vez pidiendo admin? Qué insistencia.',
-  '🐒 No hay admin para nadie jajajaj.',
-  '🤣 Acá todos somos usuarios, a llorar.'
-]
+const RESPUESTAS = {
+  usuario: [
+    '😂 No hay admin y no se da admin jajajaj.',
+    '🤖 ¿Admin? Seguí participando.',
+    '💀 No se regalan coronas por acá.',
+    '🤣 A llorar a otro lado, no hay admin.',
+    '🐒 ¿Querés admin? JAJAJA, qué gracioso.',
+    '🙄 No insistas, la respuesta sigue siendo NO.',
+    '😂 Acá no se asciende a nadie.',
+    '🤖 Solicitud rechazada por el departamento de NO.',
+    '💅 Admin no hay, admin no se da y admin no se pide.',
+    '🤣 Volvé a intentarlo en tu próxima vida.'
+  ],
 
-const PATRON =
-  /\b(admin|administrador|administradora|admins)\b/i
+  admin: [
+    '😂 ¿Y vos sos admin, rompe huevo?',
+    '💀 Pero si ya sos admin, ¿qué más querés?',
+    '🤣 ¿No te alcanza con el poder que tenés?',
+    '🙄 Administrador y todavía molestando jajaja.',
+    '🤡 ¿Querés ser dueño del grupo también?',
+    '😂 Cerrá el trámite, que ya tenés admin.',
+    '🐒 ¿Qué sigue? ¿Pedir ser el dueño de WhatsApp?',
+    '😎 Sos admin, no el presidente del grupo.',
+    '🤣 Dejá de romper las bolas, que ya tenés corona.',
+    '💅 Otro privilegio más querés, rompe huevo.'
+  ],
 
-const PETICION =
-  /\b(dame|denme|den|dame|quiero|queremos|necesito|necesitamos|pongan|hagan|hace|ponme|suban|asciendan|quiero ser|denle|dale)\b/i
+  owner: [
+    '👑 ¿Y vos sos owner, qué más querés, rompe huevo? 😂',
+    '🤣 Hasta el dueño viene a pedir admin.',
+    '💀 Señor propietario, deje de molestar jajaja.',
+    '😂 Vos mandás acá y todavía estás pidiendo.',
+    '🤖 Owner detectado: nivel de rompehuevos máximo.',
+    '👑 ¿Querés que te demos admin de tu propio bot?',
+    '🤣 El jefe también rompe las bolas.',
+    '😎 Patrón, ya sabemos que usted manda.'
+  ]
+}
+
+// ============================================================
+// 🔎 IDENTIFICAR OWNERS
+// ============================================================
 
 function esOwner(m) {
   const sender = m.sender?.split('@')[0]
@@ -31,23 +54,54 @@ function esOwner(m) {
       Array.isArray(owner) ? owner[0] : owner
     ).replace(/\D/g, '')
 
-    return numero && numero === sender
+    return numero === sender
   })
 }
 
-let handler = async (m, { conn }) => {
+// ============================================================
+// 🤖 HANDLER
+// ============================================================
+
+let handler = async (m, { conn, participants = [] }) => {
   try {
     if (!m.isGroup) return
-    if (esOwner(m)) return
 
     const texto = String(m.text || '').trim()
     if (!texto) return
 
-    if (!PATRON.test(texto)) return
-    if (!PETICION.test(texto)) return
+    const patronAdmin =
+      /\b(admin|administrador|administradora|admins)\b/i
 
+    const patronPeticion =
+      /\b(dame|denme|den|quiero|queremos|necesito|necesitamos|pongan|hagan|ponme|suban|asciendan|dale|denle|haceme)\b/i
+
+    if (!patronAdmin.test(texto)) return
+    if (!patronPeticion.test(texto)) return
+
+    // OWNER
+    let tipo = 'usuario'
+
+    if (esOwner(m)) {
+      tipo = 'owner'
+    } else {
+      // ADMIN DEL GRUPO
+      const participante = participants.find(p => {
+        const jid = p.id || p.jid
+        return jid === m.sender
+      })
+
+      if (
+        participante?.admin === 'admin' ||
+        participante?.admin === 'superadmin' ||
+        participante?.admin === 'owner'
+      ) {
+        tipo = 'admin'
+      }
+    }
+
+    const lista = RESPUESTAS[tipo]
     const respuesta =
-      FRASES[Math.floor(Math.random() * FRASES.length)]
+      lista[Math.floor(Math.random() * lista.length)]
 
     await conn.sendMessage(
       m.chat,

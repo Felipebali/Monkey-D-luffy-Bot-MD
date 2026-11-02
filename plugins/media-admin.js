@@ -1,8 +1,8 @@
-
+```js
 // 📂 plugins/media-admin.js
 // 🛡️ WHATSAPP-BOT — SISTEMA COMPLETO DE MEDIOS
 // 💾 Guardado automático + administrador + limpieza de DB
-// 📌 Recuperación con confirmación junto al archivo
+// 🎵 Recuperación de audio como audio y notas de voz
 // ============================================================
 
 import fs from 'fs'
@@ -11,7 +11,6 @@ import { downloadMediaMessage } from '@whiskeysockets/baileys'
 
 const MEDIA_DB_FILE = './database/media.json'
 const MEDIA_FOLDER = './media'
-const MEDIA_GROUP = '120363410955044864@g.us'
 
 fs.mkdirSync('./database', { recursive: true })
 fs.mkdirSync(MEDIA_FOLDER, { recursive: true })
@@ -25,7 +24,13 @@ if (!fs.existsSync(MEDIA_DB_FILE)) {
 // ============================================================
 
 function getOwners() {
-    return (global.owner || [])
+    const owners = Array.isArray(global.owner)
+        ? global.owner
+        : global.owner
+            ? [global.owner]
+            : []
+
+    return owners
         .map(owner => Array.isArray(owner) ? owner[0] : owner)
         .filter(Boolean)
         .map(owner => String(owner).trim())
@@ -68,6 +73,61 @@ function isOwner(m, conn) {
             senderNumber === ownerNumber
         )
     })
+}
+
+// ============================================================
+// 📂 UTILIDADES DE MENSAJES Y AUDIO
+// ============================================================
+
+function getMessageContent(m) {
+    return (
+        m?.message?.audioMessage ||
+        m?.message?.imageMessage ||
+        m?.message?.videoMessage ||
+        m?.message?.documentMessage ||
+        m?.msg ||
+        {}
+    )
+}
+
+function getMimeType(m, type) {
+    const content = getMessageContent(m)
+
+    return (
+        content?.mimetype ||
+        m?.mimetype ||
+        (
+            type === 'image' ? 'image/jpeg' :
+            type === 'video' ? 'video/mp4' :
+            type === 'audio' ? 'audio/ogg; codecs=opus' :
+            'application/octet-stream'
+        )
+    )
+}
+
+function getAudioExtension(mimetype) {
+    const mime = String(mimetype || '').toLowerCase()
+
+    if (mime.includes('ogg') || mime.includes('opus')) return '.ogg'
+    if (mime.includes('mpeg') || mime.includes('mp3')) return '.mp3'
+    if (mime.includes('mp4') || mime.includes('m4a')) return '.m4a'
+    if (mime.includes('aac')) return '.aac'
+    if (mime.includes('wav')) return '.wav'
+    if (mime.includes('flac')) return '.flac'
+    if (mime.includes('amr')) return '.amr'
+    if (mime.includes('3gpp')) return '.3gp'
+
+    return '.bin'
+}
+
+function isVoiceNote(m) {
+    const content = getMessageContent(m)
+
+    return (
+        content?.ptt === true ||
+        m?.msg?.ptt === true ||
+        m?.ptt === true
+    )
 }
 
 // ============================================================
@@ -222,6 +282,7 @@ async function saveIncomingMedia(m, conn) {
         const uniqueName =
             `${Date.now()}_${Math.floor(Math.random() * 999999)}`
 
+        const mimetype = getMimeType(m, type)
         let extension = ''
 
         if (type === 'image') {
@@ -229,11 +290,13 @@ async function saveIncomingMedia(m, conn) {
         } else if (type === 'video') {
             extension = '.mp4'
         } else if (type === 'audio') {
-            extension = '.mp3'
+            extension = getAudioExtension(mimetype)
         } else {
+            const content = getMessageContent(m)
+
             const originalName =
+                content?.fileName ||
                 m.msg?.fileName ||
-                m.message?.documentMessage?.fileName ||
                 'archivo'
 
             const safeName = String(originalName)
@@ -267,10 +330,8 @@ async function saveIncomingMedia(m, conn) {
             from: m.sender || null,
             groupId: m.isGroup ? m.chat : null,
             groupName: m.isGroup ? groupName : null,
-            mimetype:
-                m.msg?.mimetype ||
-                m.message?.documentMessage?.mimetype ||
-                null,
+            mimetype,
+            ptt: type === 'audio' && isVoiceNote(m),
             date: new Date().toLocaleString('es-UY', {
                 timeZone: 'America/Montevideo'
             })
@@ -299,7 +360,7 @@ async function saveIncomingMedia(m, conn) {
 }
 
 // ============================================================
-// 📤 ENVIAR ARCHIVO CON CONFIRMACIÓN EN EL MISMO MENSAJE
+// 📤 ENVIAR MEDIO RECUPERADO
 // ============================================================
 
 async function sendMediaToGroup(conn, chatId, item, filepath) {
@@ -318,7 +379,7 @@ async function sendMediaToGroup(conn, chatId, item, filepath) {
         (
             item.type === 'image' ? 'image/jpeg' :
             item.type === 'video' ? 'video/mp4' :
-            item.type === 'audio' ? 'audio/mpeg' :
+            item.type === 'audio' ? 'audio/ogg; codecs=opus' :
             'application/octet-stream'
         )
 
@@ -339,14 +400,20 @@ async function sendMediaToGroup(conn, chatId, item, filepath) {
     }
 
     if (item.type === 'audio') {
-        // WhatsApp no admite caption normal en mensajes de audio.
-        // Se envía como documento para que el texto acompañe al archivo.
-        return conn.sendMessage(chatId, {
-            document: buffer,
+        // 🎵 Enviar como audio reproducible, NO como documento.
+        await conn.sendMessage(chatId, {
+            audio: buffer,
             mimetype,
-            fileName: item.filename || 'audio.mp3',
-            caption
+            ptt: item.ptt === true
         })
+
+        // WhatsApp no permite caption normal dentro del mensaje de audio.
+        // Por eso la confirmación se envía inmediatamente después.
+        await conn.sendMessage(chatId, {
+            text: caption
+        })
+
+        return
     }
 
     return conn.sendMessage(chatId, {
@@ -404,8 +471,11 @@ const handler = async (m, { conn, args, text }) => {
             const lines = list.slice(0, 800).map(item =>
                 `🆔 *ID:* ${item.id}\n` +
                 `📄 *Archivo:* ${item.filename}\n` +
-                `📦 *Tipo:* ${item.type}\n` +
-                `👥 *Grupo:* ${item.groupName || item.groupId || 'Privado'}\n` +
+                `📦 *Tipo:* ${item.type}` +
+                (item.type === 'audio'
+                    ? `\n🎙️ *Formato:* ${item.ptt ? 'Nota de voz' : 'Audio'}`
+                    : '') +
+                `\n👥 *Grupo:* ${item.groupName || item.groupId || 'Privado'}\n` +
                 `📅 *Fecha:* ${item.date || 'Desconocida'}`
             )
 
@@ -615,8 +685,6 @@ const handler = async (m, { conn, args, text }) => {
             }
 
             try {
-                // El archivo y la confirmación salen en un mismo mensaje.
-                // Se envía al chat donde se ejecutó el comando.
                 await sendMediaToGroup(
                     conn,
                     m.chat,
@@ -685,3 +753,4 @@ handler.command = ['media', 'medias']
 handler.owner = true
 
 export default handler
+```

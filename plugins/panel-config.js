@@ -21,7 +21,6 @@ const aliasMap = {
   antievento: ['antievento'],
   antilocation: ['antilocation'],
   antieliminar: ['antieliminar'],
-  anticall: ['anticall'],
   onlyadmin: [
     'onlyadmin',
     'onlyAdmin',
@@ -224,7 +223,6 @@ const handler = async (m, { isAdmin, isOwner }) => {
   const antievento = getChatValue(chat, 'antievento')
   const antilocation = getChatValue(chat, 'antilocation')
   const antieliminar = getChatValue(chat, 'antieliminar')
-  const anticall = getChatValue(chat, 'anticall')
 
   // ============================================================
   // 📋 PANEL
@@ -276,10 +274,6 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🗑️ AntiEliminar
 └─ ${status(antieliminar)}
    └─ *.antieliminar*
-
-📞 AntiCall
-└─ ${status(anticall)}
-   └─ *.anticall*
 
 🎫 AntiEvento
 └─ ${status(antievento)}
@@ -338,7 +332,6 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🚨 .antiestado2
 📊 .antiencuesta
 🗑️ .antieliminar
-📞 .anticall
 🎫 .antievento
 📍 .antilocation
 📢 .anticanal
@@ -357,12 +350,12 @@ Los comandos funcionan como interruptor.
 
 Ejemplo:
 
-*.anticall*
+*.anticanal*
 🟢 ACTIVADO
 
 Volvés a usar:
 
-*.anticall*
+*.anticanal*
 🔴 DESACTIVADO
 
 ━━━━━━━━━━━━━━━━━━━━━━

@@ -1,13 +1,15 @@
 
 /**
  * 📂 plugins/anticall.js
- * 🤖 WHATSAPP-BOT — ANTICALL
+ * 🤖 WHATSAPP-BOT — ANTICALL AUTOMÁTICO
  *
- * 📞 Detecta llamadas mediante el evento Call
- * 🚫 Rechaza llamadas entrantes
+ * 📞 Detecta llamadas entrantes
+ * 🚫 Rechaza llamadas automáticamente
+ * 🗑️ Detecta registros de llamada
+ * 🧹 Intenta eliminarlos cuando sea posible
  * 👑 Exclusivo para owners
- * ⚙️ .anticall — Activa o desactiva
- * 💾 Guarda la configuración en JSON
+ * ⚙️ .anticall — Activar / Desactivar
+ * 💾 Configuración persistente
  *
  * Baileys ES Modules
  */
@@ -19,7 +21,7 @@ const DB_FILE = './database/anticall.json'
 fs.mkdirSync('./database', { recursive: true })
 
 // ============================================================
-// 💾 BASE DE DATOS
+// 💾 CONFIGURACIÓN
 // ============================================================
 
 function loadConfig() {
@@ -34,7 +36,7 @@ function loadConfig() {
             }
         }
     } catch (error) {
-        console.error('[ANTICALL] Error leyendo DB:', error)
+        console.error('[ANTICALL] Error leyendo JSON:', error)
     }
 
     return { enabled: false }
@@ -51,79 +53,269 @@ function saveConfig(config) {
 const config = loadConfig()
 
 // ============================================================
-// 📞 DETECTAR LLAMADAS
+// 🔐 CONTROL DE EVENTOS
 // ============================================================
 
-function registerCallListener(conn) {
-    if (!conn?.ev?.on) return
+const processedCalls = new Set()
+const processedMessages = new Set()
 
-    const previous = globalThis.__anticallListener
+function remember(set, id) {
+    if (set.has(id)) return false
 
-    // No volver a registrar el mismo listener.
-    if (
-        previous?.conn === conn &&
-        previous?.listener
-    ) {
-        return
+    set.add(id)
+
+    if (set.size > 500) {
+        const first = set.values().next().value
+        set.delete(first)
     }
 
-    // Eliminar listener anterior.
-    if (previous?.conn?.ev?.off) {
-        previous.conn.ev.off(
-            'call',
-            previous.listener
+    return true
+}
+
+// ============================================================
+// 🗑️ IDENTIFICAR REGISTROS DE LLAMADAS
+// ============================================================
+
+function isCallMessage(message) {
+    if (!message) return false
+
+    const content = message.message || {}
+
+    const types = [
+        'call',
+        'callLogMessage',
+        'callMessage',
+        'callLogMess',
+        'callLog'
+    ]
+
+    if (
+        types.some(type =>
+            Object.prototype.hasOwnProperty.call(
+                content,
+                type
+            )
+        )
+    ) {
+        return true
+    }
+
+    const stubType = String(
+        message.messageStubType || ''
+    ).toUpperCase()
+
+    return stubType.includes('CALL')
+}
+
+// ============================================================
+// 🗑️ INTENTAR ELIMINAR REGISTRO
+// ============================================================
+
+async function deleteCallRecord(conn, message) {
+    try {
+        if (!message?.key?.id) return false
+
+        const key = message.key
+
+        if (!key.remoteJid) return false
+
+        // La eliminación para todos solo funciona
+        // sobre mensajes que la cuenta puede revocar.
+        if (key.fromMe) {
+            await conn.sendMessage(
+                key.remoteJid,
+                { delete: key }
+            )
+
+            console.log(
+                '[ANTICALL] Registro propio eliminado:',
+                key.id
+            )
+
+            return true
+        }
+
+        // Para mensajes ajenos no se intenta una
+        // revocación global que WhatsApp pueda rechazar.
+        console.log(
+            '[ANTICALL] Registro ajeno detectado:',
+            key.id
+        )
+
+        return false
+
+    } catch (error) {
+        console.error(
+            '[ANTICALL] Error eliminando registro:',
+            error
+        )
+
+        return false
+    }
+}
+
+// ============================================================
+// 📞 PROCESAR LLAMADAS
+// ============================================================
+
+async function processCall(conn, call) {
+    if (!config.enabled || !call) return
+
+    if (
+        call.status !== 'offer' &&
+        call.status !== 'ringing'
+    ) return
+
+    if (!call.id || !call.from) return
+
+    const callId = `${call.from}:${call.id}`
+
+    if (!remember(processedCalls, callId)) return
+
+    try {
+        if (typeof conn.rejectCall !== 'function') {
+            console.error(
+                '[ANTICALL] rejectCall no disponible.'
+            )
+            return
+        }
+
+        await conn.rejectCall(
+            call.id,
+            call.from
+        )
+
+        console.log(
+            `[ANTICALL] Llamada rechazada: ${call.from}`
+        )
+
+        // Algunos eventos incluyen una clave
+        // asociada al registro de llamada.
+        if (call.messageKey) {
+            await deleteCallRecord(conn, {
+                key: call.messageKey
+            })
+        }
+
+    } catch (error) {
+        processedCalls.delete(callId)
+
+        console.error(
+            '[ANTICALL] Error procesando llamada:',
+            error
         )
     }
+}
 
-    const listener = async calls => {
+// ============================================================
+// 🔄 REGISTRAR LISTENERS
+// ============================================================
+
+function registerListeners(conn) {
+    if (!conn?.ev?.on) return
+
+    const previous = globalThis.__anticallListeners
+
+    // Evitar duplicados en la misma conexión.
+    if (
+        previous?.conn === conn &&
+        previous?.callListener &&
+        previous?.messageListener
+    ) return
+
+    // Eliminar listeners anteriores.
+    if (previous?.conn?.ev?.off) {
+        if (previous.callListener) {
+            previous.conn.ev.off(
+                'call',
+                previous.callListener
+            )
+        }
+
+        if (previous.messageListener) {
+            previous.conn.ev.off(
+                'messages.upsert',
+                previous.messageListener
+            )
+        }
+    }
+
+    // ========================================================
+    // 📞 EVENTO CALL
+    // ========================================================
+
+    const callListener = async calls => {
         if (!config.enabled) return
 
-        for (const call of calls || []) {
+        const events = Array.isArray(calls)
+            ? calls
+            : [calls]
+
+        for (const call of events) {
+            await processCall(conn, call)
+        }
+    }
+
+    // ========================================================
+    // 🗑️ EVENTO MESSAGES.UPSERT
+    // ========================================================
+
+    const messageListener = async update => {
+        if (!config.enabled) return
+
+        const messages = update?.messages || []
+
+        for (const message of messages) {
             try {
-                if (
-                    call.status !== 'offer' &&
-                    call.status !== 'ringing'
-                ) continue
+                if (!isCallMessage(message)) continue
 
-                if (!call.id || !call.from) continue
+                const id = message.key?.id
 
-                if (typeof conn.rejectCall !== 'function') {
-                    console.error(
-                        '[ANTICALL] rejectCall no disponible.'
-                    )
+                if (!id) continue
+
+                if (!remember(processedMessages, id)) {
                     continue
                 }
 
-                await conn.rejectCall(
-                    call.id,
-                    call.from
+                console.log(
+                    '[ANTICALL] Registro de llamada detectado:',
+                    id
                 )
 
-                console.log(
-                    `[ANTICALL] Llamada rechazada: ${call.from}`
+                await deleteCallRecord(
+                    conn,
+                    message
                 )
 
             } catch (error) {
                 console.error(
-                    '[ANTICALL] Error:',
+                    '[ANTICALL] Error procesando registro:',
                     error
                 )
             }
         }
     }
 
-    conn.ev.on('call', listener)
+    conn.ev.on('call', callListener)
 
-    globalThis.__anticallListener = {
+    conn.ev.on(
+        'messages.upsert',
+        messageListener
+    )
+
+    globalThis.__anticallListeners = {
         conn,
-        listener
+        callListener,
+        messageListener
     }
 
-    console.log('[ANTICALL] Evento Call registrado.')
+    console.log(
+        '[ANTICALL] Detectores Call y messages.upsert activos.'
+    )
 }
 
 // ============================================================
-// ⚙️ COMANDO .anticall
+// ⚙️ COMANDO .ANTICALL
 // ============================================================
 
 const handler = async (m, { conn, isOwner }) => {
@@ -133,9 +325,8 @@ const handler = async (m, { conn, isOwner }) => {
         )
     }
 
-    registerCallListener(conn)
+    registerListeners(conn)
 
-    // Alternar estado.
     config.enabled = !config.enabled
 
     saveConfig(config)
@@ -148,7 +339,10 @@ const handler = async (m, { conn, isOwner }) => {
 ┃
 ╰━━━━━━━━━━━━━━━━━━╯
 
-🚫 Las llamadas entrantes serán rechazadas automáticamente.
+🚫 Rechazo automático de llamadas.
+🔎 Detección de registros de llamada.
+🗑️ Eliminación cuando WhatsApp lo permita.
+🔕 Sin mensajes al contacto que llama.
 
 👑 *Configurado por:* Owner
 🤖 *whatsapp-bot*`
@@ -162,7 +356,8 @@ const handler = async (m, { conn, isOwner }) => {
 ┃
 ╰━━━━━━━━━━━━━━━━━━╯
 
-✅ El bot dejará de rechazar llamadas entrantes.
+✅ El bot dejará de rechazar llamadas.
+✅ Se desactiva la limpieza automática.
 
 👑 *Configurado por:* Owner
 🤖 *whatsapp-bot*`
@@ -170,11 +365,11 @@ const handler = async (m, { conn, isOwner }) => {
 }
 
 // ============================================================
-// 🔄 REGISTRAR EVENTO AUTOMÁTICAMENTE
+// 🔄 INICIALIZACIÓN
 // ============================================================
 
 handler.before = async function (m, { conn }) {
-    registerCallListener(conn)
+    registerListeners(conn)
     return false
 }
 

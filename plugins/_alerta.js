@@ -1,151 +1,290 @@
-// 📂 plugins/alerta.js
-// 🚨 Sistema de Alertas — WhatsApp-Bot
+
+/**
+ * 📂 plugins/alerta.js
+ * 🛡️ WHATSAPP-BOT — CENTRO DE NOTIFICACIONES
+ *
+ * ⚠️ Avisos administrativos de alta prioridad
+ * 👑 Exclusivo para OWNERS
+ * 👥 Mención de todos los participantes
+ * 📡 Envío a grupo específico
+ * 🕒 Fecha y hora de Uruguay
+ *
+ * Comando:
+ * .alerta <mensaje>
+ *
+ * Baileys ES Modules
+ */
+
+// ============================================================
+// ⚙️ CONFIGURACIÓN
 // ============================================================
 
-const grupoDestino = '120363429891274964@g.us'
+const GRUPO_DESTINO = '120363429891274964@g.us'
 
+const ZONA_HORARIA = 'America/Montevideo'
 
-let handler = async (m, { conn, text }) => {
+// ============================================================
+// 🕒 OBTENER FECHA Y HORA
+// ============================================================
+
+function obtenerFecha() {
+  return new Date().toLocaleString('es-UY', {
+    timeZone: ZONA_HORARIA,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+}
+
+// ============================================================
+// 🎭 REACCIONES
+// ============================================================
+
+async function reaccionar(conn, m, emoji) {
+  try {
+    await conn.sendMessage(m.chat, {
+      react: {
+        text: emoji,
+        key: m.key
+      }
+    })
+  } catch (error) {
+    console.error(
+      '[NOTIFICACIONES] Error de reacción:',
+      error
+    )
+  }
+}
+
+// ============================================================
+// 👥 OBTENER PARTICIPANTES
+// ============================================================
+
+async function obtenerGrupo(conn) {
+  const metadata = await conn.groupMetadata(GRUPO_DESTINO)
+
+  const participantes = metadata.participants || []
+
+  const menciones = [
+    ...new Set(
+      participantes
+        .map(participante => participante.id)
+        .filter(Boolean)
+    )
+  ]
+
+  return {
+    metadata,
+    menciones
+  }
+}
+
+// ============================================================
+// 🛡️ GENERAR NOTIFICACIÓN
+// ============================================================
+
+function generarNotificacion(texto, fecha) {
+  return `⚠️ *AVISO DE SEGURIDAD*
+
+━━━━━━━━━━━━━━━━━━━━
+
+Se ha generado una notificación de alta prioridad para los participantes de este grupo.
+
+*ATENCIÓN REQUERIDA*
+
+Se solicita leer cuidadosamente la siguiente información.
+
+┌─ *INFORMACIÓN DEL AVISO*
+
+${texto}
+
+└────────────────────
+
+*Detalles de la notificación*
+
+*Prioridad:* ALTA
+*Estado:* Aviso emitido
+*Alcance:* Todos los participantes
+*Fecha:* ${fecha}
+
+━━━━━━━━━━━━━━━━━━━━
+
+Este mensaje ha sido distribuido a todos los integrantes del grupo.
+
+*WhatsApp-Bot*
+_Sistema de administración y avisos_`
+}
+
+// ============================================================
+// 📋 GENERAR CONFIRMACIÓN
+// ============================================================
+
+function generarConfirmacion(metadata, menciones, fecha) {
+  return `🛡️ *CENTRO DE NOTIFICACIONES*
+
+━━━━━━━━━━━━━━━━━━━━
+
+✅ *NOTIFICACIÓN ENVIADA*
+
+El aviso administrativo fue enviado correctamente.
+
+*Detalles del envío*
+
+👥 *Grupo:* ${metadata.subject || 'Sin nombre'}
+📢 *Destinatarios:* ${menciones.length}
+🕒 *Fecha:* ${fecha}
+📡 *Estado:* Enviado
+
+━━━━━━━━━━━━━━━━━━━━
+
+_WhatsApp-Bot | Administración_`
+}
+
+// ============================================================
+// 🚨 COMANDO PRINCIPAL
+// ============================================================
+
+const handler = async (m, { conn, text }) => {
 
   // ==========================================================
   // ⚠️ VALIDAR MENSAJE
   // ==========================================================
 
-  if (!text || !text.trim()) {
+  const contenido = String(text || '').trim()
+
+  if (!contenido) {
     return m.reply(
-      '⚠️ *Uso incorrecto*\n\n' +
-      'Escribí el mensaje de la alerta:\n' +
-      '`.alerta <mensaje>`'
+      `🛡️ *CENTRO DE NOTIFICACIONES*
+
+⚠️ No se ha especificado ningún mensaje.
+
+*Uso correcto:*
+
+.alerta <mensaje>
+
+*Ejemplo:*
+
+.alerta Se informa que habrá cambios importantes en las normas del grupo.
+
+━━━━━━━━━━━━━━━━━━━━
+
+_Exclusivo para propietarios del bot._`
     )
   }
-
 
   try {
 
     // ========================================================
-    // 🚨 REACCIÓN
+    // 📡 REACCIÓN DE PROCESAMIENTO
     // ========================================================
 
-    await conn.sendMessage(
-      m.chat,
-      {
-        react: {
-          text: '🚨',
-          key: m.key
-        }
-      }
-    )
-
+    await reaccionar(conn, m, '📡')
 
     // ========================================================
     // 👥 INFORMACIÓN DEL GRUPO
     // ========================================================
 
-    const metadata = await conn.groupMetadata(
-      grupoDestino
+    const {
+      metadata,
+      menciones
+    } = await obtenerGrupo(conn)
+
+    // ========================================================
+    // 🕒 FECHA
+    // ========================================================
+
+    const fecha = obtenerFecha()
+
+    // ========================================================
+    // 🛡️ CREAR NOTIFICACIÓN
+    // ========================================================
+
+    const mensaje = generarNotificacion(
+      contenido,
+      fecha
     )
 
-    const participantes = metadata.participants || []
-
-    const menciones = participantes
-      .map(user => user.id)
-      .filter(Boolean)
-
-
     // ========================================================
-    // 🚨 ALERTA
-    // ========================================================
-
-    const mensaje = `╭━━〔 🚨 *ALERTA* 〕━━╮
-
-${text.trim()}
-
-╰━━━━━━━━━━━━━━━━━━╯
-
-📢 *Atención a todos los miembros.*`
-
-
-    // ========================================================
-    // 📤 ENVIAR
+    // 📤 ENVIAR AL GRUPO
     // ========================================================
 
     await conn.sendMessage(
-      grupoDestino,
+      GRUPO_DESTINO,
       {
         text: mensaje,
         mentions: menciones
       }
     )
 
+    // ========================================================
+    // ✅ REACCIÓN DE ÉXITO
+    // ========================================================
+
+    await reaccionar(conn, m, '✅')
 
     // ========================================================
-    // ✅ CONFIRMACIÓN
+    // 📋 CONFIRMACIÓN
     // ========================================================
 
-    await conn.sendMessage(
-      m.chat,
-      {
-        react: {
-          text: '✅',
-          key: m.key
-        }
-      }
+    const confirmacion = generarConfirmacion(
+      metadata,
+      menciones,
+      fecha
     )
 
-    await m.reply(
-      `╭━━〔 ✅ *ALERTA ENVIADA* 〕━━╮
+    await m.reply(confirmacion)
 
-👥 *Grupo:* ${metadata.subject || 'Sin nombre'}
-📢 *Mencionados:* ${menciones.length}
+  } catch (error) {
 
-╰━━━━━━━━━━━━━━━━━━╯`
-    )
-
-
-  } catch (err) {
+    // ========================================================
+    // ❌ REGISTRAR ERROR
+    // ========================================================
 
     console.error(
-      '❌ Error en comando alerta:',
-      err
+      '[NOTIFICACIONES] Error:',
+      error
     )
-
 
     // ========================================================
     // ❌ REACCIÓN
     // ========================================================
 
-    try {
-      await conn.sendMessage(
-        m.chat,
-        {
-          react: {
-            text: '❌',
-            key: m.key
-          }
-        }
-      )
-    } catch {}
-
+    await reaccionar(conn, m, '❌')
 
     // ========================================================
-    // ❌ ERROR
+    // ⚠️ MENSAJE DE ERROR
     // ========================================================
 
     await m.reply(
-      '❌ *No se pudo enviar la alerta.*\n\n' +
-      'Verificá que el bot esté dentro del grupo destino y tenga permiso para enviar mensajes.'
+      `⚠️ *ERROR DE NOTIFICACIÓN*
+
+No se pudo completar el envío del aviso.
+
+*Posibles causas:*
+
+• El bot no pertenece al grupo destino.
+• El grupo restringe el envío de mensajes.
+• Ocurrió un error de conexión.
+
+━━━━━━━━━━━━━━━━━━━━
+
+_WhatsApp-Bot | Administración_`
     )
   }
 }
 
-
 // ============================================================
-// ⚙️ CONFIGURACIÓN
+// ⚙️ CONFIGURACIÓN DEL HANDLER
 // ============================================================
 
+handler.help = ['alerta <mensaje>']
+handler.tags = ['owner']
 handler.command = ['alerta']
 
-// 👑 Solo Owners
+// 👑 Solo propietarios
 handler.owner = true
 
 export default handler

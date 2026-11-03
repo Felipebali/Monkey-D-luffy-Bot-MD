@@ -1,438 +1,254 @@
 
 /**
  * 📂 plugins/anticall.js
- * 🤖 WHATSAPP-BOT — ANTICALL COMPLETO
+ * 🛡️ WHATSAPP-BOT — ANTICALL
  *
- * 📞 Detecta llamadas entrantes
- * 🚫 Rechaza llamadas automáticamente
- * 🗑️ Detecta registros Call
- * 📢 Avisa con mención cuando solicita eliminarlos
- * 👑 Exclusivo para owners
- * ⚙️ .anticall — Activar / Desactivar
- * 🔕 Sin respuesta al comando
- * 💾 Configuración persistente
+ * • Detecta mensajes de tipo Call
+ * • Intenta eliminar usando la clave original
+ * • Advierte mencionando al usuario
+ * • Incluye administradores y owners
+ * • Configuración independiente por grupo
+ * • Usa global.db.data.chats
  *
  * Baileys ES Modules
  */
-
-import fs from 'fs'
-
-// ============================================================
-// ⚙️ CONFIGURACIÓN
-// ============================================================
-
-const DB_FILE = './database/anticall.json'
-
-fs.mkdirSync('./database', { recursive: true })
 
 // ============================================================
 // 💾 BASE DE DATOS
 // ============================================================
 
-function loadConfig() {
-    try {
-        if (fs.existsSync(DB_FILE)) {
-            const data = JSON.parse(
-                fs.readFileSync(DB_FILE, 'utf8')
-            )
-
-            return {
-                enabled: data.enabled === true
-            }
-        }
-    } catch (error) {
-        console.error(
-            '[ANTICALL] Error leyendo JSON:',
-            error
-        )
+function getChatData(chatId) {
+    if (!global.db) global.db = {}
+    if (!global.db.data) global.db.data = {}
+    if (!global.db.data.chats) {
+        global.db.data.chats = {}
     }
 
-    return { enabled: false }
+    if (!global.db.data.chats[chatId]) {
+        global.db.data.chats[chatId] = {}
+    }
+
+    return global.db.data.chats[chatId]
 }
 
-function saveConfig(config) {
-    fs.writeFileSync(
-        DB_FILE,
-        JSON.stringify(config, null, 2),
-        'utf8'
+// ============================================================
+// 👤 OBTENER REMITENTE
+// ============================================================
+
+function getSender(m) {
+    return (
+        m?.key?.participant ||
+        m?.participant ||
+        m?.sender ||
+        null
     )
 }
 
-const config = loadConfig()
-
-if (!fs.existsSync(DB_FILE)) {
-    saveConfig(config)
-}
-
 // ============================================================
-// 🛡️ EVITAR EVENTOS REPETIDOS
+// 📞 DETECTAR MENSAJES CALL
 // ============================================================
 
-const processedCalls = new Set()
-const processedMessages = new Set()
+function isCallMessage(m) {
+    if (!m) return false
 
-function remember(set, id) {
-    if (set.has(id)) return false
+    const type = String(
+        m.mtype || ''
+    ).toLowerCase()
 
-    set.add(id)
-
-    if (set.size >= 500) {
-        const first = set.values().next().value
-        set.delete(first)
+    if (
+        type === 'call' ||
+        type === 'callmessage' ||
+        type === 'calllogmessage'
+    ) {
+        return true
     }
 
-    return true
-}
+    const message = m.message || m.msg || {}
 
-// ============================================================
-// 🔎 DETECTAR REGISTROS CALL
-// ============================================================
-
-function isCallMessage(message) {
-    if (!message) return false
-
-    const content = message.message || {}
-
-    const types = [
+    const callTypes = [
         'call',
-        'callLogMessage',
-        'callMessage',
-        'callLogMess',
-        'callLog'
+        'callmessage',
+        'calllogmessage',
+        'calllogmess'
     ]
 
-    if (
-        types.some(type =>
-            Object.prototype.hasOwnProperty.call(
-                content,
-                type
-            )
-        )
-    ) {
-        return true
-    }
-
-    const stub = String(
-        message.messageStubType || ''
-    ).toUpperCase()
-
-    return stub.includes('CALL')
-}
-
-// ============================================================
-// 👤 OBTENER USUARIO
-// ============================================================
-
-function getCallerJid(message) {
-    return (
-        message?.key?.participant ||
-        message?.key?.remoteJid ||
-        ''
+    return Object.keys(message).some(key =>
+        callTypes.includes(key.toLowerCase())
     )
 }
 
+// ============================================================
+// 👤 TEXTO DE MENCIÓN
+// ============================================================
+
 function getMentionText(jid) {
-    const number = String(jid)
-        .split('@')[0]
-        .replace(/\D/g, '')
+    if (!jid) return 'Usuario'
 
-    return number
-        ? `@${number}`
-        : 'Usuario'
+    return '@' +
+        String(jid)
+            .split('@')[0]
+            .split(':')[0]
 }
 
 // ============================================================
-// 📢 AVISO DE ELIMINACIÓN
+// 🛡️ COMANDO .ANTICALL
 // ============================================================
 
-async function notifyDeletion(conn, chat, caller) {
-    if (!chat || !caller) return
-
-    await conn.sendMessage(chat, {
-        text:
-            `╭━━━〔 📞 ANTICALL 〕━━━╮
-┃
-┃ 🚫 *LLAMADA DETECTADA*
-┃
-╰━━━━━━━━━━━━━━━━━━╯
-
-👤 ${getMentionText(caller)}
-
-🗑️ Se envió una solicitud para eliminar el registro de llamada.
-
-⚠️ Las llamadas al bot no están permitidas.
-
-🤖 *whatsapp-bot*`,
-        mentions: [caller]
-    })
-}
-
-// ============================================================
-// 🗑️ ELIMINAR REGISTROS CUANDO SEA POSIBLE
-// ============================================================
-
-async function deleteCallRecord(conn, message) {
-    try {
-        const key = message?.key
-
-        if (!key?.id || !key?.remoteJid) {
-            return false
-        }
-
-        // No intentar revocar mensajes ajenos.
-        if (!key.fromMe) {
-            console.log(
-                '[ANTICALL] Registro ajeno detectado:',
-                key.id
-            )
-            return false
-        }
-
-        await conn.sendMessage(
-            key.remoteJid,
-            { delete: key }
+const handler = async (m, { conn }) => {
+    if (!m.isGroup) {
+        return m.reply(
+            '⚠️ Este comando solo se puede utilizar en grupos.'
         )
-
-        console.log(
-            '[ANTICALL] Solicitud de eliminación enviada:',
-            key.id
-        )
-
-        return true
-
-    } catch (error) {
-        console.error(
-            '[ANTICALL] Error eliminando registro:',
-            error
-        )
-
-        return false
     }
+
+    const chatData = getChatData(m.chat)
+
+    // Activar o desactivar.
+    chatData.anticall = !chatData.anticall
+
+    const message = chatData.anticall
+        ? `╭━━〔 📞 *ANTICALL* 〕━━╮
+
+✅ *Protección activada*
+
+🚫 No está permitido compartir mensajes de tipo Call en este grupo.
+
+⚠️ La regla se aplica a todos los miembros, incluidos administradores y owners.
+
+🗑️ El bot intentará eliminar los mensajes detectados.
+
+📢 Se mencionará al usuario responsable.
+
+╰━━━━━━━━━━━━━━━━━━╯`
+        : `╭━━〔 📞 *ANTICALL* 〕━━╮
+
+🔓 *Protección desactivada*
+
+La detección de mensajes Call quedó desactivada.
+
+╰━━━━━━━━━━━━━━━━━━╯`
+
+    return conn.sendMessage(
+        m.chat,
+        { text: message }
+    )
 }
 
 // ============================================================
-// 📞 PROCESAR LLAMADAS
+// 🔎 DETECTOR AUTOMÁTICO
 // ============================================================
 
-async function processCall(conn, call) {
-    if (!config.enabled || !call) return
-
-    if (
-        call.status !== 'offer' &&
-        call.status !== 'ringing'
-    ) return
-
-    if (!call.id || !call.from) return
-
-    const id = `${call.from}:${call.id}`
-
-    if (!remember(processedCalls, id)) return
-
+handler.all = async function (m) {
     try {
-        if (typeof conn.rejectCall !== 'function') {
-            console.error(
-                '[ANTICALL] rejectCall no disponible.'
-            )
-            return
-        }
+        // Solo grupos.
+        if (!m?.message || !m.isGroup) return
 
-        await conn.rejectCall(
-            call.id,
-            call.from
-        )
+        const chatData = getChatData(m.chat)
+
+        // Protección desactivada.
+        if (!chatData.anticall) return
+
+        // Detectar exclusivamente Call.
+        if (!isCallMessage(m)) return
+
+        const conn = this
+        const sender = getSender(m)
 
         console.log(
-            `[ANTICALL] Llamada rechazada: ${call.from}`
-        )
-
-        // Si WhatsApp proporciona una clave válida,
-        // intentar eliminar el registro asociado.
-        if (call.messageKey) {
-            const deleted = await deleteCallRecord(
-                conn,
-                { key: call.messageKey }
-            )
-
-            if (deleted) {
-                await notifyDeletion(
-                    conn,
-                    call.from,
-                    call.from
-                )
+            '[ANTICALL] Mensaje Call detectado:',
+            {
+                chat: m.chat,
+                sender,
+                id: m.key?.id,
+                remoteJid: m.key?.remoteJid
             }
-        }
-
-    } catch (error) {
-        processedCalls.delete(id)
-
-        console.error(
-            '[ANTICALL] Error procesando llamada:',
-            error
         )
-    }
-}
 
-// ============================================================
-// 🔄 REGISTRAR LISTENERS
-// ============================================================
+        // ====================================================
+        // 🗑️ INTENTAR ELIMINAR MENSAJE ORIGINAL
+        // ====================================================
 
-function registerListeners(conn) {
-    if (!conn?.ev?.on) return
+        let deleteRequested = false
 
-    const previous = globalThis.__anticallListeners
+        const originalKey = m.key
 
-    // Evitar registrar listeners duplicados.
-    if (
-        previous?.conn === conn &&
-        previous?.callListener &&
-        previous?.messageListener
-    ) {
-        return
-    }
-
-    // Eliminar listeners anteriores.
-    if (previous?.conn?.ev?.off) {
-        if (previous.callListener) {
-            previous.conn.ev.off(
-                'call',
-                previous.callListener
-            )
-        }
-
-        if (previous.messageListener) {
-            previous.conn.ev.off(
-                'messages.upsert',
-                previous.messageListener
-            )
-        }
-    }
-
-    // ========================================================
-    // 📞 EVENTO CALL
-    // ========================================================
-
-    const callListener = async calls => {
-        if (!config.enabled) return
-
-        const events = Array.isArray(calls)
-            ? calls
-            : [calls]
-
-        for (const call of events) {
-            await processCall(conn, call)
-        }
-    }
-
-    // ========================================================
-    // 🗑️ EVENTO MESSAGES.UPSERT
-    // ========================================================
-
-    const messageListener = async update => {
-        if (!config.enabled) return
-
-        const messages = update?.messages || []
-
-        for (const message of messages) {
+        if (
+            originalKey?.id &&
+            originalKey?.remoteJid &&
+            originalKey?.participant
+        ) {
             try {
-                if (!isCallMessage(message)) continue
+                await conn.sendMessage(
+                    m.chat,
+                    {
+                        delete: originalKey
+                    }
+                )
 
-                const id = message.key?.id
-
-                if (!id) continue
-
-                if (!remember(processedMessages, id)) {
-                    continue
-                }
-
-                const caller = getCallerJid(message)
+                deleteRequested = true
 
                 console.log(
-                    '[ANTICALL] Registro Call detectado:',
-                    id
+                    '[ANTICALL] Solicitud de eliminación enviada.'
                 )
-
-                const deleted = await deleteCallRecord(
-                    conn,
-                    message
-                )
-
-                if (deleted) {
-                    await notifyDeletion(
-                        conn,
-                        message.key.remoteJid,
-                        caller
-                    )
-                }
 
             } catch (error) {
                 console.error(
-                    '[ANTICALL] Error procesando registro:',
-                    error
+                    '[ANTICALL] No se pudo solicitar eliminación:',
+                    error.message || error
                 )
             }
+
+        } else {
+            console.log(
+                '[ANTICALL] Clave incompleta:',
+                originalKey
+            )
         }
+
+        // ====================================================
+        // 🚨 ADVERTENCIA AL USUARIO
+        // ====================================================
+
+        const warning =
+            `╭━━〔 🚨 *AVISO DE MODERACIÓN* 〕━━╮
+
+${sender
+    ? `👤 *Usuario:* ${getMentionText(sender)}`
+    : ''}
+
+🚫 *No está permitido compartir mensajes Call en este grupo.*
+
+📞 Se detectó un mensaje de tipo Call.
+
+${deleteRequested
+    ? '🗑️ Se solicitó la eliminación del mensaje.'
+    : '⚠️ No se pudo solicitar la eliminación del mensaje.'}
+
+⚠️ Esta regla se aplica a todos los participantes, incluidos administradores y owners.
+
+Por favor, respetá las reglas del grupo.
+
+╰━━━━━━━━━━━━━━━━━━╯`
+
+        const options = {
+            text: warning
+        }
+
+        if (sender) {
+            options.mentions = [sender]
+        }
+
+        await conn.sendMessage(
+            m.chat,
+            options
+        )
+
+    } catch (error) {
+        console.error(
+            '[ANTICALL] Error:',
+            error
+        )
     }
-
-    conn.ev.on('call', callListener)
-
-    conn.ev.on(
-        'messages.upsert',
-        messageListener
-    )
-
-    globalThis.__anticallListeners = {
-        conn,
-        callListener,
-        messageListener
-    }
-
-    console.log(
-        '[ANTICALL] Eventos registrados correctamente.'
-    )
-}
-
-// ============================================================
-// ⚙️ COMANDO .ANTICALL — SILENCIOSO
-// ============================================================
-
-const handler = async (m, { conn, isOwner }) => {
-    if (!isOwner) return
-
-    registerListeners(conn)
-
-    // Alternar estado.
-    config.enabled = !config.enabled
-
-    // Guardar estado.
-    saveConfig(config)
-
-    // Mostrar únicamente en consola.
-    console.log(
-        `╭━━━〔 📞 ANTICALL 〕━━━╮
-┃
-┃ ${config.enabled
-    ? '🟢 SISTEMA ACTIVADO'
-    : '🔴 SISTEMA DESACTIVADO'}
-┃
-╰━━━━━━━━━━━━━━━━━━╯
-
-🚫 Rechazo automático: ${config.enabled ? 'ACTIVO' : 'INACTIVO'}
-🗑️ Detección de Call: ${config.enabled ? 'ACTIVA' : 'INACTIVA'}
-
-🤖 whatsapp-bot`
-    )
-
-    // No responder al comando.
-    return
-}
-
-// ============================================================
-// 🔄 INICIALIZACIÓN AUTOMÁTICA
-// ============================================================
-
-handler.before = async function (m, { conn }) {
-    registerListeners(conn)
-    return false
 }
 
 // ============================================================
@@ -440,8 +256,9 @@ handler.before = async function (m, { conn }) {
 // ============================================================
 
 handler.help = ['anticall']
-handler.tags = ['owner']
-handler.command = /^anticall$/i
-handler.owner = true
+handler.tags = ['group']
+handler.command = ['anticall']
+
+handler.group = true
 
 export default handler

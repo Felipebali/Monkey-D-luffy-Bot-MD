@@ -21,7 +21,13 @@ const aliasMap = {
   antievento: ['antievento'],
   antilocation: ['antilocation'],
   antieliminar: ['antieliminar'],
-  onlyadmin: ['onlyadmin', 'onlyAdmin', 'soloAdmins', 'modoadmin'],
+  anticall: ['anticall'],
+  onlyadmin: [
+    'onlyadmin',
+    'onlyAdmin',
+    'soloAdmins',
+    'modoadmin'
+  ],
   nsfw: ['nsfw'],
   juegos: ['juegos', 'games'],
   welcome: ['welcome', 'bienvenida'],
@@ -33,9 +39,20 @@ const aliasMap = {
 // 📁 ARCHIVOS DE CONFIGURACIÓN
 // ============================================================
 
-const antiestadoFile = path.join('./database', 'antiestado.json')
-const anticanalFile = path.join('./database', 'anticanal.json')
-const antilink2File = path.join('./database', 'antilink2.json')
+const antiestadoFile = path.join(
+  './database',
+  'antiestado.json'
+)
+
+const anticanalFile = path.join(
+  './database',
+  'anticanal.json'
+)
+
+const antilink2File = path.join(
+  './database',
+  'antilink2.json'
+)
 
 // ============================================================
 // 🛡️ ANTIESTADO
@@ -50,8 +67,12 @@ function getAntiEstadoValue(groupJid) {
     )
 
     return data[groupJid] === true
+
   } catch (error) {
-    console.error('[PANEL] Error leyendo antiestado.json:', error)
+    console.error(
+      '[PANEL] Error leyendo antiestado.json:',
+      error
+    )
     return false
   }
 }
@@ -68,9 +89,16 @@ function getAntiCanalValue(groupJid) {
       fs.readFileSync(anticanalFile, 'utf8')
     )
 
-    return data.grupos?.[groupJid] === true
+    return (
+      data.grupos &&
+      data.grupos[groupJid] === true
+    ) || false
+
   } catch (error) {
-    console.error('[PANEL] Error leyendo anticanal.json:', error)
+    console.error(
+      '[PANEL] Error leyendo anticanal.json:',
+      error
+    )
     return false
   }
 }
@@ -87,9 +115,16 @@ function getAntiLink2Value(groupJid) {
       fs.readFileSync(antilink2File, 'utf8')
     )
 
-    return data.grupos?.[groupJid] === true
+    return (
+      data.grupos &&
+      data.grupos[groupJid] === true
+    ) || false
+
   } catch (error) {
-    console.error('[PANEL] Error leyendo antilink2.json:', error)
+    console.error(
+      '[PANEL] Error leyendo antilink2.json:',
+      error
+    )
     return false
   }
 }
@@ -140,7 +175,9 @@ function getChatValue(chat, key) {
 // ============================================================
 
 function status(value) {
-  return value ? '🟢 ACTIVADO' : '🔴 DESACTIVADO'
+  return value
+    ? '🟢 ACTIVADO'
+    : '🔴 DESACTIVADO'
 }
 
 // ============================================================
@@ -149,15 +186,21 @@ function status(value) {
 
 const handler = async (m, { isAdmin, isOwner }) => {
   if (!m.isGroup) {
-    return m.reply('⚠️ Este comando solo funciona en grupos.')
+    return m.reply(
+      '⚠️ Este comando solo funciona en grupos.'
+    )
   }
 
   if (!isAdmin && !isOwner) {
-    return m.reply('🚫 Solo administradores pueden usar este panel.')
+    return m.reply(
+      '🚫 Solo administradores pueden usar este panel.'
+    )
   }
 
-  if (!global.db?.data) {
-    return m.reply('❌ La base de datos no está disponible.')
+  if (!global.db || !global.db.data) {
+    return m.reply(
+      '❌ La base de datos no está disponible.'
+    )
   }
 
   if (!global.db.data.chats) {
@@ -181,6 +224,11 @@ const handler = async (m, { isAdmin, isOwner }) => {
   const antievento = getChatValue(chat, 'antievento')
   const antilocation = getChatValue(chat, 'antilocation')
   const antieliminar = getChatValue(chat, 'antieliminar')
+  const anticall = getChatValue(chat, 'anticall')
+
+  // ============================================================
+  // 📋 PANEL
+  // ============================================================
 
   const panel = `
 ╭━━━━━━━━━━━━━━━━━━━━━━╮
@@ -228,6 +276,10 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🗑️ AntiEliminar
 └─ ${status(antieliminar)}
    └─ *.antieliminar*
+
+📞 AntiCall
+└─ ${status(anticall)}
+   └─ *.anticall*
 
 🎫 AntiEvento
 └─ ${status(antievento)}
@@ -286,6 +338,7 @@ const handler = async (m, { isAdmin, isOwner }) => {
 🚨 .antiestado2
 📊 .antiencuesta
 🗑️ .antieliminar
+📞 .anticall
 🎫 .antievento
 📍 .antilocation
 📢 .anticanal
@@ -304,12 +357,12 @@ Los comandos funcionan como interruptor.
 
 Ejemplo:
 
-*.antieliminar*
+*.anticall*
 🟢 ACTIVADO
 
 Volvés a usar:
 
-*.antieliminar*
+*.anticall*
 🔴 DESACTIVADO
 
 ━━━━━━━━━━━━━━━━━━━━━━

@@ -1,14 +1,14 @@
 
 /**
  * 📂 plugins/anticall.js
- * 🤖 WHATSAPP-BOT — ANTICALL AUTOMÁTICO
+ * 🤖 WHATSAPP-BOT — ANTICALL SILENCIOSO
  *
  * 📞 Detecta llamadas entrantes
- * 🚫 Rechaza llamadas automáticamente
- * 🗑️ Detecta registros de llamada
- * 🧹 Intenta eliminarlos cuando sea posible
+ * 🚫 Rechaza llamadas
+ * 🗑️ Intenta eliminar registros Call
+ * 📢 Menciona al usuario si elimina un registro
  * 👑 Exclusivo para owners
- * ⚙️ .anticall — Activar / Desactivar
+ * ⚙️ .anticall activa/desactiva sin responder
  * 💾 Configuración persistente
  *
  * Baileys ES Modules
@@ -21,7 +21,7 @@ const DB_FILE = './database/anticall.json'
 fs.mkdirSync('./database', { recursive: true })
 
 // ============================================================
-// 💾 CONFIGURACIÓN
+// 💾 BASE DE DATOS
 // ============================================================
 
 function loadConfig() {
@@ -53,7 +53,7 @@ function saveConfig(config) {
 const config = loadConfig()
 
 // ============================================================
-// 🔐 CONTROL DE EVENTOS
+// 🛡️ EVITAR PROCESAR EVENTOS REPETIDOS
 // ============================================================
 
 const processedCalls = new Set()
@@ -73,7 +73,7 @@ function remember(set, id) {
 }
 
 // ============================================================
-// 🗑️ IDENTIFICAR REGISTROS DE LLAMADAS
+// 🔎 IDENTIFICAR MENSAJES CALL
 // ============================================================
 
 function isCallMessage(message) {
@@ -81,7 +81,7 @@ function isCallMessage(message) {
 
     const content = message.message || {}
 
-    const types = [
+    const callTypes = [
         'call',
         'callLogMessage',
         'callMessage',
@@ -90,7 +90,7 @@ function isCallMessage(message) {
     ]
 
     if (
-        types.some(type =>
+        callTypes.some(type =>
             Object.prototype.hasOwnProperty.call(
                 content,
                 type
@@ -100,11 +100,61 @@ function isCallMessage(message) {
         return true
     }
 
-    const stubType = String(
+    const stub = String(
         message.messageStubType || ''
     ).toUpperCase()
 
-    return stubType.includes('CALL')
+    return stub.includes('CALL')
+}
+
+// ============================================================
+// 👤 IDENTIFICAR USUARIO
+// ============================================================
+
+function getCallerJid(message) {
+    return (
+        message?.key?.participant ||
+        message?.key?.remoteJid ||
+        ''
+    )
+}
+
+function getMentionText(jid) {
+    const number = String(jid)
+        .split('@')[0]
+        .replace(/\D/g, '')
+
+    return number
+        ? `@${number}`
+        : 'Usuario'
+}
+
+// ============================================================
+// 📢 AVISAR ELIMINACIÓN
+// ============================================================
+
+async function notifyDeletion(conn, chat, caller) {
+    if (!chat || !caller) return
+
+    const mention = getMentionText(caller)
+
+    await conn.sendMessage(chat, {
+        text:
+            `╭━━━〔 📞 ANTICALL 〕━━━╮
+┃
+┃ 🚫 *LLAMADA DETECTADA*
+┃
+╰━━━━━━━━━━━━━━━━━━╯
+
+👤 ${mention}
+
+🗑️ Se procesó la eliminación del registro de llamada.
+
+⚠️ Las llamadas al bot no están permitidas.
+
+🤖 *whatsapp-bot*`,
+        mentions: [caller]
+    })
 }
 
 // ============================================================
@@ -113,36 +163,34 @@ function isCallMessage(message) {
 
 async function deleteCallRecord(conn, message) {
     try {
-        if (!message?.key?.id) return false
+        const key = message?.key
 
-        const key = message.key
-
-        if (!key.remoteJid) return false
-
-        // La eliminación para todos solo funciona
-        // sobre mensajes que la cuenta puede revocar.
-        if (key.fromMe) {
-            await conn.sendMessage(
-                key.remoteJid,
-                { delete: key }
-            )
-
-            console.log(
-                '[ANTICALL] Registro propio eliminado:',
-                key.id
-            )
-
-            return true
+        if (!key?.id || !key?.remoteJid) {
+            return false
         }
 
-        // Para mensajes ajenos no se intenta una
-        // revocación global que WhatsApp pueda rechazar.
+        // Solo se intenta revocar mensajes propios.
+        // Los registros ajenos no pueden borrarse
+        // globalmente mediante esta operación.
+        if (!key.fromMe) {
+            console.log(
+                '[ANTICALL] Registro ajeno detectado:',
+                key.id
+            )
+            return false
+        }
+
+        await conn.sendMessage(
+            key.remoteJid,
+            { delete: key }
+        )
+
         console.log(
-            '[ANTICALL] Registro ajeno detectado:',
+            '[ANTICALL] Solicitud de eliminación enviada:',
             key.id
         )
 
-        return false
+        return true
 
     } catch (error) {
         console.error(
@@ -155,7 +203,7 @@ async function deleteCallRecord(conn, message) {
 }
 
 // ============================================================
-// 📞 PROCESAR LLAMADAS
+// 📞 RECHAZAR LLAMADAS
 // ============================================================
 
 async function processCall(conn, call) {
@@ -168,9 +216,9 @@ async function processCall(conn, call) {
 
     if (!call.id || !call.from) return
 
-    const callId = `${call.from}:${call.id}`
+    const id = `${call.from}:${call.id}`
 
-    if (!remember(processedCalls, callId)) return
+    if (!remember(processedCalls, id)) return
 
     try {
         if (typeof conn.rejectCall !== 'function') {
@@ -189,16 +237,29 @@ async function processCall(conn, call) {
             `[ANTICALL] Llamada rechazada: ${call.from}`
         )
 
-        // Algunos eventos incluyen una clave
-        // asociada al registro de llamada.
+        // Intentar eliminar el registro si existe
+        // una clave de mensaje válida.
         if (call.messageKey) {
-            await deleteCallRecord(conn, {
+            const message = {
                 key: call.messageKey
-            })
+            }
+
+            const deleted = await deleteCallRecord(
+                conn,
+                message
+            )
+
+            if (deleted) {
+                await notifyDeletion(
+                    conn,
+                    call.from,
+                    call.from
+                )
+            }
         }
 
     } catch (error) {
-        processedCalls.delete(callId)
+        processedCalls.delete(id)
 
         console.error(
             '[ANTICALL] Error procesando llamada:',
@@ -208,7 +269,7 @@ async function processCall(conn, call) {
 }
 
 // ============================================================
-// 🔄 REGISTRAR LISTENERS
+// 🔄 REGISTRAR EVENTOS
 // ============================================================
 
 function registerListeners(conn) {
@@ -216,28 +277,24 @@ function registerListeners(conn) {
 
     const previous = globalThis.__anticallListeners
 
-    // Evitar duplicados en la misma conexión.
     if (
         previous?.conn === conn &&
         previous?.callListener &&
         previous?.messageListener
-    ) return
+    ) {
+        return
+    }
 
-    // Eliminar listeners anteriores.
     if (previous?.conn?.ev?.off) {
-        if (previous.callListener) {
-            previous.conn.ev.off(
-                'call',
-                previous.callListener
-            )
-        }
+        previous.conn.ev.off(
+            'call',
+            previous.callListener
+        )
 
-        if (previous.messageListener) {
-            previous.conn.ev.off(
-                'messages.upsert',
-                previous.messageListener
-            )
-        }
+        previous.conn.ev.off(
+            'messages.upsert',
+            previous.messageListener
+        )
     }
 
     // ========================================================
@@ -263,9 +320,7 @@ function registerListeners(conn) {
     const messageListener = async update => {
         if (!config.enabled) return
 
-        const messages = update?.messages || []
-
-        for (const message of messages) {
+        for (const message of update?.messages || []) {
             try {
                 if (!isCallMessage(message)) continue
 
@@ -277,19 +332,29 @@ function registerListeners(conn) {
                     continue
                 }
 
+                const caller = getCallerJid(message)
+
                 console.log(
-                    '[ANTICALL] Registro de llamada detectado:',
+                    '[ANTICALL] Registro Call detectado:',
                     id
                 )
 
-                await deleteCallRecord(
+                const deleted = await deleteCallRecord(
                     conn,
                     message
                 )
 
+                if (deleted) {
+                    await notifyDeletion(
+                        conn,
+                        message.key.remoteJid,
+                        caller
+                    )
+                }
+
             } catch (error) {
                 console.error(
-                    '[ANTICALL] Error procesando registro:',
+                    '[ANTICALL] Error procesando Call:',
                     error
                 )
             }
@@ -297,11 +362,7 @@ function registerListeners(conn) {
     }
 
     conn.ev.on('call', callListener)
-
-    conn.ev.on(
-        'messages.upsert',
-        messageListener
-    )
+    conn.ev.on('messages.upsert', messageListener)
 
     globalThis.__anticallListeners = {
         conn,
@@ -310,7 +371,7 @@ function registerListeners(conn) {
     }
 
     console.log(
-        '[ANTICALL] Detectores Call y messages.upsert activos.'
+        '[ANTICALL] Detectores de llamadas activos.'
     )
 }
 
@@ -319,53 +380,24 @@ function registerListeners(conn) {
 // ============================================================
 
 const handler = async (m, { conn, isOwner }) => {
-    if (!isOwner) {
-        return m.reply(
-            '⛔ Este comando es exclusivo para owners.'
-        )
-    }
+    if (!isOwner) return
 
     registerListeners(conn)
 
+    // Activar/desactivar sin enviar mensajes.
     config.enabled = !config.enabled
 
     saveConfig(config)
 
-    if (config.enabled) {
-        return m.reply(
-            `╭━━━〔 📞 ANTICALL 〕━━━╮
-┃
-┃ 🟢 *SISTEMA ACTIVADO*
-┃
-╰━━━━━━━━━━━━━━━━━━╯
-
-🚫 Rechazo automático de llamadas.
-🔎 Detección de registros de llamada.
-🗑️ Eliminación cuando WhatsApp lo permita.
-🔕 Sin mensajes al contacto que llama.
-
-👑 *Configurado por:* Owner
-🤖 *whatsapp-bot*`
-        )
-    }
-
-    return m.reply(
-        `╭━━━〔 📞 ANTICALL 〕━━━╮
-┃
-┃ 🔴 *SISTEMA DESACTIVADO*
-┃
-╰━━━━━━━━━━━━━━━━━━╯
-
-✅ El bot dejará de rechazar llamadas.
-✅ Se desactiva la limpieza automática.
-
-👑 *Configurado por:* Owner
-🤖 *whatsapp-bot*`
+    console.log(
+        `[ANTICALL] Sistema ${
+            config.enabled ? 'ACTIVADO' : 'DESACTIVADO'
+        }`
     )
 }
 
 // ============================================================
-// 🔄 INICIALIZACIÓN
+// 🔄 INICIALIZACIÓN AUTOMÁTICA
 // ============================================================
 
 handler.before = async function (m, { conn }) {

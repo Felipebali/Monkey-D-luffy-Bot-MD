@@ -1,73 +1,67 @@
-
 /**
  * 📂 plugins/anticanal.js
  * 🛡️ WHATSAPP-BOT — ANTICANAL ACTIVABLE
  *
  * Comandos:
- * .anticanal
- * .anticanal on
- * .anticanal off
+ * .anticanal       Activar / desactivar
+ * .anticanal on    Activar
+ * .anticanal off   Desactivar
  *
- * 🚫 Elimina enlaces de canales de WhatsApp
- * 👤 Modera usuarios comunes
- * 🛡️ Administradores exentos
- * 👑 Owners exentos
- * 💾 Configuración permanente por grupo
- * 🔕 Sin mensajes informativos innecesarios
+ * Detecta enlaces whatsapp.com/channel/
+ * Elimina mensajes de usuarios comunes y avisa al grupo.
  *
- * Baileys ES Modules
+ * 🛡️ Administradores y superadministradores: exentos.
+ * 👑 Owners: exentos.
+ * 🔐 Solo administradores y owners pueden cambiar la configuración.
+ * 🔕 Las confirmaciones de activación/desactivación no citan el comando.
  */
 
 import fs from 'fs'
 import path from 'path'
 
-// ============================================================
-// ⚙️ CONFIGURACIÓN
-// ============================================================
-
 const DIR = './database'
 const FILE = path.join(DIR, 'anticanal.json')
 
-fs.mkdirSync(DIR, { recursive: true })
+// ============================================================
+// ⚙️ CREAR CONFIGURACIÓN
+// ============================================================
+
+if (!fs.existsSync(DIR)) {
+  fs.mkdirSync(DIR, { recursive: true })
+}
 
 if (!fs.existsSync(FILE)) {
   fs.writeFileSync(
     FILE,
-    JSON.stringify({ grupos: {} }, null, 2),
-    'utf8'
+    JSON.stringify({ grupos: {} }, null, 2)
   )
 }
 
 // ============================================================
-// 📂 BASE DE DATOS
+// 📂 CARGAR Y GUARDAR CONFIGURACIÓN
 // ============================================================
 
 function cargarConfig() {
   try {
-    const data = JSON.parse(
-      fs.readFileSync(FILE, 'utf8')
-    )
+    const data = JSON.parse(fs.readFileSync(FILE, 'utf8'))
 
     if (!data.grupos || typeof data.grupos !== 'object') {
       data.grupos = {}
     }
 
     return data
-  } catch {
+  } catch (e) {
+    console.error('[ANTICANAL] Error leyendo configuración:', e)
     return { grupos: {} }
   }
 }
 
 function guardarConfig(data) {
-  fs.writeFileSync(
-    FILE,
-    JSON.stringify(data, null, 2),
-    'utf8'
-  )
+  fs.writeFileSync(FILE, JSON.stringify(data, null, 2))
 }
 
 // ============================================================
-// 🧹 NORMALIZAR TEXTO
+// 🧹 LIMPIAR TEXTO
 // ============================================================
 
 function limpiarTexto(texto) {
@@ -86,23 +80,18 @@ const CANAL_REGEX =
   /(?:https?:\/\/)?(?:www\.)?whatsapp\.com\/channel(?:\/[^\s<>"']*)?/i
 
 // ============================================================
-// 📝 OBTENER TEXTO
+// 📝 OBTENER TEXTO DEL MENSAJE
 // ============================================================
 
 function obtenerTexto(m) {
-  let contenido = m.message || {}
+  const msg = m.message || {}
 
-  for (let i = 0; i < 4; i++) {
-    const interno =
-      contenido.ephemeralMessage?.message ||
-      contenido.viewOnceMessage?.message ||
-      contenido.viewOnceMessageV2?.message ||
-      contenido.viewOnceMessageV2Extension?.message
-
-    if (!interno) break
-
-    contenido = interno
-  }
+  const contenido =
+    msg.ephemeralMessage?.message ||
+    msg.viewOnceMessage?.message ||
+    msg.viewOnceMessageV2?.message ||
+    msg.viewOnceMessageV2Extension?.message ||
+    msg
 
   return String(
     contenido.conversation ||
@@ -110,9 +99,7 @@ function obtenerTexto(m) {
     contenido.imageMessage?.caption ||
     contenido.videoMessage?.caption ||
     contenido.documentMessage?.caption ||
-    contenido.documentWithCaptionMessage
-      ?.message?.documentMessage?.caption ||
-    m.text ||
+    contenido.documentWithCaptionMessage?.message?.documentMessage?.caption ||
     ''
   )
 }
@@ -122,27 +109,12 @@ function obtenerTexto(m) {
 // ============================================================
 
 function obtenerAutor(m) {
-  return (
-    m.key?.participant ||
-    m.participant ||
-    m.sender ||
-    ''
-  )
+  return m.key?.participant || m.participant || m.sender || ''
 }
 
 // ============================================================
-// 🔎 NORMALIZAR JID
+// 👑 VERIFICAR OWNER
 // ============================================================
-
-function normalizarJid(id, conn) {
-  const valor = String(id || '').trim()
-
-  try {
-    return conn?.decodeJid?.(valor) || valor
-  } catch {
-    return valor
-  }
-}
 
 function normalizarNumero(id) {
   return String(id || '')
@@ -151,59 +123,14 @@ function normalizarNumero(id) {
     .replace(/\D/g, '')
 }
 
-function mismoJid(a, b, conn) {
-  const primero = normalizarJid(a, conn)
-  const segundo = normalizarJid(b, conn)
+function esOwner(sender) {
+  const numero = normalizarNumero(sender)
 
-  if (!primero || !segundo) return false
-  if (primero === segundo) return true
+  if (!numero) return false
 
-  const tipoA = primero.split('@')[1]
-  const tipoB = segundo.split('@')[1]
-
-  const telefonico = tipo =>
-    tipo === 's.whatsapp.net' ||
-    tipo === 'c.us'
-
-  if (telefonico(tipoA) && telefonico(tipoB)) {
-    return normalizarNumero(primero) === normalizarNumero(segundo)
-  }
-
-  return false
-}
-
-// ============================================================
-// 👑 VERIFICAR OWNER
-// ============================================================
-
-function esOwner(m, conn) {
-  if (m.isOwner === true) return true
-
-  const sender = obtenerAutor(m)
-
-  const owners = [
-    ...(Array.isArray(global.owner)
-      ? global.owner
-      : global.owner ? [global.owner] : []),
-    ...(Array.isArray(global.owners)
-      ? global.owners
-      : [])
-  ]
-
-  return owners.some(owner => {
-    const valor = Array.isArray(owner)
-      ? owner[0]
-      : owner?.jid || owner?.id || owner
-
-    if (!valor) return false
-
-    const id = String(valor)
-
-    const jid = id.includes('@')
-      ? id
-      : `${normalizarNumero(id)}@s.whatsapp.net`
-
-    return mismoJid(sender, jid, conn)
+  return (global.owner || []).some(owner => {
+    const id = Array.isArray(owner) ? owner[0] : owner
+    return normalizarNumero(id) === numero
   })
 }
 
@@ -211,99 +138,78 @@ function esOwner(m, conn) {
 // 🛡️ VERIFICAR ADMINISTRADORES
 // ============================================================
 
-async function esAdmin(conn, chat, sender, participants = []) {
-  let miembros = participants
+async function esAdmin(conn, chat, sender) {
+  try {
+    const metadata = await conn.groupMetadata(chat)
+    const autor = String(sender || '')
+    const numeroAutor = normalizarNumero(autor)
 
-  if (!Array.isArray(miembros) || !miembros.length) {
-    try {
-      const metadata = await conn.groupMetadata(chat)
-      miembros = metadata.participants || []
-    } catch {
-      return null
-    }
-  }
+    const participante = metadata.participants.find(p => {
+      const ids = [p.id, p.jid, p.lid].filter(Boolean)
 
-  const participante = miembros.find(p => {
-    const identificadores = [
-      p.id,
-      p.jid,
-      p.lid,
-      p.phoneNumber
-    ].filter(Boolean)
+      return ids.some(id => {
+        const idTexto = String(id)
 
-    return identificadores.some(id =>
-      mismoJid(sender, id, conn)
+        if (idTexto === autor) return true
+
+        if (
+          idTexto.includes('@s.whatsapp.net') &&
+          autor.includes('@s.whatsapp.net')
+        ) {
+          return normalizarNumero(idTexto) === numeroAutor
+        }
+
+        return false
+      })
+    })
+
+    return Boolean(
+      participante?.admin === 'admin' ||
+      participante?.admin === 'superadmin'
     )
-  })
+  } catch (e) {
+    console.error(
+      '[ANTICANAL] Error verificando administradores:',
+      e
+    )
 
-  if (!participante) return null
-
-  return (
-    participante.admin === 'admin' ||
-    participante.admin === 'superadmin' ||
-    participante.admin === 'owner'
-  )
+    return false
+  }
 }
 
 // ============================================================
 // 🔘 COMANDO .ANTICANAL
 // ============================================================
 
-const handler = async (m, {
-  conn,
-  command,
-  args,
-  isAdmin,
-  isOwner: ownerFramework
-}) => {
+const handler = async (m, { conn, command, args }) => {
   const chat = m.chat || m.key?.remoteJid
 
   if (!chat || !chat.endsWith('@g.us')) {
-    return m.reply(
-      '⚠️ Este comando solo funciona en grupos.'
-    )
+    return m.reply('⚠️ Este comando solo funciona en grupos.')
   }
+
+  const sender = m.sender || m.key?.participant
+  const config = cargarConfig()
+  const subcomando = String(args?.[0] || '').toLowerCase()
 
   if (command !== 'anticanal') return
 
-  const sender = obtenerAutor(m)
-
-  const owner =
-    ownerFramework === true ||
-    esOwner(m, conn)
-
-  const admin =
-    isAdmin === true ||
-    await esAdmin(conn, chat, sender)
-
-  if (!owner && admin !== true) {
+  // Solo owners o administradores pueden cambiar la configuración.
+  if (!esOwner(sender) && !(await esAdmin(conn, chat, sender))) {
     return m.reply(
-      '⛔ Solo los administradores del grupo o los owners pueden cambiar el anticanal.'
+      '⛔ Solo los administradores del grupo o el owner pueden cambiar el anticanal.'
     )
   }
 
-  const config = cargarConfig()
-
-  const subcomando = String(
-    args?.[0] || ''
-  ).toLowerCase()
-
   const estadoActual = config.grupos[chat] === true
-
   let nuevoEstado
 
-  if (
-    ['on', 'activar', 'activado', 'si', 'sí']
-      .includes(subcomando)
-  ) {
+  if (['on', 'activar', 'activado', 'si', 'sí'].includes(subcomando)) {
     nuevoEstado = true
-
   } else if (
-    ['off', 'desactivar', 'desactivado', 'no']
-      .includes(subcomando)
+    ['off', 'desactivar', 'desactivado', 'no'].includes(subcomando)
   ) {
     nuevoEstado = false
-
   } else {
     nuevoEstado = !estadoActual
   }
@@ -312,61 +218,55 @@ const handler = async (m, {
 
   try {
     guardarConfig(config)
-  } catch {
-    return conn.sendMessage(chat, {
+  } catch (e) {
+    console.error('[ANTICANAL] Error guardando configuración:', e)
+
+    await conn.sendMessage(chat, {
       text: '❌ No se pudo guardar la configuración del anticanal.'
     })
+
+    return
   }
 
-  // Confirmación sin citar el comando
+  // 📢 Confirmación independiente, sin citar el comando original.
   await conn.sendMessage(chat, {
     text: nuevoEstado
-      ? '✅ *ANTICANAL ACTIVADO*\n\n🚫 Los enlaces de canales de WhatsApp enviados por usuarios comunes serán eliminados.\n\n🛡️ Administradores y owners están exentos.'
-      : '🔕 *ANTICANAL DESACTIVADO*\n\nLos enlaces de canales de WhatsApp ya no serán bloqueados.'
+      ? '✅ Anticanal ACTIVADO.\n\n🚫 Se eliminarán los enlaces de canales enviados por usuarios comunes.\n\n🛡️ Administradores y owners están exentos.'
+      : '🔕 Anticanal DESACTIVADO.\n\nLos enlaces de canales de WhatsApp ya no serán bloqueados.'
   })
+
+  return
 }
 
 // ============================================================
 // 🚫 DETECTAR Y ELIMINAR ENLACES
 // ============================================================
 
-handler.before = async function (m, { conn, participants = [] }) {
+handler.before = async function (m, { conn }) {
   try {
     const chat = m.chat || m.key?.remoteJid
 
     if (!chat || !chat.endsWith('@g.us')) return
-    if (m.fromMe || m.key?.fromMe) return
+    if (m.key?.fromMe) return
 
     const config = cargarConfig()
 
+    // Solo moderar grupos donde el anticanal está activado.
     if (config.grupos[chat] !== true) return
 
     const texto = limpiarTexto(obtenerTexto(m))
 
-    if (!texto) return
-    if (!CANAL_REGEX.test(texto)) return
+    if (!texto || !CANAL_REGEX.test(texto)) return
 
     const autor = obtenerAutor(m)
 
     if (!autor || !m.key?.id) return
 
-    // 👑 Owners exentos
-    if (esOwner(m, conn)) return
+    // 👑 Los owners pueden compartir enlaces.
+    if (esOwner(autor)) return
 
-    // 🛡️ Administradores exentos
-    const admin = await esAdmin(
-      conn,
-      chat,
-      autor,
-      participants
-    )
-
-    // Si no se puede verificar el rol, no eliminar
-    if (admin !== false) return
-
-    // ========================================================
-    // 🗑️ ELIMINAR MENSAJE
-    // ========================================================
+    // 🛡️ Los administradores y superadministradores están exentos.
+    if (await esAdmin(conn, chat, autor)) return
 
     let borrado = false
 
@@ -381,25 +281,22 @@ handler.before = async function (m, { conn, participants = [] }) {
       })
 
       borrado = true
-    } catch {
-      borrado = false
+    } catch (e) {
+      console.error('[ANTICANAL] Error borrando mensaje:', e)
     }
 
-    // ========================================================
-    // 📢 AVISO AL GRUPO
-    // ========================================================
-
     const aviso = borrado
-      ? `🚫 @${autor.split('@')[0]}, no se permiten enlaces de canales de WhatsApp en este grupo.\n\n🗑️ Mensaje eliminado.`
-      : `🚫 @${autor.split('@')[0]}, no se permiten enlaces de canales de WhatsApp en este grupo.\n\n⚠️ No pude eliminar el mensaje. Verificá que el bot sea administrador.`
+      ? 🚫 @${autor.split('@')[0]}, no se permiten enlaces de canales de WhatsApp en este grupo.\n\n🗑️ Mensaje eliminado.
+      : 🚫 @${autor.split('@')[0]}, no se permiten enlaces de canales de WhatsApp en este grupo.\n\n⚠️ No pude eliminar el mensaje. Verificá que el bot sea administrador.
 
+    // Aviso de moderación independiente, sin citar el enlace original.
     await conn.sendMessage(chat, {
       text: aviso,
       mentions: [autor]
     })
 
-  } catch {
-    // Evitar mensajes informativos innecesarios
+  } catch (e) {
+    console.error('[ANTICANAL] Error:', e)
   }
 }
 
@@ -409,11 +306,5 @@ handler.before = async function (m, { conn, participants = [] }) {
 
 handler.command = ['anticanal']
 handler.group = true
-handler.help = [
-  'anticanal',
-  'anticanal on',
-  'anticanal off'
-]
-handler.tags = ['group']
 
 export default handler

@@ -1,14 +1,14 @@
 
 /**
- * 📂 plugins/anticall.js
- * 🛡️ WHATSAPP-BOT — ANTICALL
+ * 📂 plugins/_anticall.js
+ * 🤖 WHATSAPP-BOT — ANTICALL GRUPAL
  *
- * 📞 Detecta mensajes tipo "Call"
+ * 📞 Detecta mensajes "Call"
  * 📞 Escucha eventos "call" de Baileys
- * 🗑️ Intenta eliminar avisos de llamadas
- * 👤 Advierte mencionando al responsable
- * 👑 Incluye administradores y owners
- * 💾 Configuración independiente por grupo
+ * 🗑️ Intenta eliminar avisos detectados
+ * 👤 Menciona al responsable
+ * 👑 Incluye admins y owners
+ * 💾 Configuración por grupo
  *
  * Comando: .anticall
  * Baileys ES Modules
@@ -19,11 +19,12 @@
 // ============================================================
 
 function getChatData(chatId) {
-  global.db ||= {}
-  global.db.data ||= {}
-  global.db.data.chats ||= {}
+  global.db = global.db || {}
+  global.db.data = global.db.data || {}
+  global.db.data.chats = global.db.data.chats || {}
 
-  global.db.data.chats[chatId] ||= {}
+  global.db.data.chats[chatId] =
+    global.db.data.chats[chatId] || {}
 
   return global.db.data.chats[chatId]
 }
@@ -32,11 +33,14 @@ function getChatData(chatId) {
 // ⚙️ ESTADO GLOBAL
 // ============================================================
 
-const STATE = globalThis.__anticallState ||= {
-  conn: null,
-  callListener: null,
-  processed: new Map()
-}
+global.__anticallState =
+  global.__anticallState || {
+    conn: null,
+    callListener: null,
+    processed: new Map()
+  }
+
+const STATE = global.__anticallState
 
 // ============================================================
 // 🔧 UTILIDADES
@@ -51,9 +55,9 @@ function isGroup(jid) {
 
 function getSender(m) {
   return (
-    m?.key?.participant ||
-    m?.participant ||
-    m?.sender ||
+    (m && m.key && m.key.participant) ||
+    (m && m.participant) ||
+    (m && m.sender) ||
     null
   )
 }
@@ -65,15 +69,37 @@ function mention(jid) {
 }
 
 function getContent(m) {
-  let content = m?.message || {}
+  var content = (m && m.message) || {}
 
-  for (let i = 0; i < 5; i++) {
-    const inner =
-      content.ephemeralMessage?.message ||
-      content.viewOnceMessage?.message ||
-      content.viewOnceMessageV2?.message ||
-      content.documentWithCaptionMessage?.message ||
-      content.editedMessage?.message
+  for (var i = 0; i < 5; i++) {
+    var inner = null
+
+    if (
+      content.ephemeralMessage &&
+      content.ephemeralMessage.message
+    ) {
+      inner = content.ephemeralMessage.message
+    } else if (
+      content.viewOnceMessage &&
+      content.viewOnceMessage.message
+    ) {
+      inner = content.viewOnceMessage.message
+    } else if (
+      content.viewOnceMessageV2 &&
+      content.viewOnceMessageV2.message
+    ) {
+      inner = content.viewOnceMessageV2.message
+    } else if (
+      content.documentWithCaptionMessage &&
+      content.documentWithCaptionMessage.message
+    ) {
+      inner = content.documentWithCaptionMessage.message
+    } else if (
+      content.editedMessage &&
+      content.editedMessage.message
+    ) {
+      inner = content.editedMessage.message
+    }
 
     if (!inner) break
 
@@ -84,57 +110,67 @@ function getContent(m) {
 }
 
 // ============================================================
-// 📞 DETECTAR "Call"
+// 📞 DETECTAR MENSAJES "Call"
 // ============================================================
 
 function isCallMessage(m) {
   if (!m) return false
 
-  const content = getContent(m)
+  var content = getContent(m)
 
-  // Tipo exacto
+  // Tipo exacto "Call"
   if (m.mtype === 'Call') return true
 
-  // Propiedad exacta
-  if (Object.prototype.hasOwnProperty.call(
-    content,
-    'Call'
-  )) {
-    return true
-  }
-
-  // Texto exacto
-  const texto = String(
-    m.text ||
-    content.conversation ||
-    content.extendedTextMessage?.text ||
-    ''
-  ).trim()
-
-  if (texto === 'Call') return true
-
-  // Compatibilidad con avisos de Baileys
-  const type = String(m.mtype || '')
-    .toLowerCase()
-
+  // Propiedad exacta "Call"
   if (
-    type === 'callmessage' ||
-    type === 'calllogmessage' ||
-    type === 'groupcallmessage' ||
-    type === 'groupcallstartedmessage'
-  ) {
-    return true
-  }
-
-  if (
-    Object.keys(content).some(key =>
-      key.toLowerCase().includes('call')
+    Object.prototype.hasOwnProperty.call(
+      content,
+      'Call'
     )
   ) {
     return true
   }
 
-  const stub = String(
+  // Texto exacto "Call"
+  var texto = String(
+    m.text ||
+    content.conversation ||
+    (
+      content.extendedTextMessage &&
+      content.extendedTextMessage.text
+    ) ||
+    ''
+  ).trim()
+
+  if (texto === 'Call') return true
+
+  // Otros formatos de llamada
+  var type = String(m.mtype || '')
+    .toLowerCase()
+
+  var supportedTypes = [
+    'call',
+    'callmessage',
+    'calllogmessage',
+    'groupcallmessage',
+    'groupcallstartedmessage'
+  ]
+
+  if (supportedTypes.includes(type)) {
+    return true
+  }
+
+  var keys = Object.keys(content)
+
+  if (
+    keys.some(function (key) {
+      return key.toLowerCase().includes('call')
+    })
+  ) {
+    return true
+  }
+
+  var stub = String(
     m.messageStubType || ''
   ).toUpperCase()
 
@@ -150,16 +186,18 @@ function isCallMessage(m) {
 function markProcessed(chat, id) {
   if (!chat || !id) return false
 
-  const key = `${chat}:${id}`
-  const now = Date.now()
+  var key = chat + ':' + id
+  var now = Date.now()
 
-  for (const [k, time] of STATE.processed) {
-    if (now - time > 300000) {
-      STATE.processed.delete(k)
+  for (var entry of STATE.processed) {
+    if (now - entry[1] > 300000) {
+      STATE.processed.delete(entry[0])
     }
   }
 
-  if (STATE.processed.has(key)) return false
+  if (STATE.processed.has(key)) {
+    return false
+  }
 
   STATE.processed.set(key, now)
 
@@ -171,19 +209,23 @@ function markProcessed(chat, id) {
 // ============================================================
 
 async function warn(conn, chat, sender, deleted) {
-  const warning = `╭━━〔 🚨 *ANTICALL* 〕━━╮
+  var usuario = sender
+    ? '👤 *Usuario:* ' + mention(sender)
+    : '👤 *Usuario no identificado*'
 
-${sender
-  ? `👤 *Usuario:* ${mention(sender)}`
-  : '👤 *Usuario no identificado*'}
+  var eliminacion = deleted
+    ? '🗑️ Se solicitó eliminar el aviso.'
+    : '⚠️ No fue posible solicitar la eliminación.'
+
+  var warning = `╭━━〔 🚨 *ANTICALL* 〕━━╮
+
+${usuario}
 
 📞 *Se detectó un aviso de llamada.*
 
 🚫 No está permitido iniciar llamadas grupales.
 
-${deleted
-  ? '🗑️ Se solicitó eliminar el aviso.'
-  : '⚠️ No fue posible eliminar el aviso.'}
+${eliminacion}
 
 ⚠️ Esta regla también se aplica a administradores y owners.
 
@@ -191,30 +233,37 @@ Por favor, respetá las reglas del grupo.
 
 ╰━━━━━━━━━━━━━━━━━━╯`
 
-  await conn.sendMessage(chat, {
-    text: warning,
-    ...(sender ? { mentions: [sender] } : {})
-  })
+  var options = {
+    text: warning
+  }
+
+  if (sender) {
+    options.mentions = [sender]
+  }
+
+  await conn.sendMessage(chat, options)
 }
 
 // ============================================================
-// 🗑️ PROCESAR MENSAJE "Call"
+// 🗑️ PROCESAR MENSAJES CALL
 // ============================================================
 
 async function processCallMessage(conn, m) {
-  const chat =
-    m?.key?.remoteJid ||
-    m?.chat
+  var chat =
+    (m && m.key && m.key.remoteJid) ||
+    (m && m.chat)
 
   if (!isGroup(chat)) return
 
-  if (!getChatData(chat).anticall) return
+  var chatData = getChatData(chat)
+
+  if (!chatData.anticall) return
 
   if (!isCallMessage(m)) return
 
-  const key = m.key
+  var key = m.key || {}
 
-  if (!key?.id) {
+  if (!key.id) {
     console.log(
       '[ANTICALL] Call detectado sin ID:',
       Object.keys(getContent(m))
@@ -222,19 +271,24 @@ async function processCallMessage(conn, m) {
     return
   }
 
-  if (!markProcessed(chat, key.id)) return
+  if (!markProcessed(chat, key.id)) {
+    return
+  }
 
-  const sender = getSender(m)
+  var sender = getSender(m)
 
-  console.log('[ANTICALL] Call detectado:', {
-    chat,
-    sender,
-    id: key.id,
-    type: m.mtype,
-    stub: m.messageStubType
-  })
+  console.log(
+    '[ANTICALL] Call detectado:',
+    {
+      chat: chat,
+      sender: sender,
+      id: key.id,
+      type: m.mtype,
+      stub: m.messageStubType
+    }
+  )
 
-  let deleted = false
+  var deleted = false
 
   try {
     await conn.sendMessage(chat, {
@@ -242,7 +296,7 @@ async function processCallMessage(conn, m) {
         remoteJid: chat,
         id: key.id,
         participant: key.participant,
-        fromMe: !!key.fromMe
+        fromMe: Boolean(key.fromMe)
       }
     })
 
@@ -263,42 +317,44 @@ async function processCallMessage(conn, m) {
 }
 
 // ============================================================
-// 📞 PROCESAR EVENTOS "call"
+// 📞 PROCESAR EVENTOS DE BAILEYS
 // ============================================================
 
 async function processCallEvent(conn, calls) {
-  const events = Array.isArray(calls)
+  var events = Array.isArray(calls)
     ? calls
     : [calls]
 
-  for (const call of events) {
+  for (var call of events) {
     try {
       console.log(
-        '[ANTICALL] Evento call:',
+        '[ANTICALL] Evento call recibido:',
         JSON.stringify(call)
       )
 
-      const chat =
-        call?.chatId ||
-        call?.remoteJid ||
-        call?.groupJid ||
-        call?.groupId ||
-        call?.from
+      var chat =
+        call.chatId ||
+        call.remoteJid ||
+        call.groupJid ||
+        call.groupId ||
+        call.from
 
       if (!isGroup(chat)) continue
 
-      if (!getChatData(chat).anticall) continue
+      var chatData = getChatData(chat)
 
-      const sender =
-        call?.participant ||
-        call?.sender ||
-        call?.from ||
+      if (!chatData.anticall) continue
+
+      var sender =
+        call.participant ||
+        call.sender ||
+        call.from ||
         null
 
-      const id =
-        call?.messageId ||
-        call?.msgId ||
-        call?.id
+      var id =
+        call.messageId ||
+        call.msgId ||
+        call.id
 
       if (!id) {
         console.log(
@@ -307,16 +363,23 @@ async function processCallEvent(conn, calls) {
         continue
       }
 
-      if (!markProcessed(chat, id)) continue
+      if (!markProcessed(chat, id)) {
+        continue
+      }
 
-      // Un ID de llamada no siempre corresponde
-      // a un mensaje eliminable de WhatsApp.
+      // Los IDs de llamada no siempre son
+      // mensajes que se puedan eliminar.
 
-      await warn(conn, chat, sender, false)
+      await warn(
+        conn,
+        chat,
+        sender,
+        false
+      )
 
     } catch (error) {
       console.error(
-        '[ANTICALL] Error procesando call:',
+        '[ANTICALL] Error evento call:',
         error
       )
     }
@@ -324,11 +387,13 @@ async function processCallEvent(conn, calls) {
 }
 
 // ============================================================
-// 🔌 REGISTRAR LISTENER DE BAILEYS
+// 🔌 REGISTRAR EVENTO CALL
 // ============================================================
 
 function registerCallListener(conn) {
-  if (!conn?.ev?.on) return
+  if (!conn || !conn.ev || !conn.ev.on) {
+    return
+  }
 
   if (
     STATE.conn === conn &&
@@ -338,27 +403,38 @@ function registerCallListener(conn) {
   }
 
   if (
-    STATE.conn?.ev &&
+    STATE.conn &&
+    STATE.conn.ev &&
     STATE.callListener
   ) {
     try {
-      STATE.conn.ev.off(
-        'call',
-        STATE.callListener
-      )
-    } catch {
-      try {
+      if (STATE.conn.ev.off) {
+        STATE.conn.ev.off(
+          'call',
+          STATE.callListener
+        )
+      } else if (
+        STATE.conn.ev.removeListener
+      ) {
         STATE.conn.ev.removeListener(
           'call',
           STATE.callListener
         )
-      } catch {}
+      }
+    } catch (error) {
+      console.error(
+        '[ANTICALL] Error quitando listener:',
+        error
+      )
     }
   }
 
-  const listener = async calls => {
+  var listener = async function (calls) {
     try {
-      await processCallEvent(conn, calls)
+      await processCallEvent(
+        conn,
+        calls
+      )
     } catch (error) {
       console.error(
         '[ANTICALL] Error listener:',
@@ -381,10 +457,10 @@ function registerCallListener(conn) {
 // ⚙️ COMANDO .ANTICALL
 // ============================================================
 
-const handler = async (
+var handler = async function (
   m,
   { conn, isAdmin, isOwner }
-) => {
+) {
   if (!m.isGroup) {
     return m.reply(
       '⚠️ Este comando solo funciona en grupos.'
@@ -399,11 +475,11 @@ const handler = async (
 
   registerCallListener(conn)
 
-  const chat = getChatData(m.chat)
+  var chatData = getChatData(m.chat)
 
-  chat.anticall = !chat.anticall
+  chatData.anticall = !chatData.anticall
 
-  const text = chat.anticall
+  var text = chatData.anticall
     ? `╭━━〔 📞 *ANTICALL* 〕━━╮
 
 ✅ *PROTECCIÓN ACTIVADA*
@@ -426,7 +502,7 @@ const handler = async (
 
   return conn.sendMessage(
     m.chat,
-    { text },
+    { text: text },
     { quoted: m }
   )
 }
@@ -439,7 +515,10 @@ handler.all = async function (m) {
   try {
     registerCallListener(this)
 
-    await processCallMessage(this, m)
+    await processCallMessage(
+      this,
+      m
+    )
 
   } catch (error) {
     console.error(

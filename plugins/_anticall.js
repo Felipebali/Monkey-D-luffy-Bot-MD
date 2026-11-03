@@ -1,15 +1,16 @@
 
 /**
  * 📂 plugins/anticall.js
- * 🛡️ WHATSAPP-BOT — ANTICALL
+ * 🛡️ WHATSAPP-BOT — ANTICALL GRUPAL
  *
- * • Detecta mensajes de tipo Call
- * • Intenta eliminar usando la clave original
- * • Advierte mencionando al usuario
- * • Incluye administradores y owners
- * • Configuración independiente por grupo
- * • Usa global.db.data.chats
+ * 📞 Detecta mensajes Call
+ * 📞 Detecta posibles avisos de llamadas grupales
+ * 🗑️ Intenta eliminar el mensaje original
+ * 👤 Advierte mencionando al responsable
+ * 👑 Incluye administradores y owners
+ * 💾 Configuración independiente por grupo
  *
+ * Comando: .anticall
  * Baileys ES Modules
  */
 
@@ -18,21 +19,18 @@
 // ============================================================
 
 function getChatData(chatId) {
-    if (!global.db) global.db = {}
-    if (!global.db.data) global.db.data = {}
-    if (!global.db.data.chats) {
-        global.db.data.chats = {}
-    }
+    global.db = global.db || {}
+    global.db.data = global.db.data || {}
+    global.db.data.chats = global.db.data.chats || {}
 
-    if (!global.db.data.chats[chatId]) {
-        global.db.data.chats[chatId] = {}
-    }
+    global.db.data.chats[chatId] =
+        global.db.data.chats[chatId] || {}
 
     return global.db.data.chats[chatId]
 }
 
 // ============================================================
-// 👤 OBTENER REMITENTE
+// 🔧 UTILIDADES
 // ============================================================
 
 function getSender(m) {
@@ -44,8 +42,44 @@ function getSender(m) {
     )
 }
 
+function getMentionText(jid) {
+    if (!jid) return 'Usuario'
+
+    return '@' + String(jid)
+        .split('@')[0]
+        .split(':')[0]
+}
+
+function getMessageContent(m) {
+    let content = m?.message || {}
+
+    // Desenvolver mensajes encapsulados.
+    for (let i = 0; i < 4; i++) {
+        if (content.ephemeralMessage?.message) {
+            content = content.ephemeralMessage.message
+        } else if (
+            content.viewOnceMessage?.message
+        ) {
+            content = content.viewOnceMessage.message
+        } else if (
+            content.viewOnceMessageV2?.message
+        ) {
+            content = content.viewOnceMessageV2.message
+        } else if (
+            content.documentWithCaptionMessage?.message
+        ) {
+            content =
+                content.documentWithCaptionMessage.message
+        } else {
+            break
+        }
+    }
+
+    return content
+}
+
 // ============================================================
-// 📞 DETECTAR MENSAJES CALL
+// 📞 DETECTAR CALL
 // ============================================================
 
 function isCallMessage(m) {
@@ -55,76 +89,112 @@ function isCallMessage(m) {
         m.mtype || ''
     ).toLowerCase()
 
+    const supportedTypes = [
+        'call',
+        'callmessage',
+        'calllogmessage',
+        'calllogmess',
+        'groupcallmessage',
+        'groupcall',
+        'groupcallstartedmessage'
+    ]
+
+    if (supportedTypes.includes(type)) {
+        return true
+    }
+
+    const content = getMessageContent(m)
+
+    const keys = Object.keys(content)
+
     if (
-        type === 'call' ||
-        type === 'callmessage' ||
-        type === 'calllogmessage'
+        keys.some(key =>
+            supportedTypes.includes(
+                key.toLowerCase()
+            )
+        )
     ) {
         return true
     }
 
-    const message = m.message || m.msg || {}
+    // Algunos avisos de llamada llegan como
+    // mensajes de sistema, no como texto normal.
+    const stub = String(
+        m.messageStubType || ''
+    ).toUpperCase()
 
-    const callTypes = [
-        'call',
-        'callmessage',
-        'calllogmessage',
-        'calllogmess'
-    ]
+    if (
+        stub.includes('CALL') ||
+        stub.includes('GROUP_CALL')
+    ) {
+        return true
+    }
 
-    return Object.keys(message).some(key =>
-        callTypes.includes(key.toLowerCase())
-    )
+    return false
 }
 
 // ============================================================
-// 👤 TEXTO DE MENCIÓN
+// 🛡️ EVITAR AVISOS DUPLICADOS
 // ============================================================
 
-function getMentionText(jid) {
-    if (!jid) return 'Usuario'
+const processed = new Set()
 
-    return '@' +
-        String(jid)
-            .split('@')[0]
-            .split(':')[0]
+function markProcessed(chat, id) {
+    const key = `${chat}:${id}`
+
+    if (processed.has(key)) return false
+
+    processed.add(key)
+
+    if (processed.size > 500) {
+        const oldest = processed.values().next().value
+        processed.delete(oldest)
+    }
+
+    return true
 }
 
 // ============================================================
-// 🛡️ COMANDO .ANTICALL
+// ⚙️ COMANDO .ANTICALL
 // ============================================================
 
-const handler = async (m, { conn }) => {
+const handler = async (m, { conn, isAdmin, isOwner }) => {
     if (!m.isGroup) {
         return m.reply(
-            '⚠️ Este comando solo se puede utilizar en grupos.'
+            '⚠️ Este comando solo funciona en grupos.'
+        )
+    }
+
+    // Solo administradores y owners pueden configurar.
+    if (!isAdmin && !isOwner) {
+        return m.reply(
+            '⛔ Solo administradores y owners pueden configurar AntiCall.'
         )
     }
 
     const chatData = getChatData(m.chat)
 
-    // Activar o desactivar.
     chatData.anticall = !chatData.anticall
 
     const message = chatData.anticall
         ? `╭━━〔 📞 *ANTICALL* 〕━━╮
 
-✅ *Protección activada*
+✅ *PROTECCIÓN ACTIVADA*
 
-🚫 No está permitido compartir mensajes de tipo Call en este grupo.
+🚫 No se permiten avisos de llamadas grupales.
 
-⚠️ La regla se aplica a todos los miembros, incluidos administradores y owners.
+📞 Detección de mensajes Call activada.
+🗑️ Eliminación automática cuando sea posible.
+👤 Advertencias con mención al responsable.
 
-🗑️ El bot intentará eliminar los mensajes detectados.
-
-📢 Se mencionará al usuario responsable.
+⚠️ Se aplica también a administradores y owners.
 
 ╰━━━━━━━━━━━━━━━━━━╯`
         : `╭━━〔 📞 *ANTICALL* 〕━━╮
 
-🔓 *Protección desactivada*
+🔓 *PROTECCIÓN DESACTIVADA*
 
-La detección de mensajes Call quedó desactivada.
+📞 La detección de Call quedó desactivada.
 
 ╰━━━━━━━━━━━━━━━━━━╯`
 
@@ -140,42 +210,50 @@ La detección de mensajes Call quedó desactivada.
 
 handler.all = async function (m) {
     try {
-        // Solo grupos.
-        if (!m?.message || !m.isGroup) return
+        if (!m?.isGroup) return
 
         const chatData = getChatData(m.chat)
 
-        // Protección desactivada.
         if (!chatData.anticall) return
 
-        // Detectar exclusivamente Call.
         if (!isCallMessage(m)) return
 
         const conn = this
         const sender = getSender(m)
 
+        const originalKey = m.key
+
+        const id = originalKey?.id
+
+        if (!id) {
+            console.log(
+                '[ANTICALL] Aviso Call sin ID de mensaje.'
+            )
+            return
+        }
+
+        if (!markProcessed(m.chat, id)) return
+
         console.log(
-            '[ANTICALL] Mensaje Call detectado:',
+            '[ANTICALL] Aviso de llamada detectado:',
             {
                 chat: m.chat,
                 sender,
-                id: m.key?.id,
-                remoteJid: m.key?.remoteJid
+                id,
+                type: m.mtype,
+                stub: m.messageStubType
             }
         )
 
         // ====================================================
-        // 🗑️ INTENTAR ELIMINAR MENSAJE ORIGINAL
+        // 🗑️ ELIMINAR MENSAJE ORIGINAL
         // ====================================================
 
         let deleteRequested = false
 
-        const originalKey = m.key
-
         if (
             originalKey?.id &&
-            originalKey?.remoteJid &&
-            originalKey?.participant
+            originalKey?.remoteJid
         ) {
             try {
                 await conn.sendMessage(
@@ -193,38 +271,32 @@ handler.all = async function (m) {
 
             } catch (error) {
                 console.error(
-                    '[ANTICALL] No se pudo solicitar eliminación:',
-                    error.message || error
+                    '[ANTICALL] Error eliminando Call:',
+                    error
                 )
             }
-
-        } else {
-            console.log(
-                '[ANTICALL] Clave incompleta:',
-                originalKey
-            )
         }
 
         // ====================================================
-        // 🚨 ADVERTENCIA AL USUARIO
+        // 🚨 ADVERTENCIA CON MENCIÓN
         // ====================================================
 
         const warning =
-            `╭━━〔 🚨 *AVISO DE MODERACIÓN* 〕━━╮
+            `╭━━〔 🚨 *ANTICALL* 〕━━╮
 
 ${sender
     ? `👤 *Usuario:* ${getMentionText(sender)}`
-    : ''}
+    : '👤 *Usuario no identificado*'}
 
-🚫 *No está permitido compartir mensajes Call en este grupo.*
+📞 *Se detectó un aviso de llamada.*
 
-📞 Se detectó un mensaje de tipo Call.
+🚫 No está permitido iniciar o compartir llamadas en este grupo.
 
 ${deleteRequested
-    ? '🗑️ Se solicitó la eliminación del mensaje.'
-    : '⚠️ No se pudo solicitar la eliminación del mensaje.'}
+    ? '🗑️ Se solicitó la eliminación de la notificación.'
+    : '⚠️ No fue posible solicitar la eliminación.'}
 
-⚠️ Esta regla se aplica a todos los participantes, incluidos administradores y owners.
+⚠️ Esta regla también se aplica a administradores y owners.
 
 Por favor, respetá las reglas del grupo.
 
@@ -245,7 +317,7 @@ Por favor, respetá las reglas del grupo.
 
     } catch (error) {
         console.error(
-            '[ANTICALL] Error:',
+            '[ANTICALL] Error general:',
             error
         )
     }
@@ -257,7 +329,7 @@ Por favor, respetá las reglas del grupo.
 
 handler.help = ['anticall']
 handler.tags = ['group']
-handler.command = ['anticall']
+handler.command = /^anticall$/i
 
 handler.group = true
 

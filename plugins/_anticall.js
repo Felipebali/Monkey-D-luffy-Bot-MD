@@ -3,12 +3,12 @@
  * 📂 plugins/_anticall.js
  * 🤖 WHATSAPP-BOT — ANTICALL GRUPAL
  *
- * 📞 Detecta mensajes "Call"
- * 📞 Escucha eventos "call" de Baileys
- * 🗑️ Intenta eliminar avisos detectados
+ * 📞 Detecta eventos de llamadas grupales
+ * 📞 Compatible con groupJid y usuarios @lid
+ * 🗑️ Elimina avisos cuando sea posible
  * 👤 Menciona al responsable
- * 👑 Incluye admins y owners
- * 💾 Configuración por grupo
+ * 👑 Incluye administradores y owners
+ * 💾 Configuración independiente por grupo
  *
  * Comando: .anticall
  * Baileys ES Modules
@@ -144,9 +144,8 @@ function isCallMessage(m) {
 
   if (texto === 'Call') return true
 
-  // Otros formatos de llamada
-  var type = String(m.mtype || '')
-    .toLowerCase()
+  // Otros tipos de mensajes de llamada
+  var type = String(m.mtype || '').toLowerCase()
 
   var supportedTypes = [
     'call',
@@ -215,15 +214,15 @@ async function warn(conn, chat, sender, deleted) {
 
   var eliminacion = deleted
     ? '🗑️ Se solicitó eliminar el aviso.'
-    : '⚠️ No fue posible solicitar la eliminación.'
+    : 'ℹ️ El aviso de llamada no se pudo eliminar.'
 
   var warning = `╭━━〔 🚨 *ANTICALL* 〕━━╮
 
 ${usuario}
 
-📞 *Se detectó un aviso de llamada.*
+📞 *Se detectó una llamada grupal.*
 
-🚫 No está permitido iniciar llamadas grupales.
+🚫 No está permitido iniciar llamadas en este grupo.
 
 ${eliminacion}
 
@@ -258,7 +257,6 @@ async function processCallMessage(conn, m) {
   var chatData = getChatData(chat)
 
   if (!chatData.anticall) return
-
   if (!isCallMessage(m)) return
 
   var key = m.key || {}
@@ -271,20 +269,17 @@ async function processCallMessage(conn, m) {
     return
   }
 
-  if (!markProcessed(chat, key.id)) {
-    return
-  }
+  if (!markProcessed(chat, key.id)) return
 
   var sender = getSender(m)
 
   console.log(
-    '[ANTICALL] Call detectado:',
+    '[ANTICALL] Mensaje Call detectado:',
     {
       chat: chat,
       sender: sender,
       id: key.id,
-      type: m.mtype,
-      stub: m.messageStubType
+      type: m.mtype
     }
   )
 
@@ -295,7 +290,7 @@ async function processCallMessage(conn, m) {
       delete: {
         remoteJid: chat,
         id: key.id,
-        participant: key.participant,
+        participant: key.participant || sender,
         fromMe: Boolean(key.fromMe)
       }
     })
@@ -317,7 +312,7 @@ async function processCallMessage(conn, m) {
 }
 
 // ============================================================
-// 📞 PROCESAR EVENTOS DE BAILEYS
+// 📞 PROCESAR EVENTOS CALL DE BAILEYS
 // ============================================================
 
 async function processCallEvent(conn, calls) {
@@ -327,38 +322,83 @@ async function processCallEvent(conn, calls) {
 
   for (var call of events) {
     try {
+      if (!call) continue
+
       console.log(
         '[ANTICALL] Evento call recibido:',
         JSON.stringify(call)
       )
 
+      // Solo detectar llamadas entrantes nuevas.
+      if (call.status !== 'offer') {
+        continue
+      }
+
+      // ======================================================
+      // 👥 IDENTIFICAR EL GRUPO CORRECTAMENTE
+      // ======================================================
+
+      // En llamadas grupales, chatId puede ser @lid.
+      // groupJid contiene el grupo verdadero.
+
       var chat =
-        call.chatId ||
-        call.remoteJid ||
         call.groupJid ||
         call.groupId ||
-        call.from
+        (
+          isGroup(call.chatId)
+            ? call.chatId
+            : null
+        ) ||
+        (
+          isGroup(call.remoteJid)
+            ? call.remoteJid
+            : null
+        )
 
-      if (!isGroup(chat)) continue
+      if (!isGroup(chat)) {
+        console.log(
+          '[ANTICALL] Evento sin grupo válido:',
+          call
+        )
+        continue
+      }
+
+      // ======================================================
+      // ⚙️ COMPROBAR SI ANTICALL ESTÁ ACTIVADO
+      // ======================================================
 
       var chatData = getChatData(chat)
 
-      if (!chatData.anticall) continue
+      if (!chatData.anticall) {
+        console.log(
+          '[ANTICALL] Protección desactivada:',
+          chat
+        )
+        continue
+      }
+
+      // ======================================================
+      // 👤 IDENTIFICAR AL RESPONSABLE
+      // ======================================================
 
       var sender =
+        call.from ||
         call.participant ||
         call.sender ||
-        call.from ||
         null
 
+      // ======================================================
+      // 🆔 IDENTIFICAR LA LLAMADA
+      // ======================================================
+
       var id =
+        call.id ||
         call.messageId ||
-        call.msgId ||
-        call.id
+        call.msgId
 
       if (!id) {
         console.log(
-          '[ANTICALL] Evento sin ID.'
+          '[ANTICALL] Llamada sin ID.'
         )
         continue
       }
@@ -367,8 +407,24 @@ async function processCallEvent(conn, calls) {
         continue
       }
 
-      // Los IDs de llamada no siempre son
-      // mensajes que se puedan eliminar.
+      // ======================================================
+      // 📞 LLAMADA DETECTADA
+      // ======================================================
+
+      console.log(
+        '[ANTICALL] LLAMADA GRUPAL DETECTADA:',
+        {
+          grupo: chat,
+          usuario: sender,
+          llamada: id,
+          video: Boolean(call.isVideo),
+          estado: call.status
+        }
+      )
+
+      // El ID del evento call no garantiza
+      // que exista un mensaje eliminable.
+      // Por eso no se usa para borrar mensajes.
 
       await warn(
         conn,
@@ -379,7 +435,7 @@ async function processCallEvent(conn, calls) {
 
     } catch (error) {
       console.error(
-        '[ANTICALL] Error evento call:',
+        '[ANTICALL] Error procesando llamada:',
         error
       )
     }
@@ -387,7 +443,7 @@ async function processCallEvent(conn, calls) {
 }
 
 // ============================================================
-// 🔌 REGISTRAR EVENTO CALL
+// 🔌 REGISTRAR LISTENER CALL
 // ============================================================
 
 function registerCallListener(conn) {
@@ -402,6 +458,7 @@ function registerCallListener(conn) {
     return
   }
 
+  // Evitar listeners duplicados al recargar plugins.
   if (
     STATE.conn &&
     STATE.conn.ev &&
@@ -431,10 +488,7 @@ function registerCallListener(conn) {
 
   var listener = async function (calls) {
     try {
-      await processCallEvent(
-        conn,
-        calls
-      )
+      await processCallEvent(conn, calls)
     } catch (error) {
       console.error(
         '[ANTICALL] Error listener:',
@@ -484,10 +538,10 @@ var handler = async function (
 
 ✅ *PROTECCIÓN ACTIVADA*
 
-📞 Detección de mensajes "Call".
-🔎 Escucha de eventos de llamadas.
-🗑️ Eliminación cuando sea posible.
+📞 Detección de llamadas grupales.
+🔎 Compatible con usuarios @lid.
 👤 Advertencias con mención.
+🗑️ Eliminación de avisos cuando sea posible.
 
 👑 También aplica a administradores y owners.
 
@@ -515,10 +569,7 @@ handler.all = async function (m) {
   try {
     registerCallListener(this)
 
-    await processCallMessage(
-      this,
-      m
-    )
+    await processCallMessage(this, m)
 
   } catch (error) {
     console.error(

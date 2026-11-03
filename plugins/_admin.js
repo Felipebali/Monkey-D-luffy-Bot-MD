@@ -3,10 +3,10 @@
  * 📂 plugins/noadmin.js
  * 🤖 WHATSAPP-BOT — NO HAY ADMIN 😂
  *
- * 😂 Respuestas automáticas
- * 👑 Diferencia OWNERS
- * 🛡️ Diferencia ADMINS
- * 👤 Respuestas para usuarios
+ * 👤 Respuestas para usuarios normales
+ * 👑 Respuestas especiales para OWNERS
+ * 🛡️ Ignora administradores del grupo
+ * 🚫 Ignora el comando .admins
  * 🔎 Detecta variantes de "admin"
  * 🔄 Evita respuestas repetidas
  * ⏳ Cooldown de 15 segundos
@@ -56,29 +56,6 @@ const RESPUESTAS = {
     '👀 Otra vez con el tema del admin, qué pesados.'
   ],
 
-  admin: [
-    '😂 ¿Y vos sos admin, rompe huevo?',
-    '💀 Pero si ya sos admin, ¿qué más querés?',
-    '🤣 ¿No te alcanza con el poder que tenés?',
-    '🙄 Administrador y todavía molestando.',
-    '🤡 ¿Querés ser dueño del grupo también?',
-    '😂 Cerrá el trámite, que ya tenés admin.',
-    '🐒 ¿Qué sigue? ¿Pedir ser dueño de WhatsApp?',
-    '😎 Sos admin, no el presidente del grupo.',
-    '🤣 Dejá de romper las bolas, que ya tenés corona.',
-    '💅 Otro privilegio más querés, rompe huevo.',
-    '🚨 ADMIN DETECTADO: nivel de rompebolas elevado.',
-    '😂 ¿No tenés un grupo que administrar?',
-    '🤖 Administrador hablando de administración, qué novedad.',
-    '💀 Mucho admin y pocas ganas de trabajar.',
-    '🤣 Mirá quién apareció, el gerente del grupo.',
-    '👑 Tranquilo, rey, que la corona no se te cae.',
-    '😂 ¿Querés que te demos admin dos veces?',
-    '🙄 Administrá algo en vez de hablar tanto.',
-    '🐒 El admin más rompehuevos del condado.',
-    '💅 Bajale un cambio, señor administrador.'
-  ],
-
   owner: [
     '👑 ¿Y vos sos owner, qué más querés, rompe huevo? 😂',
     '🤣 Hasta el dueño viene a hablar de admin.',
@@ -126,18 +103,18 @@ function mismoJid(a, b, conn) {
   const primero = normalizarJid(a, conn)
   const segundo = normalizarJid(b, conn)
 
+  if (!primero || !segundo) return false
   if (primero === segundo) return true
 
   const tipoA = primero.split('@')[1]
   const tipoB = segundo.split('@')[1]
 
-  // Comparar números solo si ambos son JID telefónicos.
-  // Un LID no es un número de teléfono.
-  const telefonico = tipo =>
+  const esTelefonico = tipo =>
     tipo === 's.whatsapp.net' ||
     tipo === 'c.us'
 
-  if (telefonico(tipoA) && telefonico(tipoB)) {
+  // Un LID no equivale directamente a un teléfono
+  if (esTelefonico(tipoA) && esTelefonico(tipoB)) {
     return obtenerNumero(primero) === obtenerNumero(segundo)
   }
 
@@ -145,7 +122,7 @@ function mismoJid(a, b, conn) {
 }
 
 // ============================================================
-// 👑 DETECTAR OWNER
+// 👑 DETECTAR OWNERS
 // ============================================================
 
 function esOwner(m, conn) {
@@ -179,7 +156,7 @@ function esOwner(m, conn) {
 }
 
 // ============================================================
-// 🛡️ DETECTAR ADMINISTRADOR
+// 🛡️ DETECTAR ADMINISTRADORES
 // ============================================================
 
 async function esAdmin(m, conn, participants = []) {
@@ -192,12 +169,18 @@ async function esAdmin(m, conn, participants = []) {
 
   let miembros = participants
 
+  // Consultar metadatos si no se proporcionaron
   if (!Array.isArray(miembros) || !miembros.length) {
     try {
       const metadata = await conn.groupMetadata(m.chat)
       miembros = metadata.participants || []
-    } catch {
-      miembros = []
+    } catch (error) {
+      console.error(
+        '[NOADMIN] Error al consultar administradores:',
+        error
+      )
+
+      return null
     }
   }
 
@@ -214,10 +197,13 @@ async function esAdmin(m, conn, participants = []) {
     )
   })
 
+  // No responder si no se puede verificar el rol
+  if (!participante) return null
+
   return (
-    participante?.admin === 'admin' ||
-    participante?.admin === 'superadmin' ||
-    participante?.admin === 'owner'
+    participante.admin === 'admin' ||
+    participante.admin === 'superadmin' ||
+    participante.admin === 'owner'
   )
 }
 
@@ -237,7 +223,15 @@ function obtenerTexto(m) {
 }
 
 // ============================================================
-// 🔍 DETECTAR LA PALABRA ADMIN
+// 🚫 IGNORAR EL COMANDO .admins
+// ============================================================
+
+function esComandoAdmins(texto) {
+  return /^\s*\.admins(?:\s|$)/i.test(texto)
+}
+
+// ============================================================
+// 🔍 DETECTAR PALABRAS RELACIONADAS CON ADMIN
 // ============================================================
 
 function contieneAdmin(texto) {
@@ -246,8 +240,6 @@ function contieneAdmin(texto) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
 
-  // Detecta palabras relacionadas con admin.
-  // No activa por palabras como "admirar".
   const patron =
     /(?:^|[^\p{L}\p{N}])(?:admin(?:s|es)?|admi|adm|administrador(?:a|es|as)?|administracion|administrativo(?:s|as)?|administrativa(?:s)?)(?=$|[^\p{L}\p{N}])/iu
 
@@ -261,7 +253,8 @@ function contieneAdmin(texto) {
 function elegirRespuesta(tipo, chat) {
   const lista = RESPUESTAS[tipo] || RESPUESTAS.usuario
 
-  const anterior = ultimasRespuestas.get(`${chat}:${tipo}`)
+  const clave = `${chat}:${tipo}`
+  const anterior = ultimasRespuestas.get(clave)
 
   const disponibles = lista.filter(frase =>
     frase !== anterior
@@ -275,7 +268,7 @@ function elegirRespuesta(tipo, chat) {
     Math.floor(Math.random() * opciones.length)
   ]
 
-  ultimasRespuestas.set(`${chat}:${tipo}`, respuesta)
+  ultimasRespuestas.set(clave, respuesta)
 
   return respuesta
 }
@@ -300,44 +293,81 @@ function tieneCooldown(chat, sender) {
 }
 
 // ============================================================
-// 🤖 EJECUTAR DETECCIÓN
+// 🤖 DETECCIÓN AUTOMÁTICA
 // ============================================================
 
 async function ejecutarNoAdmin(m, conn, participants = []) {
   try {
+    // Solo grupos
     if (!m?.isGroup) return
+
+    // Ignorar mensajes del bot
     if (m.fromMe || m.key?.fromMe) return
+
+    // ========================================================
+    // 📝 OBTENER TEXTO
+    // ========================================================
 
     const texto = obtenerTexto(m)
 
     if (!texto) return
+
+    // ========================================================
+    // 🚫 IGNORAR .admins
+    // ========================================================
+
+    // Ignora:
+    // .admins
+    // .admins aviso
+    // .admins quiero admin
+    // .ADMINS cualquier mensaje
+
+    if (esComandoAdmins(texto)) return
+
+    // ========================================================
+    // 🔎 DETECTAR ADMIN
+    // ========================================================
+
     if (!contieneAdmin(texto)) return
 
-    const sender = m.sender || m.key?.participant || ''
-
-    // Evitar spam de respuestas
-    if (tieneCooldown(m.chat, sender)) return
+    const sender =
+      m.sender ||
+      m.key?.participant ||
+      ''
 
     // ========================================================
-    // 👑 IDENTIFICAR TIPO DE USUARIO
+    // 👑 IDENTIFICAR OWNER
     // ========================================================
 
-    let tipo = 'usuario'
+    const owner = esOwner(m, conn)
 
-    if (esOwner(m, conn)) {
-      tipo = 'owner'
-    } else if (await esAdmin(m, conn, participants)) {
-      tipo = 'admin'
+    // ========================================================
+    // 🛡️ IGNORAR ADMINISTRADORES
+    // ========================================================
+
+    if (!owner) {
+      const admin = await esAdmin(m, conn, participants)
+
+      // Ignora admins y roles que no pudo verificar
+      if (admin !== false) return
     }
 
     // ========================================================
-    // 😂 GENERAR RESPUESTA
+    // ⏳ COOLDOWN
     // ========================================================
+
+    if (tieneCooldown(m.chat, sender)) return
+
+    // ========================================================
+    // 😂 ELEGIR RESPUESTA
+    // ========================================================
+
+    const tipo = owner ? 'owner' : 'usuario'
 
     const respuesta = elegirRespuesta(tipo, m.chat)
 
     // ========================================================
-    // 📤 RESPONDER CITANDO
+    // 📤 ENVIAR RESPUESTA
     // ========================================================
 
     await conn.sendMessage(
@@ -371,9 +401,9 @@ handler.all = async function (m) {
   return ejecutarNoAdmin(m, this)
 }
 
-// No requiere prefijo
+// Reconocimiento de palabras sin prefijo
 handler.customPrefix =
-  /\b(admin|admines|administrador|administradora|administradores|administradoras|administracion|admi|adm)\b/i
+  /\b(admin|admins|admines|administrador|administradora|administradores|administradoras|administracion|admi|adm)\b/i
 
 handler.command = /^$/
 

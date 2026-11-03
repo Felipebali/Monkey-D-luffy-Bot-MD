@@ -373,7 +373,7 @@ handler.all = async function (m) {
 
 // No requiere prefijo
 handler.customPrefix =
-  /\b(admin|admins|admines|administrador|administradora|administradores|administradoras|administracion|admi|adm)\b/i
+  /\b(admin|admines|administrador|administradora|administradores|administradoras|administracion|admi|adm)\b/i
 
 handler.command = /^$/
 

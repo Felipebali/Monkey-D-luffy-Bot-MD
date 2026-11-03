@@ -84,7 +84,7 @@ const handler = async (m, { conn, groupMetadata, isBotAdmin, isAdmin, text }) =>
           })
           .filter(Boolean)
       )
-    ].slice(0, 2)
+    ].slice(0, 1)
 
     const sender = normalizeJid(m.sender)
     const senderNumber = normalizeNumber(sender)

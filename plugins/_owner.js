@@ -3,13 +3,14 @@
  * 📂 plugins/owner.js
  * 👑 WHATSAPP-BOT — OWNERS PREMIUM
  *
- * 🥶 Pipe — Creador principal
- * 🩷 Angee — Segunda propietaria
+ * 🩷 Angee — Owner principal
+ * 🥶 Pipe — Creador y segundo owner
  *
  * ✅ Dos propietarios
- * ✅ Frase personalizada para cada uno
+ * ✅ Angee aparece primero
+ * ✅ Frases personalizadas
  * ✅ Menciones clickeables
- * ✅ Números obtenidos de global.owner
+ * ✅ Números desde global.owner
  *
  * Baileys ES Modules
  */
@@ -21,9 +22,11 @@
 function normalizar(valor) {
   if (!valor) return ''
 
-  if (Array.isArray(valor)) valor = valor[0]
+  if (Array.isArray(valor)) {
+    valor = valor[0]
+  }
 
-  if (typeof valor === 'object') {
+  if (typeof valor === 'object' && valor !== null) {
     valor =
       valor.id ||
       valor.jid ||
@@ -40,7 +43,7 @@ function normalizar(valor) {
 }
 
 // ============================================================
-// 👑 OBTENER OWNERS
+// 👑 OBTENER LOS DOS OWNERS
 // ============================================================
 
 function obtenerOwners() {
@@ -54,7 +57,10 @@ function obtenerOwners() {
     ...new Set(
       lista
         .map(normalizar)
-        .filter(n => n.length >= 7 && n.length <= 15)
+        .filter(n =>
+          n.length >= 7 &&
+          n.length <= 15
+        )
     )
   ].slice(0, 2)
 }
@@ -69,15 +75,18 @@ const handler = async (m, { conn }) => {
 
   if (owners.length < 2) {
     return m.reply(
-      '❌ Debés configurar a Pipe y Angee en global.owner.'
+      '❌ Debés configurar dos propietarios en global.owner.'
     )
   }
+
+  // Se asume Pipe primero y Angee segunda
+  // en global.owner, pero se muestran invertidos.
 
   const [pipe, angee] = owners
 
   const mentions = [
-    `${pipe}@s.whatsapp.net`,
-    `${angee}@s.whatsapp.net`
+    `${angee}@s.whatsapp.net`,
+    `${pipe}@s.whatsapp.net`
   ]
 
   // ============================================================
@@ -86,25 +95,25 @@ const handler = async (m, { conn }) => {
 
   const texto = `╭━━━〔 👑 *WHATSAPP-BOT* 〕━━━╮
 ┃
-┃ 🥶 *PROPIETARIOS OFICIALES*
+┃ 💠 *PROPIETARIOS OFICIALES*
 ┃
-┣━━━〔 👑 *OWNER PRINCIPAL* 〕━━━
+┣━━━〔 🩷 *OWNER PRINCIPAL* 〕━━━
 ┃
-┃ 🥶 *Pipe*
+┃ 🎀 *Angee*
+┃ 👑 Propietaria principal
+┃ 📱 @${angee}
+┃
+┃ 💬 *Frase de Angee:*
+┃ _No necesito ser perfecta para ser única; mi esencia habla por mí._ 🩷
+┃
+┣━━━〔 🥶 *SEGUNDO OWNER* 〕━━━
+┃
+┃ ✨ *Pipe*
 ┃ 🛡️ Creador y propietario
 ┃ 📱 @${pipe}
 ┃
 ┃ 💬 *Frase de Pipe:*
 ┃ _En silencio, a mi ritmo y a mi manera; no necesito demostrar quién soy._ 🥶
-┃
-┣━━━〔 🩷 *SEGUNDA OWNER* 〕━━━
-┃
-┃ 🎀 *Angee*
-┃ 🛡️ Propietaria y administradora
-┃ 📱 @${angee}
-┃
-┃ 💬 *Frase de Angee:*
-┃ _No necesito ser perfecta para ser única; mi esencia habla por mí._ 🩷
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 

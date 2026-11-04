@@ -5,6 +5,7 @@
  *
  * 👑 Solo owners de global.owner
  * 😂 Descansada con mención, sin citar ni expulsar
+ * 🔗 Enlace actual + 2 grupos adicionales
  */
 
 const handler = async (m, { conn, isBotAdmin }) => {
@@ -14,10 +15,14 @@ const handler = async (m, { conn, isBotAdmin }) => {
     })
   }
 
-  // 👑 Obtener owners desde global.owner
+  // ============================================================
+  // 👑 OBTENER OWNERS
+  // ============================================================
+
   const owners = (global.owner || []).map(owner => {
-    if (Array.isArray(owner)) owner = owner[0]
-    else if (owner && typeof owner === 'object') {
+    if (Array.isArray(owner)) {
+      owner = owner[0]
+    } else if (owner && typeof owner === 'object') {
       owner = owner.id || owner.number || owner.jid || ''
     }
 
@@ -31,10 +36,16 @@ const handler = async (m, { conn, isBotAdmin }) => {
 
   const isOwner = owners.includes(senderNumber)
 
-  // 😂 Descansar al usuario sin citar su mensaje
+  // ============================================================
+  // 😂 USUARIOS SIN PERMISO
+  // ============================================================
+
   if (!isOwner) {
     await conn.sendMessage(m.chat, {
-      react: { text: '☠️', key: m.key }
+      react: {
+        text: '☠️',
+        key: m.key
+      }
     }).catch(() => {})
 
     const descansadas = [
@@ -52,10 +63,16 @@ const handler = async (m, { conn, isBotAdmin }) => {
     const nombre = m.pushName || 'Usuario'
 
     return conn.sendMessage(m.chat, {
-      text: `☠️ @${senderNumber}\n\n💀 *${nombre}*, ${descanso}`,
+      text: `☠️ @${senderNumber}
+
+💀 *${nombre}*, ${descanso}`,
       mentions: [m.sender]
     })
   }
+
+  // ============================================================
+  // 🛡️ VERIFICAR ADMINISTRADOR
+  // ============================================================
 
   if (!isBotAdmin) {
     return conn.sendMessage(m.chat, {
@@ -65,26 +82,31 @@ const handler = async (m, { conn, isBotAdmin }) => {
 
   try {
     await conn.sendMessage(m.chat, {
-      react: { text: '😼', key: m.key }
+      react: {
+        text: '😼',
+        key: m.key
+      }
     }).catch(() => {})
 
-    // 🔗 Enlaces adicionales compartidos anteriormente
+    // ============================================================
+    // 🔗 NUEVOS ENLACES DE GRUPOS
+    // ============================================================
+
     const enlacesExtra = [
       {
         nombre: 'Grupo 1',
-        codigo: 'HwQuzOOfqA8C38ICFG4jq5'
+        codigo: 'HB9qYS377UZARJLypp9MVb'
       },
       {
         nombre: 'Grupo 2',
-        codigo: 'EMFwLDMzjJ0KwUjaYDdSXT'
-      },
-      {
-        nombre: 'Grupo 3',
-        codigo: 'BpNPJrkFY4EDSR4DsOyZMs'
+        codigo: 'DFnfd3Kyd4q8QNRHsj4PEp'
       }
     ]
 
-    // 🔗 Obtener el enlace del grupo actual
+    // ============================================================
+    // 🔗 ENLACE DEL GRUPO ACTUAL
+    // ============================================================
+
     const code = await conn.groupInviteCode(m.chat)
     const metadata = await conn.groupMetadata(m.chat)
 
@@ -100,12 +122,20 @@ const handler = async (m, { conn, isBotAdmin }) => {
       '┣━━━〔 📌 *OTROS GRUPOS* 〕━━━\n' +
       '┃\n'
 
+    // ============================================================
+    // 📌 AGREGAR LOS DOS GRUPOS
+    // ============================================================
+
     for (const grupo of enlacesExtra) {
       texto +=
         `┃ 🔹 *${grupo.nombre}*\n` +
         `┃ https://chat.whatsapp.com/${grupo.codigo}\n` +
         '┃\n'
     }
+
+    // ============================================================
+    // 👑 FRASES PARA OWNERS
+    // ============================================================
 
     const frases = [
       '🐾 A la orden, mi creador.',
@@ -115,24 +145,38 @@ const handler = async (m, { conn, isBotAdmin }) => {
       '🦾 A sus órdenes, comandante.'
     ]
 
-    const frase = frases[Math.floor(Math.random() * frases.length)]
+    const frase = frases[
+      Math.floor(Math.random() * frases.length)
+    ]
 
     texto +=
       '╰━━━━━━━━━━━━━━━━━━━━━━╯\n\n' +
       `${frase}\n` +
       '🐾 *WHATSAPP-BOT — Conectando grupos*'
 
-    // 📩 Enviar sin citar el mensaje del comando
-    return conn.sendMessage(m.chat, { text: texto })
+    // ============================================================
+    // 📩 ENVIAR SIN CITAR
+    // ============================================================
+
+    return conn.sendMessage(m.chat, {
+      text: texto
+    })
 
   } catch (err) {
-    console.error('[LINK] Error obteniendo los enlaces:', err)
+    console.error(
+      '[LINK] Error obteniendo los enlaces:',
+      err
+    )
 
     return conn.sendMessage(m.chat, {
       text: '❗ No pude obtener el enlace actual. Verificá que el bot sea administrador del grupo.'
     })
   }
 }
+
+// ============================================================
+// ⚙️ CONFIGURACIÓN
+// ============================================================
 
 handler.help = ['link', 'glink']
 handler.tags = ['owner']

@@ -1,71 +1,132 @@
-// 📂 plugins/owner.js
-// 👑 WHATSAPP-BOT — OWNER PREMIUM
-// 🥶 Pipe
 
-const handler = async (m, { conn }) => {
-  // Obtener el primer owner de global.owner
-  const owner = Array.isArray(global.owner)
-    ? global.owner[0]
-    : global.owner
+/**
+ * 📂 plugins/owner.js
+ * 👑 WHATSAPP-BOT — OWNERS PREMIUM
+ *
+ * 🥶 Pipe — Creador principal
+ * 🩷 Angee — Segunda propietaria
+ *
+ * ✅ Dos propietarios
+ * ✅ Frase personalizada para cada uno
+ * ✅ Menciones clickeables
+ * ✅ Números obtenidos de global.owner
+ *
+ * Baileys ES Modules
+ */
 
-  const normalizar = (valor) => {
-    if (!valor) return ''
+// ============================================================
+// 🔧 NORMALIZAR NÚMEROS
+// ============================================================
 
-    if (Array.isArray(valor)) {
-      valor = valor[0]
-    }
+function normalizar(valor) {
+  if (!valor) return ''
 
-    if (typeof valor === 'object' && valor !== null) {
-      valor = valor.id || valor.jid || valor.number || valor.numero || ''
-    }
+  if (Array.isArray(valor)) valor = valor[0]
 
-    return String(valor)
-      .trim()
-      .replace(/@s\.whatsapp\.net/gi, '')
-      .replace(/@c\.us/gi, '')
-      .replace(/@lid/gi, '')
-      .replace(/:\d+$/g, '')
-      .replace(/\D/g, '')
+  if (typeof valor === 'object') {
+    valor =
+      valor.id ||
+      valor.jid ||
+      valor.number ||
+      valor.numero ||
+      ''
   }
 
-  const numero = normalizar(owner)
+  return String(valor)
+    .trim()
+    .split('@')[0]
+    .split(':')[0]
+    .replace(/\D/g, '')
+}
 
-  if (!numero || numero.length < 7 || numero.length > 15) {
+// ============================================================
+// 👑 OBTENER OWNERS
+// ============================================================
+
+function obtenerOwners() {
+  const lista = Array.isArray(global.owner)
+    ? global.owner
+    : global.owner
+      ? [global.owner]
+      : []
+
+  return [
+    ...new Set(
+      lista
+        .map(normalizar)
+        .filter(n => n.length >= 7 && n.length <= 15)
+    )
+  ].slice(0, 2)
+}
+
+// ============================================================
+// 📌 COMANDO OWNER
+// ============================================================
+
+const handler = async (m, { conn }) => {
+
+  const owners = obtenerOwners()
+
+  if (owners.length < 2) {
     return m.reply(
-      '❌ No se pudo obtener el número del owner desde global.owner.'
+      '❌ Debés configurar a Pipe y Angee en global.owner.'
     )
   }
 
-  const jid = `${numero}@s.whatsapp.net`
+  const [pipe, angee] = owners
 
-  const texto =
-    `╭━━━〔 👑 WHATSAPP-BOT 〕━━━╮
+  const mentions = [
+    `${pipe}@s.whatsapp.net`,
+    `${angee}@s.whatsapp.net`
+  ]
+
+  // ============================================================
+  // 📝 MENSAJE
+  // ============================================================
+
+  const texto = `╭━━━〔 👑 *WHATSAPP-BOT* 〕━━━╮
 ┃
-┃ 🥶 *OWNER OFICIAL*
+┃ 🥶 *PROPIETARIOS OFICIALES*
 ┃
-┃ ✨ *Pipe*
+┣━━━〔 👑 *OWNER PRINCIPAL* 〕━━━
+┃
+┃ 🥶 *Pipe*
 ┃ 🛡️ Creador y propietario
-┃ 📱 @${numero}
+┃ 📱 @${pipe}
 ┃
-┃ 💬 *Una frase para vos:*
+┃ 💬 *Frase de Pipe:*
 ┃ _En silencio, a mi ritmo y a mi manera; no necesito demostrar quién soy._ 🥶
+┃
+┣━━━〔 🩷 *SEGUNDA OWNER* 〕━━━
+┃
+┃ 🎀 *Angee*
+┃ 🛡️ Propietaria y administradora
+┃ 📱 @${angee}
+┃
+┃ 💬 *Frase de Angee:*
+┃ _No necesito ser perfecta para ser única; mi esencia habla por mí._ 🩷
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-╭━━━〔 💠 SISTEMA 〕━━━╮
-┃ 👤 Propietarios: *1*
+╭━━━〔 💠 *SISTEMA* 〕━━━╮
+┃ 👤 Propietarios: *2*
 ┃ 🔐 Estado: *Configuración activa*
+┃ 🤖 Bot: *WHATSAPP-BOT*
 ╰━━━━━━━━━━━━━━━━━━━━━━╯`
 
   return conn.sendMessage(
     m.chat,
     {
       text: texto,
-      mentions: [jid]
+      mentions
     },
     { quoted: m }
   )
 }
+
+// ============================================================
+// ⚙️ CONFIGURACIÓN
+// ============================================================
 
 handler.command = /^owner$/i
 handler.help = ['owner']

@@ -41,7 +41,7 @@ const DATABASE_DIR = path.join(ROOT, 'database')
 const MEDIA_DB_FILE = path.join(DATABASE_DIR, 'media.json')
 
 const MAX_MEDIA_SIZE = 100 * 1024 * 1024
-const MAX_LIST_ITEMS = 50
+const MAX_LIST_ITEMS = 700
 
 fs.mkdirSync(MEDIA_FOLDER, { recursive: true })
 fs.mkdirSync(DATABASE_DIR, { recursive: true })

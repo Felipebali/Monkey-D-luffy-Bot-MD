@@ -8,13 +8,8 @@
  * 📁 .play3 / .playdoc
  * 📹 .play4 / .playdoc2
  *
- * ✅ Sin dependencias locales de /lib
- * ✅ Node.js 18+
- * ✅ Búsqueda por nombre o URL
- * ✅ API alternativas
- * ✅ Control de solicitudes
- * ✅ Errores controlados
- * ✅ Sin failureHandler ni global.dfail
+ * Node.js 18+
+ * Dependencia: yt-search
  */
 
 import yts from 'yt-search'
@@ -24,42 +19,41 @@ import yts from 'yt-search'
 // ============================================================
 
 const CONFIG = {
-  apiTimeout: 20000,
-  maxAudio: 100 * 1024 * 1024,
-  maxVideo: 200 * 1024 * 1024,
+  apiTimeout: 15000,
+  searchTimeout: 20000,
+  sendTimeout: 90000,
+  cooldown: 5 * 60 * 1000,
   maxDuration: 7 * 60,
-  cooldown: 5 * 60 * 1000
+  maxAudio: 100 * 1024 * 1024,
+  maxVideo: 200 * 1024 * 1024
 }
 
-const solicitudes = new Set()
-const cooldowns = new Map()
+const busy = new Set()
+const lastUsed = new Map()
 
-const AUDIO = new Set([
-  'play', 'musica', 'audio',
-  'play3', 'playdoc'
+const audioCommands = new Set([
+  'play',
+  'musica',
+  'audio',
+  'play3',
+  'playdoc'
 ])
 
-const DOCUMENTOS = new Set([
-  'play3', 'playdoc',
-  'play4', 'playdoc2'
+const documentCommands = new Set([
+  'play3',
+  'playdoc',
+  'play4',
+  'playdoc2'
 ])
 
+const ytId =
+  /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/|embed\/))([\w-]{11})/i
+
 // ============================================================
-// 🛠️ FUNCIONES AUXILIARES
+// 🛠️ UTILIDADES
 // ============================================================
 
-function urlValida(value) {
-  if (typeof value !== 'string') return false
-
-  try {
-    const url = new URL(value)
-    return ['https:', 'http:'].includes(url.protocol)
-  } catch {
-    return false
-  }
-}
-
-function normalizarURL(value, base) {
+function httpUrl(value, base) {
   if (typeof value !== 'string' || !value.trim()) {
     return null
   }
@@ -67,7 +61,7 @@ function normalizarURL(value, base) {
   try {
     const url = new URL(value, base)
 
-    return urlValida(url.href)
+    return ['http:', 'https:'].includes(url.protocol)
       ? url.href
       : null
   } catch {
@@ -75,76 +69,145 @@ function normalizarURL(value, base) {
   }
 }
 
-function extraerURL(data) {
-  if (typeof data === 'string') {
-    return normalizarURL(data)
+function extract(value, kind, depth = 0) {
+  if (!value || depth > 3) return null
+
+  if (typeof value === 'string') {
+    return httpUrl(value)
   }
 
-  if (!data || typeof data !== 'object') {
+  if (typeof value !== 'object') {
     return null
   }
 
   const candidates = [
-    data.download_url_full,
-    data.stream_url_full,
-    data.download_url,
-    data.downloadUrl,
-    data.dl_url,
-    data.dl,
-    data.url,
-    data.link,
-    data.download,
-    data.result?.download,
-    data.result?.url,
-    data.result?.dl_url,
-    data.data?.audio?.url,
-    data.data?.video?.url,
-    data.data?.media?.dl_download,
-    data.data?.download?.url,
-    data.data?.download,
-    data.data?.url
+    value.download_url_full,
+    value.stream_url_full,
+    value.download_url,
+    value.dl_url,
+    value.dl,
+    value.downloadUrl,
+    value.download,
+    value.result?.download,
+    value.result?.dl_url,
+    value.data?.media?.dl_download,
+    value.data?.download?.url,
+    value.data?.download,
+    value.data?.[kind]?.url,
+    value.result?.[kind]?.url,
+    value.url
   ]
 
   for (const item of candidates) {
-    const url = normalizarURL(item)
-    if (url) return url
+    if (typeof item === 'string') {
+      const url = httpUrl(item)
+
+      if (url) return url
+    } else if (
+      item &&
+      typeof item === 'object'
+    ) {
+      const url = extract(
+        item,
+        kind,
+        depth + 1
+      )
+
+      if (url) return url
+    }
   }
 
   return null
 }
 
-function limpiarNombre(texto) {
-  return String(texto || 'archivo')
+function safeName(value) {
+  return String(value || 'archivo')
     .replace(/[\\/:*?"<>|]/g, '')
-    .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 100)
+    .slice(0, 90) || 'archivo'
 }
 
-function duracion(seconds) {
-  const n = Number(seconds) || 0
+function duration(seconds) {
+  const n = Math.max(
+    0,
+    Number(seconds) || 0
+  )
 
-  const min = Math.floor(n / 60)
-  const sec = Math.floor(n % 60)
+  const minutes = Math.floor(n / 60)
+  const secs = Math.floor(n % 60)
 
-  return `${min}:${String(sec).padStart(2, '0')}`
+  return `${minutes}:${String(secs).padStart(2, '0')}`
 }
 
-function espera(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-async function reaccionar(m, emoji) {
+async function react(m, emoji) {
   try {
     await m.react(emoji)
   } catch {}
 }
 
 // ============================================================
-// 🌐 PETICIONES HTTP
+// 📢 ENVIAR AVISOS
 // ============================================================
 
-async function fetchJSON(url) {
+async function notify(conn, m, message) {
+  console.log(
+    '[PLAY] Aviso:',
+    message.replace(/\n/g, ' ').slice(0, 130)
+  )
+
+  try {
+    return await conn.sendMessage(
+      m.chat,
+      { text: message },
+      { quoted: m }
+    )
+  } catch (error) {
+    console.error(
+      '[PLAY] No se pudo enviar aviso:',
+      error?.message || error
+    )
+
+    try {
+      return await m.reply(message)
+    } catch (e) {
+      console.error(
+        '[PLAY] Tampoco funcionó m.reply:',
+        e?.message || e
+      )
+    }
+  }
+}
+
+// ============================================================
+// ⏱️ TIMEOUT
+// ============================================================
+
+async function withTimeout(task, ms, label) {
+  let timer
+
+  try {
+    return await Promise.race([
+      Promise.resolve().then(task),
+
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(
+            new Error(`${label}: tiempo agotado`)
+          ),
+          ms
+        )
+      })
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// ============================================================
+// 🌐 CONSULTAR API
+// ============================================================
+
+async function fetchJson(url) {
   const controller = new AbortController()
 
   const timer = setTimeout(
@@ -162,7 +225,9 @@ async function fetchJSON(url) {
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
+      throw new Error(
+        `HTTP ${response.status}`
+      )
     }
 
     return await response.json()
@@ -172,172 +237,183 @@ async function fetchJSON(url) {
 }
 
 // ============================================================
-// 🔎 BUSCAR VIDEO
+// 🔎 BUSCAR EN YOUTUBE
 // ============================================================
 
-async function buscarVideo(query) {
-  const match = query.match(
-    /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/|embed\/))([a-zA-Z0-9_-]{11})/i
-  )
+async function findVideo(query) {
+  const match = query.match(ytId)
 
   if (match) {
     const url =
       `https://www.youtube.com/watch?v=${match[1]}`
 
-    const resultado = await yts(url)
+    try {
+      const result = await withTimeout(
+        () => yts(url),
+        CONFIG.searchTimeout,
+        'YouTube'
+      )
 
-    const video = resultado.videos?.find(
-      v => v.videoId === match[1]
-    )
+      const video =
+        result?.videos?.find(
+          v => v.videoId === match[1]
+        ) ||
+        result?.videos?.[0]
 
-    return video || {
+      if (video) {
+        return {
+          ...video,
+          url
+        }
+      }
+    } catch (error) {
+      console.warn(
+        '[PLAY] Metadatos no disponibles:',
+        error?.message
+      )
+    }
+
+    return {
       title: `YouTube ${match[1]}`,
       url,
-      seconds: 0,
-      thumbnail:
-        `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`
+      seconds: 0
     }
   }
 
-  const resultado = await yts.search(query)
+  const result = await withTimeout(
+    () => yts.search(query),
+    CONFIG.searchTimeout,
+    'Búsqueda YouTube'
+  )
 
-  if (!resultado.videos?.length) {
+  const video = result?.videos?.[0]
+
+  if (!video?.url) {
     throw new Error(
-      'No encontré resultados para esa búsqueda.'
+      'No encontré resultados en YouTube.'
     )
   }
 
-  return resultado.videos[0]
+  return video
 }
 
 // ============================================================
-// 🎵 PROVEEDORES DE AUDIO
+// 🎵🎬 PROVEEDORES DE DESCARGA
 // ============================================================
 
-function proveedoresAudio(video) {
+function providers(video, kind) {
   const url = encodeURIComponent(video.url)
-  const titulo = encodeURIComponent(video.title)
+
+  const title = encodeURIComponent(
+    video.title || ''
+  )
+
   const key = encodeURIComponent(
     process.env.API_KEY || ''
   )
 
-  const proveedores = [
-    {
-      nombre: 'Mitzuki',
-      url:
-        `https://api.mitzuki.xyz/download/youtube?url=${url}&type=audio&format=mp3&apikey=${key}`
-    },
-    {
-      nombre: 'Mitzuki 2',
-      url:
-        `https://api.mitzuki.xyz/download/youtube2?url=${url}&apikey=${key}`
-    },
-    {
-      nombre: 'DV Yer',
-      url:
-        `https://dv-yer-api.online/ytmp3?mode=link&url=${url}`,
-      base: 'https://dv-yer-api.online'
-    },
-    {
-      nombre: 'Zenkey',
-      url:
-        `https://api.zenkey.my.id/api/download/ytmp3?apikey=zenkey&url=${url}`
-    },
-    {
-      nombre: 'Exonity',
-      url:
-        `https://exonity.tech/api/dl/playmp3?query=${titulo}`
-    }
-  ]
+  const list = kind === 'audio'
+    ? [
+        [
+          'Mitzuki',
+          `https://api.mitzuki.xyz/download/youtube?url=${url}&type=audio&format=mp3&apikey=${key}`
+        ],
+        [
+          'Mitzuki 2',
+          `https://api.mitzuki.xyz/download/youtube2?url=${url}&apikey=${key}`
+        ],
+        [
+          'DV Yer',
+          `https://dv-yer-api.online/ytmp3?mode=link&url=${url}`
+        ],
+        [
+          'Dorratz',
+          `https://api.dorratz.com/v3/ytdl?url=${url}`
+        ],
+        [
+          'Zenkey',
+          `https://api.zenkey.my.id/api/download/ytmp3?apikey=zenkey&url=${url}`
+        ],
+        [
+          'Exonity',
+          `https://exonity.tech/api/dl/playmp3?query=${title}`
+        ]
+      ]
+    : [
+        [
+          'Siputzx',
+          `https://api.siputzx.my.id/api/d/ytmp4?url=${url}`
+        ],
+        [
+          'Neoxr',
+          `https://api.neoxr.eu/api/youtube?url=${url}&type=video&quality=720p&apikey=GataDios`
+        ],
+        [
+          'FGMods',
+          `https://api.fgmods.xyz/api/downloader/ytmp4?url=${url}&apikey=elrebelde21`
+        ],
+        [
+          'Exonity',
+          `https://exonity.tech/api/dl/playmp4?query=${title}`
+        ]
+      ]
 
   if (global.info?.apis) {
-    proveedores.push({
-      nombre: 'Info API',
-      url:
-        `${global.info.apis}/download/ytmp3?url=${url}`
-    })
+    const base = String(
+      global.info.apis
+    ).replace(/\/$/, '')
+
+    const format = kind === 'audio'
+      ? 'ytmp3'
+      : 'ytmp4'
+
+    list.push([
+      'Info API',
+      `${base}/download/${format}?url=${url}`
+    ])
   }
 
-  return proveedores
+  return list
 }
 
 // ============================================================
-// 🎬 PROVEEDORES DE VIDEO
+// 🔗 OBTENER ENLACE DE DESCARGA
 // ============================================================
 
-function proveedoresVideo(video) {
-  const url = encodeURIComponent(video.url)
-  const titulo = encodeURIComponent(video.title)
+async function getDownloadUrl(provider, kind) {
+  const [name, endpoint] = provider
 
-  const proveedores = [
-    {
-      nombre: 'Siputzx',
-      url:
-        `https://api.siputzx.my.id/api/d/ytmp4?url=${url}`
-    },
-    {
-      nombre: 'Neoxr',
-      url:
-        `https://api.neoxr.eu/api/youtube?url=${url}&type=video&quality=720p&apikey=GataDios`
-    },
-    {
-      nombre: 'FGMods',
-      url:
-        `https://api.fgmods.xyz/api/downloader/ytmp4?url=${url}&apikey=elrebelde21`
-    },
-    {
-      nombre: 'Exonity',
-      url:
-        `https://exonity.tech/api/dl/playmp4?query=${titulo}`
-    }
-  ]
+  const data = await fetchJson(endpoint)
 
-  if (global.info?.apis) {
-    proveedores.push({
-      nombre: 'Info API Video',
-      url:
-        `${global.info.apis}/download/ytmp4?url=${url}`
-    })
-  }
-
-  return proveedores
-}
-
-// ============================================================
-// 🔄 OBTENER ENLACE
-// ============================================================
-
-async function obtenerEnlace(proveedor) {
-  const data = await fetchJSON(proveedor.url)
-
-  if (proveedor.nombre === 'DV Yer') {
-    const enlace =
+  if (name === 'DV Yer') {
+    return httpUrl(
       data?.download_url_full ||
       data?.stream_url_full ||
-      data?.url
-
-    return normalizarURL(
-      enlace,
-      proveedor.base
+      data?.url,
+      'https://dv-yer-api.online'
     )
   }
 
-  if (
-    proveedor.nombre === 'Mitzuki 2'
-  ) {
-    return extraerURL(
-      data?.data?.audio?.url || data
+  if (name === 'Dorratz') {
+    const medias = Array.isArray(data?.medias)
+      ? data.medias
+      : []
+
+    const media = medias.find(
+      item => item.extension === 'mp3'
     )
+
+    return httpUrl(media?.url)
   }
 
-  return extraerURL(data)
+  return extract(data, kind)
 }
 
 // ============================================================
 // 📏 CONSULTAR TAMAÑO
 // ============================================================
 
-async function obtenerTamaño(url) {
+async function fileSize(url) {
   const controller = new AbortController()
 
   const timer = setTimeout(
@@ -353,12 +429,12 @@ async function obtenerTamaño(url) {
 
     if (!response.ok) return null
 
-    const size = Number(
+    const n = Number(
       response.headers.get('content-length')
     )
 
-    return Number.isFinite(size) && size > 0
-      ? size
+    return Number.isFinite(n) && n > 0
+      ? n
       : null
   } catch {
     return null
@@ -368,134 +444,148 @@ async function obtenerTamaño(url) {
 }
 
 // ============================================================
-// 📤 ENVIAR MULTIMEDIA
+// 📤 ENVIAR AUDIO O VIDEO
 // ============================================================
 
-async function enviarMultimedia(
+async function sendFile(
   conn,
   m,
   video,
-  enlace,
-  tipo,
-  documento
+  url,
+  kind,
+  document
 ) {
-  const audio = tipo === 'audio'
+  const audio = kind === 'audio'
 
-  const maximo = audio
+  const size = await fileSize(url)
+
+  const limit = audio
     ? CONFIG.maxAudio
     : CONFIG.maxVideo
 
-  const size = await obtenerTamaño(enlace)
-
-  if (size !== null && size > maximo) {
+  if (size && size > limit) {
     throw new Error(
       'El archivo supera el tamaño permitido.'
     )
   }
 
-  const extension = audio ? 'mp3' : 'mp4'
-
-  const mimetype = audio
+  const mime = audio
     ? 'audio/mpeg'
     : 'video/mp4'
 
-  const fileName =
-    `${limpiarNombre(video.title)}.${extension}`
+  const name =
+    `${safeName(video.title)}.${audio ? 'mp3' : 'mp4'}`
 
-  let mensaje
+  const payload = document
+    ? {
+        document: { url },
+        mimetype: mime,
+        fileName: name
+      }
+    : audio
+      ? {
+          audio: { url },
+          mimetype: mime,
+          ptt: false
+        }
+      : {
+          video: { url },
+          mimetype: mime,
+          caption: `🎬 *${video.title}*`
+        }
 
-  if (documento) {
-    mensaje = {
-      document: { url: enlace },
-      mimetype,
-      fileName
-    }
-  } else if (audio) {
-    mensaje = {
-      audio: { url: enlace },
-      mimetype,
-      ptt: false
-    }
-  } else {
-    mensaje = {
-      video: { url: enlace },
-      mimetype,
-      caption: `🎬 *${video.title}*`
-    }
-  }
-
-  await conn.sendMessage(
-    m.chat,
-    mensaje,
-    { quoted: m }
+  return withTimeout(
+    () => conn.sendMessage(
+      m.chat,
+      payload,
+      { quoted: m }
+    ),
+    CONFIG.sendTimeout,
+    'Envío'
   )
 }
 
 // ============================================================
-// 📥 DESCARGA CON RESPALDO
+// 🔄 DESCARGAR CON API ALTERNATIVAS
 // ============================================================
 
-async function descargar(
+async function downloadAndSend(
   conn,
   m,
   video,
-  tipo,
-  documento
+  kind,
+  document
 ) {
-  const proveedores = tipo === 'audio'
-    ? proveedoresAudio(video)
-    : proveedoresVideo(video)
+  const failures = []
 
-  for (const proveedor of proveedores) {
+  for (const provider of providers(video, kind)) {
+    const name = provider[0]
+
     try {
       console.log(
-        `[PLAY] Probando ${proveedor.nombre}`
+        `[PLAY] Consultando ${name}`
       )
 
-      const enlace = await obtenerEnlace(
-        proveedor
+      const url = await getDownloadUrl(
+        provider,
+        kind
       )
 
-      if (!urlValida(enlace)) {
+      if (!url) {
         throw new Error(
-          'La API no devolvió un enlace válido.'
+          'Sin enlace de descarga'
         )
       }
 
       console.log(
-        `[PLAY] Enlace obtenido: ${proveedor.nombre}`
+        `[PLAY] Enlace recibido de ${name}`
       )
 
-      await enviarMultimedia(
+      await sendFile(
         conn,
         m,
         video,
-        enlace,
-        tipo,
-        documento
+        url,
+        kind,
+        document
       )
 
       console.log(
-        `[PLAY] Enviado con ${proveedor.nombre}`
+        `[PLAY] Archivo enviado con ${name}`
       )
 
       return true
-
     } catch (error) {
       console.error(
-        `[PLAY] ${proveedor.nombre}:`,
+        `[PLAY] ${name}:`,
         error?.message || error
       )
 
-      await espera(300)
+      if (
+        String(error?.message).includes(
+          'Envío: tiempo agotado'
+        )
+      ) {
+        // Evitar duplicados si el envío sigue activo.
+        throw error
+      }
+
+      failures.push(
+        `${name}: ${error?.message || error}`
+      )
     }
   }
+
+  console.error(
+    '[PLAY] Proveedores agotados:\n' +
+    failures.join('\n')
+  )
 
   return false
 }
 
 // ============================================================
-// 🤖 HANDLER
+// 🤖 HANDLER PRINCIPAL
 // ============================================================
 
 const handler = async (
@@ -511,14 +601,18 @@ const handler = async (
     isROwner
   }
 ) => {
-  const cmd = String(command).toLowerCase()
+  const cmd = String(
+    command || ''
+  ).toLowerCase()
 
   const query = String(
     text || args.join(' ')
   ).trim()
 
   if (!query) {
-    return m.reply(
+    return notify(
+      conn,
+      m,
       `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
       `🎧 ${usedPrefix}play canción\n` +
       `🎬 ${usedPrefix}play2 video\n` +
@@ -527,161 +621,160 @@ const handler = async (
     )
   }
 
-  const exento = Boolean(
+  const exempt = Boolean(
     isAdmin || isOwner || isROwner
   )
 
   // ========================================================
-  // ⏳ COOLDOWN DE 5 MINUTOS
+  // ⏳ COOLDOWN
   // ========================================================
 
-  if (!exento) {
-    const ultimo = cooldowns.get(m.sender) || 0
-    const restante =
-      CONFIG.cooldown - (Date.now() - ultimo)
+  if (!exempt) {
+    const remaining =
+      CONFIG.cooldown -
+      (Date.now() - (lastUsed.get(m.sender) || 0))
 
-    if (restante > 0) {
-      const minutos = Math.ceil(
-        restante / 60000
-      )
-
-      return m.reply(
-        `⏳ Esperá ${minutos} minuto(s) para volver a usar PLAY.`
+    if (remaining > 0) {
+      return notify(
+        conn,
+        m,
+        `⏳ Esperá ${Math.ceil(remaining / 60000)} minuto(s) para usar PLAY otra vez.`
       )
     }
   }
 
-  if (solicitudes.has(m.sender)) {
-    return m.reply(
-      '⏳ Ya tenés una descarga en proceso.'
+  if (busy.has(m.sender)) {
+    return notify(
+      conn,
+      m,
+      '⏳ Ya tenés una descarga en curso.'
     )
   }
 
-  solicitudes.add(m.sender)
+  busy.add(m.sender)
 
   try {
-    const tipo = AUDIO.has(cmd)
+    const kind = audioCommands.has(cmd)
       ? 'audio'
       : 'video'
 
-    const documento = DOCUMENTOS.has(cmd)
+    const document = documentCommands.has(cmd)
 
-    await reaccionar(m, '🔎')
-
-    // ======================================================
-    // 🔎 BUSCAR
-    // ======================================================
-
-    const video = await buscarVideo(query)
-
-    if (!video?.url) {
-      throw new Error(
-        'No se encontró el contenido.'
-      )
-    }
+    console.log(
+      `[PLAY] Comando ${cmd}, búsqueda: ${query}`
+    )
 
     // ======================================================
-    // ⏰ LÍMITE DE 7 MINUTOS
+    // 📢 AVISAR ANTES DE BUSCAR
     // ======================================================
 
-    const segundos = Number(
+    await notify(
+      conn,
+      m,
+      `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
+      `🔎 Buscando: *${query}*\n` +
+      `⏳ Preparando ${kind === 'audio' ? 'el audio' : 'el video'}, aguardá un momento...`
+    )
+
+    await react(m, '🔎')
+
+    // ======================================================
+    // 🔎 BUSCAR EN YOUTUBE
+    // ======================================================
+
+    const video = await findVideo(query)
+
+    console.log(
+      `[PLAY] Encontrado: ${video.title} (${video.url})`
+    )
+
+    const seconds = Number(
       video.seconds ||
       video.duration?.seconds ||
       0
     )
 
-    if (
-      segundos > 0 &&
-      segundos > CONFIG.maxDuration
-    ) {
-      return m.reply(
-        '⛔ Solo se permiten canciones o videos de hasta 7 minutos.'
+    // ======================================================
+    // ⏰ LÍMITE DE DURACIÓN
+    // ======================================================
+
+    if (seconds > CONFIG.maxDuration) {
+      await react(m, '❌')
+
+      return notify(
+        conn,
+        m,
+        `⛔ El contenido dura ${duration(seconds)}. El máximo permitido es 7 minutos.`
       )
     }
 
     // ======================================================
-    // 📋 INFORMACIÓN
+    // 📥 AVISO DE DESCARGA
     // ======================================================
 
-    const info =
-      `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
-      `📌 *${video.title}*\n` +
-      `⏰ Duración: ${duracion(segundos)}\n` +
-      `📁 Formato: ${tipo}${documento ? ' (documento)' : ''}\n\n` +
-      `⏳ Buscando descarga...`
+    await notify(
+      conn,
+      m,
+      `🎵 *${video.title}*\n` +
+      `⏰ Duración: ${seconds ? duration(seconds) : 'No disponible'}\n` +
+      `📁 Formato: ${kind}${document ? ' (documento)' : ''}\n` +
+      `⏳ Descargando y enviando...`
+    )
 
-    try {
-      await conn.sendMessage(
-        m.chat,
-        {
-          text: info,
-          contextInfo: {
-            externalAdReply: {
-              title: video.title,
-              body: 'WHATSAPP-BOT',
-              thumbnailUrl: video.thumbnail,
-              sourceUrl: video.url,
-              mediaType: 1,
-              showAdAttribution: false
-            }
-          }
-        },
-        { quoted: m }
-      )
-    } catch {
-      await m.reply(info)
-    }
-
-    await reaccionar(m, '⏳')
+    await react(m, '⏳')
 
     // ======================================================
-    // 📥 DESCARGAR Y ENVIAR
+    // 📤 DESCARGAR Y ENVIAR
     // ======================================================
 
-    const enviado = await descargar(
+    const ok = await downloadAndSend(
       conn,
       m,
       video,
-      tipo,
-      documento
+      kind,
+      document
     )
 
-    if (!enviado) {
-      await reaccionar(m, '❌')
+    if (!ok) {
+      await react(m, '❌')
 
-      return m.reply(
-        '❌ No se pudo descargar el archivo. Todas las API disponibles fallaron.'
+      return notify(
+        conn,
+        m,
+        '❌ No se pudo descargar el archivo. Revisá la consola: todas las API fallaron o devolvieron enlaces inválidos.'
       )
     }
 
-    if (!exento) {
-      cooldowns.set(
+    if (!exempt) {
+      lastUsed.set(
         m.sender,
         Date.now()
       )
     }
 
-    await reaccionar(m, '✅')
+    await react(m, '✅')
 
   } catch (error) {
     console.error(
-      '[PLAY] Error:',
+      '[PLAY] Error general:',
       error
     )
 
-    await reaccionar(m, '❌')
+    await react(m, '❌')
 
-    return m.reply(
-      `❌ Error: ${error?.message || 'Error desconocido'}`
+    await notify(
+      conn,
+      m,
+      `❌ No se pudo completar PLAY: ${error?.message || 'Error desconocido'}`
     )
 
   } finally {
-    solicitudes.delete(m.sender)
+    busy.delete(m.sender)
   }
 }
 
 // ============================================================
-// ⚙️ REGISTRO
+// ⚙️ REGISTRO DEL PLUGIN
 // ============================================================
 
 handler.help = [
@@ -701,8 +794,6 @@ handler.tags = ['downloader']
 handler.command =
   /^(play|musica|audio|play2|video|play3|playdoc|play4|playdoc2)$/i
 
-// No se exige registro para evitar que el handler
-// invoque global.dfail('unreg') por este plugin.
 handler.register = false
 
 export default handler

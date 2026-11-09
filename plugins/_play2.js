@@ -520,7 +520,6 @@ const handler = async (
   if (!query) {
     return m.reply(
       `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
-      `🎧 ${usedPrefix}play canción\n` +
       `🎬 ${usedPrefix}play2 video\n` +
       `📁 ${usedPrefix}play3 canción\n` +
       `📹 ${usedPrefix}play4 video`

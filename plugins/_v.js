@@ -1,17 +1,18 @@
 
 /**
  * 📂 plugins/v.js
- * 🎧 WHATSAPP-BOT — RECUPERAR AUDIO
+ * 🎧 WHATSAPP-BOT — RECUPERADOR DE AUDIOS
  *
  * Comando:
  * .v
  *
- * ✅ Responder a un audio
- * ✅ Compatible con audios normales
- * ✅ Intenta procesar audios de una escucha
- * ✅ Envía como audio normal
- * ✅ No guarda archivos
- * ✅ No envía a otros grupos
+ * ✅ Detecta audios normales
+ * ✅ Reconoce contenedores viewOnce
+ * ✅ Reconoce mensajes efímeros
+ * ✅ Descarga mediante Baileys
+ * ✅ Reenvía como audio normal
+ * ✅ Compatible con notas de voz (PTT)
+ * ✅ Diagnóstico de errores
  * 👑 Exclusivo para owners
  *
  * Baileys ES Modules
@@ -22,64 +23,93 @@ import {
 } from '@whiskeysockets/baileys'
 
 // ============================================================
-// 🎧 IDENTIFICAR AUDIO CITADO
+// 🔧 BUSCAR AUDIO EN MENSAJES ANIDADOS
 // ============================================================
 
 function getAudioMessage(quoted) {
   if (!quoted) return null
 
-  const msg = quoted.message || {}
+  const visited = new Set()
 
-  // Audio normal
-  if (msg.audioMessage) {
-    return msg.audioMessage
+  function buscar(obj, depth = 0) {
+    if (
+      !obj ||
+      typeof obj !== 'object' ||
+      depth > 10 ||
+      visited.has(obj)
+    ) {
+      return null
+    }
+
+    visited.add(obj)
+
+    // Audio directo
+    if (obj.audioMessage) {
+      return obj.audioMessage
+    }
+
+    // Audio serializado
+    if (
+      obj.mtype === 'audioMessage' &&
+      obj.msg &&
+      typeof obj.msg === 'object'
+    ) {
+      return obj.msg
+    }
+
+    // Audio dentro de mensaje citado
+    if (
+      obj.type === 'audioMessage' &&
+      obj.content &&
+      typeof obj.content === 'object'
+    ) {
+      return obj.content
+    }
+
+    // Contenedores compatibles
+    const wrappers = [
+      'message',
+      'msg',
+      'ephemeralMessage',
+      'viewOnceMessage',
+      'viewOnceMessageV2',
+      'viewOnceMessageV2Extension',
+      'documentWithCaptionMessage',
+      'deviceSentMessage',
+      'editedMessage',
+      'protocolMessage',
+      'quotedMessage',
+      'contextInfo',
+      'content'
+    ]
+
+    for (const key of wrappers) {
+      if (!obj[key]) continue
+
+      const found = buscar(
+        obj[key],
+        depth + 1
+      )
+
+      if (found) return found
+    }
+
+    return null
   }
 
-  // Audio dentro de mensaje efímero
-  if (
-    msg.ephemeralMessage?.message?.audioMessage
-  ) {
-    return msg.ephemeralMessage.message.audioMessage
-  }
-
-  // Audio de una escucha
-  if (
-    msg.viewOnceMessage?.message?.audioMessage
-  ) {
-    return msg.viewOnceMessage.message.audioMessage
-  }
-
-  if (
-    msg.viewOnceMessageV2?.message?.audioMessage
-  ) {
-    return msg.viewOnceMessageV2.message.audioMessage
-  }
-
-  if (
-    msg.viewOnceMessageV2Extension
-      ?.message?.audioMessage
-  ) {
-    return msg.viewOnceMessageV2Extension
-      .message.audioMessage
-  }
-
-  // Algunos serializers de Baileys
-  if (
-    quoted.mtype === 'audioMessage' &&
-    quoted.msg
-  ) {
-    return quoted.msg
-  }
-
-  return null
+  return buscar(quoted)
 }
 
 // ============================================================
 // 📥 DESCARGAR AUDIO
 // ============================================================
 
-async function downloadAudio(quoted, audioMessage) {
-  // Primer método: descarga del mensaje citado.
+async function downloadAudio(
+  quoted,
+  audioMessage,
+  conn
+) {
+  // Primer intento: método del serializer
   if (typeof quoted.download === 'function') {
     try {
       const result = await quoted.download()
@@ -89,22 +119,31 @@ async function downloadAudio(quoted, audioMessage) {
           ? result
           : Buffer.from(result)
 
-        if (buffer.length) {
+        if (buffer.length > 0) {
           return buffer
         }
       }
+
     } catch (error) {
       console.error(
-        '[V] Descarga directa falló:',
+        '[V] quoted.download falló:',
         error?.message || error
       )
     }
   }
 
-  // Segundo método: descarga desde Baileys.
+  // Segundo intento: descarga directa
+  const options = {}
+
+  if (typeof conn.updateMediaMessage === 'function') {
+    options.reuploadRequest = msg =>
+      conn.updateMediaMessage(msg)
+  }
+
   const stream = await downloadContentFromMessage(
     audioMessage,
-    'audio'
+    'audio',
+    options
   )
 
   const chunks = []
@@ -117,7 +156,41 @@ async function downloadAudio(quoted, audioMessage) {
 }
 
 // ============================================================
-// 👑 COMANDO .V
+// 🔍 DIAGNÓSTICO DE MENSAJE CITADO
+// ============================================================
+
+function debugQuoted(quoted) {
+  try {
+    console.log(
+      '[V] Tipo citado:',
+      quoted?.mtype || 'Desconocido'
+    )
+
+    console.log(
+      '[V] Claves del quoted:',
+      Object.keys(quoted || {})
+    )
+
+    console.log(
+      '[V] Claves del mensaje:',
+      Object.keys(quoted?.message || {})
+    )
+
+    console.log(
+      '[V] Claves de quoted.msg:',
+      Object.keys(quoted?.msg || {})
+    )
+
+  } catch (error) {
+    console.error(
+      '[V] Error de diagnóstico:',
+      error
+    )
+  }
+}
+
+// ============================================================
+// 👑 COMANDO PRINCIPAL
 // ============================================================
 
 const handler = async (m, {
@@ -125,12 +198,14 @@ const handler = async (m, {
   isOwner,
   isROwner
 }) => {
+  // Solo owners
   if (!isOwner && !isROwner) {
     return m.reply(
       '⛔ Solo los propietarios pueden usar este comando.'
     )
   }
 
+  // Verificar mensaje citado
   const quoted = m.quoted
 
   if (!quoted) {
@@ -139,29 +214,40 @@ const handler = async (m, {
     )
   }
 
+  // Buscar audio
   const audioMessage = getAudioMessage(quoted)
 
   if (!audioMessage) {
+    debugQuoted(quoted)
+
     return m.reply(
-      '❌ El mensaje citado no contiene un audio compatible.'
+      '❌ No se detectó un audio compatible en el mensaje citado. Revisá la consola para ver cómo lo recibe Baileys.'
     )
   }
 
+  // Reacción de espera
   try {
     await m.react('⏳')
   } catch {}
 
   try {
+    // Descargar
     const buffer = await downloadAudio(
       quoted,
-      audioMessage
+      audioMessage,
+      conn
     )
 
     if (!buffer?.length) {
-      throw new Error('Audio vacío')
+      throw new Error(
+        'El archivo descargado está vacío.'
+      )
     }
 
-    // Enviar como audio normal.
+    // ========================================================
+    // 🎧 ENVIAR COMO AUDIO NORMAL
+    // ========================================================
+
     await conn.sendMessage(
       m.chat,
       {
@@ -181,10 +267,14 @@ const handler = async (m, {
       await m.react('✅')
     } catch {}
 
+    console.log(
+      `[V] Audio enviado correctamente a ${m.chat}`
+    )
+
   } catch (error) {
     console.error(
-      '[WHATSAPP-BOT / V] Error:',
-      error
+      '[V] Error recuperando audio:',
+      error?.message || error
     )
 
     try {
@@ -192,18 +282,21 @@ const handler = async (m, {
     } catch {}
 
     return m.reply(
-      '❌ No se pudo recuperar el audio. Puede que WhatsApp ya no permita descargarlo o que el archivo haya expirado.'
+      '❌ No se pudo descargar el audio. Puede que haya expirado, ya se haya escuchado o WhatsApp no permita acceder a él.'
     )
   }
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN
+// ⚙️ CONFIGURACIÓN DEL PLUGIN
 // ============================================================
 
 handler.command = /^v$/i
+
 handler.help = ['v']
+
 handler.tags = ['owner']
+
 handler.rowner = true
 
 export default handler

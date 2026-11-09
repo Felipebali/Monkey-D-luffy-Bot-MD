@@ -1,353 +1,200 @@
+//import { youtubedl, youtubedlv2 } from '@bochilteam/scraper'
+import fetch from 'node-fetch';
+import yts from 'yt-search';
+import ytdl from 'ytdl-core';
+import axios from 'axios'; 
+import { savetube } from '../lib/yt-savetube.js'
+import { ogmp3 } from '../lib/youtubedl.js'; 
+const LimitAud = 725 * 1024 * 1024; // 725MB
+const LimitVid = 425 * 1024 * 1024; // 425MB
+const youtubeRegexID = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/;
+const userCaptions = new Map();
+const userRequests = {};
+  
+const handler = async (m, { conn, command, args, text, usedPrefix }) => {
+  if (!text) return m.reply(`*🤔Que está buscando? 🤔*\n*Ingrese el nombre de la canción*\n\n*Ejemplo:*\n${usedPrefix + command} emilia 420`);
+const tipoDescarga = command === 'play' || command === 'musica' ? 'audio' : command === 'play2' ? 'video' : command === 'play3' ? 'audio (documento)' : command === 'play4' ? 'video (documento)' : '';
+if (userRequests[m.sender]) return await conn.reply(m.chat, `⏳ Hey @${m.sender.split('@')[0]} espera pendejo, ya estás descargando algo 🙄\nEspera a que termine tu solicitud actual antes de hacer otra...`, userCaptions.get(m.sender) || m);
+userRequests[m.sender] = true;
+try {
+let videoIdToFind = text.match(youtubeRegexID) || null;
+const yt_play = await search(args.join(' ')); 
+let ytplay2 = await yts(videoIdToFind === null ? text : 'https://youtu.be/' + videoIdToFind[1]);
+if (videoIdToFind) {
+const videoId = videoIdToFind[1];
+ytplay2 = ytplay2.all.find(item => item.videoId === videoId) || ytplay2.videos.find(item => item.videoId === videoId)}
+ytplay2 = ytplay2.all?.[0] || ytplay2.videos?.[0] || ytplay2;
+const PlayText = await conn.sendMessage(m.chat, { text: `${yt_play[0].title}
+*⇄ㅤ     ◁   ㅤ  ❚❚ㅤ     ▷ㅤ     ↻*
 
-/**
- * 📂 plugins/play2.js
- * 🎬 WHATSAPP-BOT — YOUTUBE VIDEO DOWNLOADER
- *
- * Comandos:
- * .play2
- * .ytmp4
- * .video
- * .playv
- */
+*⏰ Duración:* ${secondString(yt_play[0].duration.seconds)}
+*👉🏻Aguarde un momento en lo que envío su ${tipoDescarga}*`,  
+contextInfo:{  
+forwardedNewsletterMessageInfo: { 
+newsletterJid: process.env.CHANNEL_ID, 
+newsletterName: 'LoliBot ✨️' },
+forwardingScore: 9999999,  
+isForwarded: true,   
+mentionedJid: null,  
+externalAdReply: {  
+showAdAttribution: false,  
+renderLargerThumbnail: false,  
+title: yt_play[0].title,   
+body: "LoliBot",
+containsAutoReply: true,  
+mediaType: 1,   
+thumbnailUrl: yt_play[0].thumbnail, 
+sourceUrl: "skyultraplus.com"
+}}}, { quoted: m })
+userCaptions.set(m.sender, PlayText);
 
-import yts from 'yt-search'
-import { LRUCache } from 'lru-cache'
-import axios from 'axios'
+const [input, qualityInput = command === 'play' || command === 'musica' || command === 'play3' ? '320' : '720'] = text.split(' ');
+const audioQualities = ['64', '96', '128', '192', '256', '320'];
+const videoQualities = ['240', '360', '480', '720', '1080'];
+const isAudioCommand = command === 'play' || command === 'musica' || command === 'play3';
+const selectedQuality = (isAudioCommand ? audioQualities : videoQualities).includes(qualityInput) ? qualityInput : (isAudioCommand ? '320' : '720');
+const isAudio = command.toLowerCase().includes('mp3') || command.toLowerCase().includes('audio')
+const format = isAudio ? 'mp3' : '720' 
 
-const cache = new LRUCache({
-  max: 100,
-  ttl: 3600000
-})
+const audioApis = [
+{ url: () => savetube.download(yt_play[0].url, format), extract: (data) => ({ data: data.result.download, isDirect: false }) },
+{ url: () => fetch(`https://api.mitzuki.xyz/download/youtube?url=${encodeURIComponent(yt_play[0].url)}&type=audio&format=mp3&apikey=${process.env.API_KEY}`).then(res => res.json()), extract: (data) => ({ data: data?.data?.media?.dl_download, isDirect: false }) },
+{ url: () => fetch(`https://api.mitzuki.xyz/download/youtube2?url=${encodeURIComponent(yt_play[0].url)}&apikey=${process.env.API_KEY}`).then(res => res.json()), extract: (data) => ({ data: data?.data?.audio?.url isDirect: false }) },
+{ url: () => fetch(`https://dv-yer-api.online/ytmp3?mode=link&url=${encodeURIComponent(yt_play[0].url)}`).then(res => res.json()), extract: (data) => ({ data: data?.download_url_full || data?.stream_url_full || (data?.url ? `https://dv-yer-api.online${d.url}` : null, isDirect: false }) },
+{ url: () => ogmp3.download(yt_play[0].url, selectedQuality, 'audio'), extract: (data) => ({ data: data.result.download, isDirect: false }) },
+{ url: () => fetch(`https://api.dorratz.com/v3/ytdl?url=${yt_play[0].url}`).then(res => res.json()), extract: (data) => { 
+const mp3 = data.medias.find(media => media.quality === "160kbps" && media.extension === "mp3");
+return { data: mp3.url, isDirect: false }}},
+{ url: () => fetch(`https://api.siputzx.my.id/api/d/ytmp4?url=${yt_play[0].url}`).then(res => res.json()), extract: (data) => ({ data: data.dl, isDirect: false }) },
+{ url: () => fetch(`${info.apis}/download/ytmp3?url=${yt_play[0].url}`).then(res => res.json()), extract: (data) => ({ data: data.status ? data.data.download.url : null, isDirect: false }) },
+{ url: () => fetch(`https://api.zenkey.my.id/api/download/ytmp3?apikey=zenkey&url=${yt_play[0].url}`).then(res => res.json()), extract: (data) => ({ data: data.result.download.url, isDirect: false }) },
+{ url: () => fetch(`https://exonity.tech/api/dl/playmp3?query=${yt_play[0].title}`).then(res => res.json()), extract: (data) => ({ data: data.result.download, isDirect: false }) 
+}];
 
-const downloadCache = new LRUCache({
-  max: 50,
-  ttl: 120000
-})
+const videoApis = [
+{ url: () => savetube.download(yt_play[0].url, '720'), extract: (data) => ({ data: data.result.download, isDirect: false }) },
+{ url: () => ogmp3.download(yt_play[0].url, selectedQuality, 'video'), extract: (data) => ({ data: data.result.download, isDirect: false }) },
+{ url: () => fetch(`https://api.siputzx.my.id/api/d/ytmp4?url=${yt_play[0].url}`).then(res => res.json()), extract: (data) => ({ data: data.dl, isDirect: false }) },
+{ url: () => fetch(`https://api.neoxr.eu/api/youtube?url=${yt_play[0].url}&type=video&quality=720p&apikey=GataDios`).then(res => res.json()), extract: (data) => ({ data: data.data.url, isDirect: false }) },
+{ url: () => fetch(`https://api.fgmods.xyz/api/downloader/ytmp4?url=${yt_play[0].url}&apikey=elrebelde21`).then(res => res.json()), extract: (data) => ({ data: data.result.dl_url, isDirect: false }) },
+{ url: () => fetch(`${info.apis}/download/ytmp4?url=${encodeURIComponent(yt_play[0].url)}`).then(res => res.json()), extract: (data) => ({ data: data.status ? data.data.download.url : null, isDirect: false }) },
+{ url: () => fetch(`https://exonity.tech/api/dl/playmp4?query=${encodeURIComponent(yt_play[0].title)}`).then(res => res.json()), extract: (data) => ({ data: data.result.download, isDirect: false })
+}];
 
-const MAX_DURATION_SECONDS = 7 * 60
-const MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024
+const download = async (apis) => {
+let mediaData = null;
+let isDirect = false;
+for (const api of apis) {
+try {
+const data = await api.url();
+const { data: extractedData, isDirect: direct } = api.extract(data);
+if (extractedData) {
+const size = await getFileSize(extractedData);
+if (size >= 1024) {
+mediaData = extractedData;
+isDirect = direct;
+break;
+}}} catch (e) {
+console.log(`Error con API: ${e}`);
+continue;
+}}
+return { mediaData, isDirect };
+};
 
-const cleanText = text => {
-  if (text === null || text === undefined) return ''
-  if (typeof text === 'string') return text.trim()
-  if (typeof text === 'number') return String(text)
+if (command === 'play' || command === 'musica') {
+const { mediaData, isDirect } = await download(audioApis);
+if (mediaData) {
+const fileSize = await getFileSize(mediaData);
+if (fileSize > LimitAud) {
+await conn.sendMessage(m.chat, { document: isDirect ? mediaData : { url: mediaData }, mimetype: 'audio/mpeg', fileName: `${yt_play[0].title}.mp3`, contextInfo: {} }, { quoted: m });
+} else {
+await conn.sendMessage(m.chat, { audio: isDirect ? mediaData : { url: mediaData }, mimetype: 'audio/mpeg', contextInfo: {} }, { quoted: m });
+}} else {
+//await m.react('❌');
+}}
 
-  if (typeof text === 'object') {
-    try {
-      return JSON.stringify(text).trim()
-    } catch {
-      return ''
-    }
+if (command === 'play2' || command === 'video') {
+const { mediaData, isDirect } = await download(videoApis);
+if (mediaData) {
+const fileSize = await getFileSize(mediaData);
+const messageOptions = { fileName: `${yt_play[0].title}.mp4`, caption: `🔰 Aquí está tu video \n🔥 Título: ${yt_play[0].title}`, mimetype: 'video/mp4' };
+if (fileSize > LimitVid) {
+await conn.sendMessage(m.chat, { document: isDirect ? mediaData : { url: mediaData }, ...messageOptions }, { quoted: m });
+} else {
+await conn.sendMessage(m.chat, { video: isDirect ? mediaData : { url: mediaData }, thumbnail: yt_play[0].thumbnail, ...messageOptions }, { quoted: m });
+}} else {
+//await m.react('❌');
+}}
+
+if (command === 'play3' || command === 'playdoc') {
+const { mediaData, isDirect } = await download(audioApis);
+if (mediaData) {
+await conn.sendMessage(m.chat, { document: isDirect ? mediaData : { url: mediaData }, mimetype: 'audio/mpeg', fileName: `${yt_play[0].title}.mp3`, contextInfo: {} }, { quoted: m });
+} else {
+await m.react('❌');
+}}
+
+if (command === 'play4' || command === 'playdoc2') {
+const { mediaData, isDirect } = await download(videoApis);
+if (mediaData) {
+await conn.sendMessage(m.chat, { document: isDirect ? mediaData : { url: mediaData }, fileName: `${yt_play[0].title}.mp4`, caption: `🔰Título: ${yt_play[0].title}`, thumbnail: yt_play[0].thumbnail, mimetype: 'video/mp4'}, { quoted: m })
+} else {
+//await m.react('❌');
+}}
+} catch (error) {
+console.error(error);
+m.react("❌️")
+} finally {
+delete userRequests[m.sender]; 
+}}
+handler.help = ['play', 'play2', 'play3', 'play4', 'playdoc'];
+handler.tags = ['downloader'];
+handler.command = ['play', 'play2', 'play3', 'play4', 'audio', 'video', 'playdoc', 'playdoc2', 'musica'];
+handler.register = true;
+export default handler;
+
+async function search(query, options = {}) {
+const search = await yts.search({query, hl: 'es', gl: 'ES', ...options});
+return search.videos;
+}
+
+function MilesNumber(number) {
+const exp = /(\d)(?=(\d{3})+(?!\d))/g;
+const rep = '$1.';
+const arr = number.toString().split('.');
+arr[0] = arr[0].replace(exp, rep);
+return arr[1] ? arr.join('.') : arr[0];
+}
+
+function secondString(seconds) {
+seconds = Number(seconds);
+const d = Math.floor(seconds / (3600 * 24));
+const h = Math.floor((seconds % (3600 * 24)) / 3600);
+const m = Math.floor((seconds % 3600) / 60);
+const s = Math.floor(seconds % 60);
+const dDisplay = d > 0 ? d + (d == 1 ? ' día, ' : ' días, ') : '';
+const hDisplay = h > 0 ? h + (h == 1 ? ' hora, ' : ' horas, ') : '';
+const mDisplay = m > 0 ? m + (m == 1 ? ' minuto, ' : ' minutos, ') : '';
+const sDisplay = s > 0 ? s + (s == 1 ? ' segundo' : ' segundos') : '';
+return dDisplay + hDisplay + mDisplay + sDisplay;
   }
-
-  return String(text).trim()
-}
-
-const formatViews = views =>
-  views >= 1e9 ? (views / 1e9).toFixed(1) + 'B' :
-  views >= 1e6 ? (views / 1e6).toFixed(1) + 'M' :
-  views >= 1e3 ? (views / 1e3).toFixed(1) + 'K' :
-  String(views)
-
-const emitProgress = (msgId, step, extraData = {}) => {
-  if (!msgId) return
-
-  queueMicrotask(() => {
-    global.broadcast?.('cmd_progress', {
-      id: msgId,
-      step,
-      ...extraData
-    })
-  })
-}
-
-const getBuffer = async (url, timeoutMs = 60000) => {
+  
+const getBuffer = async (url) => {
   try {
-    const res = await axios.get(url, {
-      responseType: 'arraybuffer',
-      timeout: timeoutMs,
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
-      }
-    })
-
-    return Buffer.from(res.data)
+    const response = await fetch(url);
+    const buffer = await response.arrayBuffer();
+    return Buffer.from(buffer);
   } catch (error) {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-
-    try {
-      const res = await fetch(url, {
-        signal: controller.signal
-      })
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-
-      return Buffer.from(await res.arrayBuffer())
-    } finally {
-      clearTimeout(timeoutId)
-    }
+    console.error("Error al obtener el buffer", error);
+    throw new Error("Error al obtener el buffer");
   }
 }
 
-const extractVideoUrl = data => {
-  const candidate =
-    data?.data?.download ||
-    data?.data?.dl_url ||
-    data?.url ||
-    data?.dl ||
-    data?.datos?.url ||
-    data?.result?.download ||
-    data?.result?.url ||
-    (typeof data?.download === 'object'
-      ? data?.download?.url
-      : data?.download)
-
-  if (
-    !candidate ||
-    typeof candidate !== 'string' ||
-    !candidate.startsWith('http')
-  ) {
-    throw new Error('La API no devolvió una URL de video válida.')
-  }
-
-  return candidate
-}
-
-const getVideoDownloadUrl = async (link, msgId) => {
-  const cacheKey = link.toLowerCase()
-  const cached = downloadCache.get(cacheKey)
-
-  if (cached) return cached
-
-  const api =
-    `https://api.ryuzei.xyz/download/ytvideo?url=${encodeURIComponent(link)}`
-
-  emitProgress(msgId, 'requesting_api', {
-    apiIndex: 1,
-    totalApis: 1
-  })
-
-  const res = await axios.get(api, {
-    timeout: 20000,
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-      Accept: 'application/json'
-    }
-  })
-
-  const downloadUrl = extractVideoUrl(res.data)
-
-  downloadCache.set(cacheKey, downloadUrl)
-
-  return downloadUrl
-}
-
-const handler = async (m, { conn, text, usedPrefix, command }) => {
-  const prefix = usedPrefix || '.'
-  const msgId = m.key?.id || m.id
-
+async function getFileSize(url) {
   try {
-    const query = cleanText(text)
-
-    if (!query) {
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-            `ꕤ Ingresa el título o enlace del video a buscar ✰\n\n` +
-            `> ꕤ *Ejemplo:* ${prefix}${command} Kamikaze - Víctor Mendivil`
-        },
-        { quoted: m }
-      )
-    }
-
-    emitProgress(msgId, 'search_started', { query })
-
-    let searchQuery = query
-
-    const urlMatch = query.match(
-      /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/|v\/))([a-zA-Z0-9_-]{11})/
-    )
-
-    if (urlMatch) {
-      searchQuery = `https://youtu.be/${urlMatch[1]}`
-    }
-
-    const cacheKey = searchQuery.toLowerCase()
-    let video = cache.get(cacheKey)
-
-    if (!video) {
-      const searchResult = await yts(searchQuery)
-
-      if (!searchResult?.videos?.length) {
-        emitProgress(msgId, 'no_results', { query })
-
-        return conn.sendMessage(
-          m.chat,
-          {
-            text:
-              `ׄ ✿ No se encontraron resultados para *${query}*.\n` +
-              'Intenta con otro nombre o enlace.'
-          },
-          { quoted: m }
-        )
-      }
-
-      // Si se pasó un enlace, priorizar el video correspondiente.
-      video = urlMatch
-        ? searchResult.videos.find(v => v.videoId === urlMatch[1]) ||
-          searchResult.videos[0]
-        : searchResult.videos[0]
-
-      const videoId = video.videoId || (urlMatch ? urlMatch[1] : '')
-
-      video = {
-        ...video,
-        link: video.url || `https://youtu.be/${videoId}`,
-        thumb:
-          video.thumbnail ||
-          video.image ||
-          `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
-      }
-
-      cache.set(cacheKey, video)
-
-      if (videoId) {
-        cache.set(videoId, video)
-        cache.set(video.link.toLowerCase(), video)
-      }
-    }
-
-    if (
-      typeof video.seconds === 'number' &&
-      video.seconds > MAX_DURATION_SECONDS
-    ) {
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-            `ׄ ✿ El video dura *${video.timestamp || video.duration}*, ` +
-            'superando el límite máximo permitido de *7 minutos*.'
-        },
-        { quoted: m }
-      )
-    }
-
-    const videoUrl = cleanText(video.link || video.url)
-    const title = cleanText(video.title) || 'Sin título'
-    const thumb = cleanText(video.thumb || video.thumbnail || video.image)
-    const channel = cleanText(video.author?.name || video.author) || 'Desconocido'
-    const views = typeof video.views === 'number' ? video.views : 0
-    const duration = cleanText(video.timestamp || video.duration || '')
-
-    emitProgress(msgId, 'media_found', {
-      title,
-      duration,
-      channel,
-      videoUrl
-    })
-
-    const caption =
-      `﹒𝜗ৎ ࣪ *${title}*\n\n` +
-      `ׅ ׄ ✿ *Canal* » ${channel}\n` +
-      `ׅ ׄ ✿ *Vistas* » ${formatViews(views)}\n` +
-      `ׅ ׄ ✿ *Tiempo* » ${duration}\n` +
-      `ׅ ׄ ✿ *Link* » ${videoUrl}\n\n` +
-      'ׅ ׄ ✿ *¡Enviando video, por favor espera!*'
-
-    emitProgress(msgId, 'fetching_thumbnail')
-
-    // Iniciar la obtención del enlace mientras se procesa la miniatura.
-    const downloadUrlPromise = getVideoDownloadUrl(videoUrl, msgId)
-
-    let thumbBuffer = null
-
-    if (thumb) {
-      try {
-        thumbBuffer = await getBuffer(thumb, 10000)
-      } catch {}
-    }
-
-    if (thumbBuffer) {
-      await conn.sendMessage(
-        m.chat,
-        {
-          image: thumbBuffer,
-          caption
-        },
-        { quoted: m }
-      )
-    } else {
-      await conn.sendMessage(
-        m.chat,
-        { text: caption },
-        { quoted: m }
-      )
-    }
-
-    emitProgress(msgId, 'thumbnail_sent')
-
-    const downloadUrl = await downloadUrlPromise
-
-    emitProgress(msgId, 'downloading_video_stream')
-
-    const videoBuffer = await getBuffer(downloadUrl)
-
-    if (videoBuffer.length > MAX_FILE_SIZE_BYTES) {
-      const sizeMb = (videoBuffer.length / (1024 * 1024)).toFixed(1)
-
-      return conn.sendMessage(
-        m.chat,
-        {
-          text:
-            `ׄ ✿ El video pesa *${sizeMb} MB*, ` +
-            'superando el límite máximo permitido de *30 MB*.'
-        },
-        { quoted: m }
-      )
-    }
-
-    emitProgress(msgId, 'sending_video_to_whatsapp')
-
-    const result = await conn.sendMessage(
-      m.chat,
-      {
-        video: videoBuffer,
-        mimetype: 'video/mp4',
-        caption: `> ✦ *${title}*`,
-        fileName: `${title.replace(/[\\/:*?"<>|]/g, '_')}.mp4`
-      },
-      { quoted: m }
-    )
-
-    emitProgress(msgId, 'completed', { title })
-
-    return result
-  } catch (error) {
-    console.error('[PLAY2] Error:', error)
-
-    emitProgress(msgId, 'error', {
-      error: error.message || String(error)
-    })
-
-    return conn.sendMessage(
-      m.chat,
-      {
-        text:
-          `《✧》 Ocurrió un error:\n\n` +
-          `❒ *${error.message || error}*\n\n` +
-          '> *Error al procesar la solicitud*'
-      },
-      { quoted: m }
-    )
+    const response = await fetch(url, { method: 'HEAD' });
+    return parseInt(response.headers.get('content-length') || 0);
+  } catch {
+    return 0; // Si falla, asumimos 0
   }
 }
-
-handler.help = ['play2 <título o enlace>', 'ytmp4 <título o enlace>', 'video <título o enlace>', 'playv <título o enlace>']
-handler.tags = ['downloader']
-handler.command = ['play2', 'ytmp4', 'video', 'playv']
-
-export default handler

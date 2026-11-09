@@ -1,16 +1,20 @@
 
 /**
  * 📂 plugins/_play2.js
- * 🤖 WHATSAPP-BOT — PLAY AUDIO Y VIDEO
+ * 🤖 WHATSAPP-BOT — PLAY MULTIMEDIA
  *
- * Comandos:
- * .play / .musica / .audio
- * .play2 / .video
- * .play3 / .playdoc
- * .play4 / .playdoc2
+ * 🎵 .play / .musica / .audio
+ * 🎬 .play2 / .video
+ * 📁 .play3 / .playdoc
+ * 📹 .play4 / .playdoc2
  *
- * No requiere archivos adicionales en /lib.
- * Requiere: yt-search y Node.js >= 18.
+ * ✅ Sin dependencias locales de /lib
+ * ✅ Node.js 18+
+ * ✅ Búsqueda por nombre o URL
+ * ✅ API alternativas
+ * ✅ Control de solicitudes
+ * ✅ Errores controlados
+ * ✅ Sin failureHandler ni global.dfail
  */
 
 import yts from 'yt-search'
@@ -19,22 +23,20 @@ import yts from 'yt-search'
 // ⚙️ CONFIGURACIÓN
 // ============================================================
 
-const API_TIMEOUT = 20000
-const SEND_TIMEOUT = 90000
-
-const MAX_AUDIO = 100 * 1024 * 1024
-const MAX_VIDEO = 200 * 1024 * 1024
+const CONFIG = {
+  apiTimeout: 20000,
+  maxAudio: 100 * 1024 * 1024,
+  maxVideo: 200 * 1024 * 1024,
+  maxDuration: 7 * 60,
+  cooldown: 5 * 60 * 1000
+}
 
 const solicitudes = new Set()
+const cooldowns = new Map()
 
 const AUDIO = new Set([
   'play', 'musica', 'audio',
   'play3', 'playdoc'
-])
-
-const VIDEO = new Set([
-  'play2', 'video',
-  'play4', 'playdoc2'
 ])
 
 const DOCUMENTOS = new Set([
@@ -43,63 +45,111 @@ const DOCUMENTOS = new Set([
 ])
 
 // ============================================================
-// 🛠️ UTILIDADES
+// 🛠️ FUNCIONES AUXILIARES
 // ============================================================
 
-function nombreSeguro(texto) {
-  return String(texto || 'Audio')
-    .replace(/[\\/:*?"<>|]/g, '')
-    .trim()
-    .slice(0, 100)
-}
-
-function duracion(segundos) {
-  const n = Number(segundos) || 0
-  const m = Math.floor(n / 60)
-  const s = Math.floor(n % 60)
-
-  return `${m}:${String(s).padStart(2, '0')}`
-}
-
-function enlaceValido(valor) {
-  if (typeof valor !== 'string') return false
+function urlValida(value) {
+  if (typeof value !== 'string') return false
 
   try {
-    const u = new URL(valor)
-    return ['http:', 'https:'].includes(u.protocol)
+    const url = new URL(value)
+    return ['https:', 'http:'].includes(url.protocol)
   } catch {
     return false
   }
 }
 
-function urlNormalizada(valor, base) {
-  if (typeof valor !== 'string' || !valor.trim()) {
+function normalizarURL(value, base) {
+  if (typeof value !== 'string' || !value.trim()) {
     return null
   }
 
   try {
-    const u = new URL(valor, base)
-    return enlaceValido(u.href) ? u.href : null
+    const url = new URL(value, base)
+
+    return urlValida(url.href)
+      ? url.href
+      : null
   } catch {
     return null
   }
 }
 
-function timeoutPromise(ms, mensaje) {
-  return new Promise((_, reject) => {
-    setTimeout(
-      () => reject(new Error(mensaje)),
-      ms
-    )
-  })
+function extraerURL(data) {
+  if (typeof data === 'string') {
+    return normalizarURL(data)
+  }
+
+  if (!data || typeof data !== 'object') {
+    return null
+  }
+
+  const candidates = [
+    data.download_url_full,
+    data.stream_url_full,
+    data.download_url,
+    data.downloadUrl,
+    data.dl_url,
+    data.dl,
+    data.url,
+    data.link,
+    data.download,
+    data.result?.download,
+    data.result?.url,
+    data.result?.dl_url,
+    data.data?.audio?.url,
+    data.data?.video?.url,
+    data.data?.media?.dl_download,
+    data.data?.download?.url,
+    data.data?.download,
+    data.data?.url
+  ]
+
+  for (const item of candidates) {
+    const url = normalizarURL(item)
+    if (url) return url
+  }
+
+  return null
 }
 
-async function jsonAPI(url) {
+function limpiarNombre(texto) {
+  return String(texto || 'archivo')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 100)
+}
+
+function duracion(seconds) {
+  const n = Number(seconds) || 0
+
+  const min = Math.floor(n / 60)
+  const sec = Math.floor(n % 60)
+
+  return `${min}:${String(sec).padStart(2, '0')}`
+}
+
+function espera(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function reaccionar(m, emoji) {
+  try {
+    await m.react(emoji)
+  } catch {}
+}
+
+// ============================================================
+// 🌐 PETICIONES HTTP
+// ============================================================
+
+async function fetchJSON(url) {
   const controller = new AbortController()
 
   const timer = setTimeout(
     () => controller.abort(),
-    API_TIMEOUT
+    CONFIG.apiTimeout
   )
 
   try {
@@ -122,273 +172,193 @@ async function jsonAPI(url) {
 }
 
 // ============================================================
-// 🔍 BUSCAR EN YOUTUBE
+// 🔎 BUSCAR VIDEO
 // ============================================================
 
-async function buscar(query) {
-  const id = query.match(
-    /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/))([a-zA-Z0-9_-]{11})/i
+async function buscarVideo(query) {
+  const match = query.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/|embed\/))([a-zA-Z0-9_-]{11})/i
   )
 
-  if (id) {
-    const url = `https://www.youtube.com/watch?v=${id[1]}`
+  if (match) {
+    const url =
+      `https://www.youtube.com/watch?v=${match[1]}`
 
     const resultado = await yts(url)
 
-    return resultado.videos?.[0] || {
-      title: `YouTube ${id[1]}`,
+    const video = resultado.videos?.find(
+      v => v.videoId === match[1]
+    )
+
+    return video || {
+      title: `YouTube ${match[1]}`,
       url,
       seconds: 0,
       thumbnail:
-        `https://img.youtube.com/vi/${id[1]}/hqdefault.jpg`
+        `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`
     }
   }
 
   const resultado = await yts.search(query)
 
   if (!resultado.videos?.length) {
-    throw new Error('No encontré resultados.')
+    throw new Error(
+      'No encontré resultados para esa búsqueda.'
+    )
   }
 
   return resultado.videos[0]
 }
 
 // ============================================================
-// 🔗 EXTRAER ENLACE DE DESCARGA
+// 🎵 PROVEEDORES DE AUDIO
 // ============================================================
 
-function extraer(data) {
-  if (typeof data === 'string') {
-    return urlNormalizada(data)
-  }
-
-  if (!data || typeof data !== 'object') {
-    return null
-  }
-
-  const opciones = [
-    data.download_url_full,
-    data.stream_url_full,
-    data.download_url,
-    data.downloadUrl,
-    data.dl_url,
-    data.dl,
-    data.url,
-    data.link,
-    data.download,
-    data.result?.download,
-    data.result?.url,
-    data.result?.dl_url,
-    data.data?.audio?.url,
-    data.data?.video?.url,
-    data.data?.media?.dl_download,
-    data.data?.download?.url,
-    data.data?.download,
-    data.data?.url
-  ]
-
-  for (const opcion of opciones) {
-    const url = urlNormalizada(opcion)
-    if (url) return url
-  }
-
-  return null
-}
-
-// ============================================================
-// 🎵 API DE AUDIO
-// ============================================================
-
-function apisAudio(video) {
+function proveedoresAudio(video) {
   const url = encodeURIComponent(video.url)
   const titulo = encodeURIComponent(video.title)
-  const key = encodeURIComponent(process.env.API_KEY || '')
+  const key = encodeURIComponent(
+    process.env.API_KEY || ''
+  )
 
-  const apis = [
+  const proveedores = [
     {
       nombre: 'Mitzuki',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://api.mitzuki.xyz/download/youtube?url=${url}&type=audio&format=mp3&apikey=${key}`
-        )
-
-        return extraer(data)
-      }
+      url:
+        `https://api.mitzuki.xyz/download/youtube?url=${url}&type=audio&format=mp3&apikey=${key}`
     },
     {
       nombre: 'Mitzuki 2',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://api.mitzuki.xyz/download/youtube2?url=${url}&apikey=${key}`
-        )
-
-        return extraer(data?.data?.audio?.url || data)
-      }
+      url:
+        `https://api.mitzuki.xyz/download/youtube2?url=${url}&apikey=${key}`
     },
     {
       nombre: 'DV Yer',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://dv-yer-api.online/ytmp3?mode=link&url=${url}`
-        )
-
-        return urlNormalizada(
-          data?.download_url_full ||
-          data?.stream_url_full ||
-          data?.url,
-          'https://dv-yer-api.online'
-        )
-      }
-    },
-    {
-      nombre: 'Dorratz',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://api.dorratz.com/v3/ytdl?url=${url}`
-        )
-
-        const medias = Array.isArray(data?.medias)
-          ? data.medias
-          : []
-
-        const mp3 = medias.find(
-          x => x.extension === 'mp3'
-        )
-
-        return urlNormalizada(mp3?.url)
-      }
+      url:
+        `https://dv-yer-api.online/ytmp3?mode=link&url=${url}`,
+      base: 'https://dv-yer-api.online'
     },
     {
       nombre: 'Zenkey',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://api.zenkey.my.id/api/download/ytmp3?apikey=zenkey&url=${url}`
-        )
-
-        return extraer(data)
-      }
+      url:
+        `https://api.zenkey.my.id/api/download/ytmp3?apikey=zenkey&url=${url}`
     },
     {
       nombre: 'Exonity',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://exonity.tech/api/dl/playmp3?query=${titulo}`
-        )
-
-        return extraer(data)
-      }
+      url:
+        `https://exonity.tech/api/dl/playmp3?query=${titulo}`
     }
   ]
 
   if (global.info?.apis) {
-    apis.push({
+    proveedores.push({
       nombre: 'Info API',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `${global.info.apis}/download/ytmp3?url=${url}`
-        )
-
-        return extraer(data)
-      }
+      url:
+        `${global.info.apis}/download/ytmp3?url=${url}`
     })
   }
 
-  return apis
+  return proveedores
 }
 
 // ============================================================
-// 🎬 API DE VIDEO
+// 🎬 PROVEEDORES DE VIDEO
 // ============================================================
 
-function apisVideo(video) {
+function proveedoresVideo(video) {
   const url = encodeURIComponent(video.url)
   const titulo = encodeURIComponent(video.title)
 
-  const apis = [
+  const proveedores = [
     {
       nombre: 'Siputzx',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://api.siputzx.my.id/api/d/ytmp4?url=${url}`
-        )
-
-        return extraer(data)
-      }
+      url:
+        `https://api.siputzx.my.id/api/d/ytmp4?url=${url}`
     },
     {
       nombre: 'Neoxr',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://api.neoxr.eu/api/youtube?url=${url}&type=video&quality=720p&apikey=GataDios`
-        )
-
-        return extraer(data)
-      }
+      url:
+        `https://api.neoxr.eu/api/youtube?url=${url}&type=video&quality=720p&apikey=GataDios`
     },
     {
       nombre: 'FGMods',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://api.fgmods.xyz/api/downloader/ytmp4?url=${url}&apikey=elrebelde21`
-        )
-
-        return extraer(data)
-      }
+      url:
+        `https://api.fgmods.xyz/api/downloader/ytmp4?url=${url}&apikey=elrebelde21`
     },
     {
       nombre: 'Exonity',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `https://exonity.tech/api/dl/playmp4?query=${titulo}`
-        )
-
-        return extraer(data)
-      }
+      url:
+        `https://exonity.tech/api/dl/playmp4?query=${titulo}`
     }
   ]
 
   if (global.info?.apis) {
-    apis.push({
+    proveedores.push({
       nombre: 'Info API Video',
-      ejecutar: async () => {
-        const data = await jsonAPI(
-          `${global.info.apis}/download/ytmp4?url=${url}`
-        )
-
-        return extraer(data)
-      }
+      url:
+        `${global.info.apis}/download/ytmp4?url=${url}`
     })
   }
 
-  return apis
+  return proveedores
 }
 
 // ============================================================
-// 📏 TAMAÑO DEL ARCHIVO
+// 🔄 OBTENER ENLACE
 // ============================================================
 
-async function tamañoArchivo(url) {
+async function obtenerEnlace(proveedor) {
+  const data = await fetchJSON(proveedor.url)
+
+  if (proveedor.nombre === 'DV Yer') {
+    const enlace =
+      data?.download_url_full ||
+      data?.stream_url_full ||
+      data?.url
+
+    return normalizarURL(
+      enlace,
+      proveedor.base
+    )
+  }
+
+  if (
+    proveedor.nombre === 'Mitzuki 2'
+  ) {
+    return extraerURL(
+      data?.data?.audio?.url || data
+    )
+  }
+
+  return extraerURL(data)
+}
+
+// ============================================================
+// 📏 CONSULTAR TAMAÑO
+// ============================================================
+
+async function obtenerTamaño(url) {
   const controller = new AbortController()
 
   const timer = setTimeout(
     () => controller.abort(),
-    API_TIMEOUT
+    CONFIG.apiTimeout
   )
 
   try {
-    const res = await fetch(url, {
+    const response = await fetch(url, {
       method: 'HEAD',
       signal: controller.signal
     })
 
-    if (!res.ok) return null
+    if (!response.ok) return null
 
-    const n = Number(
-      res.headers.get('content-length')
+    const size = Number(
+      response.headers.get('content-length')
     )
 
-    return Number.isFinite(n) && n > 0
-      ? n
+    return Number.isFinite(size) && size > 0
+      ? size
       : null
   } catch {
     return null
@@ -398,77 +368,71 @@ async function tamañoArchivo(url) {
 }
 
 // ============================================================
-// 📤 ENVIAR ARCHIVO
+// 📤 ENVIAR MULTIMEDIA
 // ============================================================
 
-async function enviar(
+async function enviarMultimedia(
   conn,
   m,
   video,
-  url,
+  enlace,
   tipo,
   documento
 ) {
-  const esAudio = tipo === 'audio'
+  const audio = tipo === 'audio'
 
-  const maximo = esAudio
-    ? MAX_AUDIO
-    : MAX_VIDEO
+  const maximo = audio
+    ? CONFIG.maxAudio
+    : CONFIG.maxVideo
 
-  const tamaño = await tamañoArchivo(url)
+  const size = await obtenerTamaño(enlace)
 
-  if (tamaño !== null && tamaño > maximo) {
+  if (size !== null && size > maximo) {
     throw new Error(
       'El archivo supera el tamaño permitido.'
     )
   }
 
-  const extension = esAudio ? 'mp3' : 'mp4'
+  const extension = audio ? 'mp3' : 'mp4'
 
-  const mimetype = esAudio
+  const mimetype = audio
     ? 'audio/mpeg'
     : 'video/mp4'
 
-  const nombre =
-    `${nombreSeguro(video.title)}.${extension}`
+  const fileName =
+    `${limpiarNombre(video.title)}.${extension}`
 
   let mensaje
 
   if (documento) {
     mensaje = {
-      document: { url },
+      document: { url: enlace },
       mimetype,
-      fileName: nombre
+      fileName
     }
-  } else if (esAudio) {
+  } else if (audio) {
     mensaje = {
-      audio: { url },
+      audio: { url: enlace },
       mimetype,
       ptt: false
     }
   } else {
     mensaje = {
-      video: { url },
+      video: { url: enlace },
       mimetype,
       caption: `🎬 *${video.title}*`
     }
   }
 
-  await Promise.race([
-    conn.sendMessage(
-      m.chat,
-      mensaje,
-      { quoted: m }
-    ),
-    timeoutPromise(
-      SEND_TIMEOUT,
-      'Tiempo de envío agotado'
-    )
-  ])
+  await conn.sendMessage(
+    m.chat,
+    mensaje,
+    { quoted: m }
+  )
 }
 
 // ============================================================
-// 🔄 PROBAR API ALTERNATIVAS
+// 📥 DESCARGA CON RESPALDO
 // ============================================================
 
 async function descargar(
@@ -478,54 +442,52 @@ async function descargar(
   tipo,
   documento
 ) {
-  const apis = tipo === 'audio'
-    ? apisAudio(video)
-    : apisVideo(video)
+  const proveedores = tipo === 'audio'
+    ? proveedoresAudio(video)
+    : proveedoresVideo(video)
 
-  for (const api of apis) {
+  for (const proveedor of proveedores) {
     try {
       console.log(
-        `[PLAY] Probando ${api.nombre}`
+        `[PLAY] Probando ${proveedor.nombre}`
       )
 
-      const url = await api.ejecutar()
+      const enlace = await obtenerEnlace(
+        proveedor
+      )
 
-      if (!enlaceValido(url)) {
+      if (!urlValida(enlace)) {
         throw new Error(
-          'No devolvió un enlace válido.'
+          'La API no devolvió un enlace válido.'
         )
       }
 
       console.log(
-        `[PLAY] Enlace obtenido: ${api.nombre}`
+        `[PLAY] Enlace obtenido: ${proveedor.nombre}`
       )
 
-      await enviar(
+      await enviarMultimedia(
         conn,
         m,
         video,
-        url,
+        enlace,
         tipo,
         documento
       )
 
       console.log(
-        `[PLAY] Enviado con ${api.nombre}`
+        `[PLAY] Enviado con ${proveedor.nombre}`
       )
 
       return true
 
     } catch (error) {
       console.error(
-        `[PLAY] ${api.nombre}:`,
+        `[PLAY] ${proveedor.nombre}:`,
         error?.message || error
       )
 
-      if (
-        error?.message === 'Tiempo de envío agotado'
-      ) {
-        throw error
-      }
+      await espera(300)
     }
   }
 
@@ -533,7 +495,7 @@ async function descargar(
 }
 
 // ============================================================
-// 🤖 HANDLER PRINCIPAL
+// 🤖 HANDLER
 // ============================================================
 
 const handler = async (
@@ -543,7 +505,10 @@ const handler = async (
     command,
     args = [],
     text = '',
-    usedPrefix = '.'
+    usedPrefix = '.',
+    isAdmin,
+    isOwner,
+    isROwner
   }
 ) => {
   const cmd = String(command).toLowerCase()
@@ -555,11 +520,35 @@ const handler = async (
   if (!query) {
     return m.reply(
       `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
-      `🎧 ${usedPrefix}play nombre\n` +
-      `🎬 ${usedPrefix}play2 nombre\n` +
-      `📁 ${usedPrefix}play3 nombre\n` +
-      `📹 ${usedPrefix}play4 nombre`
+      `🎧 ${usedPrefix}play canción\n` +
+      `🎬 ${usedPrefix}play2 video\n` +
+      `📁 ${usedPrefix}play3 canción\n` +
+      `📹 ${usedPrefix}play4 video`
     )
+  }
+
+  const exento = Boolean(
+    isAdmin || isOwner || isROwner
+  )
+
+  // ========================================================
+  // ⏳ COOLDOWN DE 5 MINUTOS
+  // ========================================================
+
+  if (!exento) {
+    const ultimo = cooldowns.get(m.sender) || 0
+    const restante =
+      CONFIG.cooldown - (Date.now() - ultimo)
+
+    if (restante > 0) {
+      const minutos = Math.ceil(
+        restante / 60000
+      )
+
+      return m.reply(
+        `⏳ Esperá ${minutos} minuto(s) para volver a usar PLAY.`
+      )
+    }
   }
 
   if (solicitudes.has(m.sender)) {
@@ -571,35 +560,54 @@ const handler = async (
   solicitudes.add(m.sender)
 
   try {
-    const esAudio = AUDIO.has(cmd)
-    const esVideo = VIDEO.has(cmd)
+    const tipo = AUDIO.has(cmd)
+      ? 'audio'
+      : 'video'
 
-    if (!esAudio && !esVideo) {
-      return m.reply(
-        '❌ Comando no reconocido.'
-      )
-    }
-
-    const tipo = esAudio ? 'audio' : 'video'
     const documento = DOCUMENTOS.has(cmd)
 
-    try {
-      await m.react('🔎')
-    } catch {}
+    await reaccionar(m, '🔎')
 
-    const video = await buscar(query)
+    // ======================================================
+    // 🔎 BUSCAR
+    // ======================================================
+
+    const video = await buscarVideo(query)
 
     if (!video?.url) {
       throw new Error(
-        'No se encontró el video.'
+        'No se encontró el contenido.'
       )
     }
 
+    // ======================================================
+    // ⏰ LÍMITE DE 7 MINUTOS
+    // ======================================================
+
+    const segundos = Number(
+      video.seconds ||
+      video.duration?.seconds ||
+      0
+    )
+
+    if (
+      segundos > 0 &&
+      segundos > CONFIG.maxDuration
+    ) {
+      return m.reply(
+        '⛔ Solo se permiten canciones o videos de hasta 7 minutos.'
+      )
+    }
+
+    // ======================================================
+    // 📋 INFORMACIÓN
+    // ======================================================
+
     const info =
-      `🎵 *WHATSAPP-BOT*\n\n` +
+      `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
       `📌 *${video.title}*\n` +
-      `⏰ Duración: ${duracion(video.seconds)}\n` +
-      `📁 Formato: ${tipo}\n\n` +
+      `⏰ Duración: ${duracion(segundos)}\n` +
+      `📁 Formato: ${tipo}${documento ? ' (documento)' : ''}\n\n` +
       `⏳ Buscando descarga...`
 
     try {
@@ -624,11 +632,13 @@ const handler = async (
       await m.reply(info)
     }
 
-    try {
-      await m.react('⏳')
-    } catch {}
+    await reaccionar(m, '⏳')
 
-    const ok = await descargar(
+    // ======================================================
+    // 📥 DESCARGAR Y ENVIAR
+    // ======================================================
+
+    const enviado = await descargar(
       conn,
       m,
       video,
@@ -636,19 +646,22 @@ const handler = async (
       documento
     )
 
-    if (!ok) {
-      try {
-        await m.react('❌')
-      } catch {}
+    if (!enviado) {
+      await reaccionar(m, '❌')
 
       return m.reply(
         '❌ No se pudo descargar el archivo. Todas las API disponibles fallaron.'
       )
     }
 
-    try {
-      await m.react('✅')
-    } catch {}
+    if (!exento) {
+      cooldowns.set(
+        m.sender,
+        Date.now()
+      )
+    }
+
+    await reaccionar(m, '✅')
 
   } catch (error) {
     console.error(
@@ -656,9 +669,7 @@ const handler = async (
       error
     )
 
-    try {
-      await m.react('❌')
-    } catch {}
+    await reaccionar(m, '❌')
 
     return m.reply(
       `❌ Error: ${error?.message || 'Error desconocido'}`
@@ -670,7 +681,7 @@ const handler = async (
 }
 
 // ============================================================
-// ⚙️ REGISTRO DEL PLUGIN
+// ⚙️ REGISTRO
 // ============================================================
 
 handler.help = [
@@ -690,6 +701,8 @@ handler.tags = ['downloader']
 handler.command =
   /^(play|musica|audio|play2|video|play3|playdoc|play4|playdoc2)$/i
 
-handler.register = true
+// No se exige registro para evitar que el handler
+// invoque global.dfail('unreg') por este plugin.
+handler.register = false
 
 export default handler

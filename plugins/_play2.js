@@ -3,10 +3,12 @@
  * 📂 plugins/_play2.js
  * 🤖 WHATSAPP-BOT — PLAY MULTIMEDIA
  *
- * 🎵 .play / .musica / .audio
+ * 🎵 .musica / .audio
  * 🎬 .play2 / .video
  * 📁 .play3 / .playdoc
  * 📹 .play4 / .playdoc2
+ *
+ * ❌ NO utiliza .play
  *
  * Node.js 18+
  * Dependencia: yt-search
@@ -32,7 +34,6 @@ const busy = new Set()
 const lastUsed = new Map()
 
 const audioCommands = new Set([
-  'play',
   'musica',
   'audio',
   'play3',
@@ -151,7 +152,7 @@ async function react(m, emoji) {
 
 async function notify(conn, m, message) {
   console.log(
-    '[PLAY] Aviso:',
+    '[PLAY2] Aviso:',
     message.replace(/\n/g, ' ').slice(0, 130)
   )
 
@@ -163,7 +164,7 @@ async function notify(conn, m, message) {
     )
   } catch (error) {
     console.error(
-      '[PLAY] No se pudo enviar aviso:',
+      '[PLAY2] No se pudo enviar aviso:',
       error?.message || error
     )
 
@@ -171,7 +172,7 @@ async function notify(conn, m, message) {
       return await m.reply(message)
     } catch (e) {
       console.error(
-        '[PLAY] Tampoco funcionó m.reply:',
+        '[PLAY2] Tampoco funcionó m.reply:',
         e?.message || e
       )
     }
@@ -268,7 +269,7 @@ async function findVideo(query) {
       }
     } catch (error) {
       console.warn(
-        '[PLAY] Metadatos no disponibles:',
+        '[PLAY2] Metadatos no disponibles:',
         error?.message
       )
     }
@@ -523,7 +524,7 @@ async function downloadAndSend(
 
     try {
       console.log(
-        `[PLAY] Consultando ${name}`
+        `[PLAY2] Consultando ${name}`
       )
 
       const url = await getDownloadUrl(
@@ -538,7 +539,7 @@ async function downloadAndSend(
       }
 
       console.log(
-        `[PLAY] Enlace recibido de ${name}`
+        `[PLAY2] Enlace recibido de ${name}`
       )
 
       await sendFile(
@@ -551,13 +552,13 @@ async function downloadAndSend(
       )
 
       console.log(
-        `[PLAY] Archivo enviado con ${name}`
+        `[PLAY2] Archivo enviado con ${name}`
       )
 
       return true
     } catch (error) {
       console.error(
-        `[PLAY] ${name}:`,
+        `[PLAY2] ${name}:`,
         error?.message || error
       )
 
@@ -566,7 +567,6 @@ async function downloadAndSend(
           'Envío: tiempo agotado'
         )
       ) {
-        // Evitar duplicados si el envío sigue activo.
         throw error
       }
 
@@ -577,7 +577,7 @@ async function downloadAndSend(
   }
 
   console.error(
-    '[PLAY] Proveedores agotados:\n' +
+    '[PLAY2] Proveedores agotados:\n' +
     failures.join('\n')
   )
 
@@ -613,8 +613,9 @@ const handler = async (
     return notify(
       conn,
       m,
-      `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
-      `🎧 ${usedPrefix}play canción\n` +
+      `🎵 *WHATSAPP-BOT — MULTIMEDIA*\n\n` +
+      `🎧 ${usedPrefix}musica canción\n` +
+      `🎧 ${usedPrefix}audio canción\n` +
       `🎬 ${usedPrefix}play2 video\n` +
       `📁 ${usedPrefix}play3 canción\n` +
       `📹 ${usedPrefix}play4 video`
@@ -638,7 +639,7 @@ const handler = async (
       return notify(
         conn,
         m,
-        `⏳ Esperá ${Math.ceil(remaining / 60000)} minuto(s) para usar PLAY otra vez.`
+        `⏳ Esperá ${Math.ceil(remaining / 60000)} minuto(s) para usar este comando otra vez.`
       )
     }
   }
@@ -661,7 +662,7 @@ const handler = async (
     const document = documentCommands.has(cmd)
 
     console.log(
-      `[PLAY] Comando ${cmd}, búsqueda: ${query}`
+      `[PLAY2] Comando ${cmd}, búsqueda: ${query}`
     )
 
     // ======================================================
@@ -671,7 +672,7 @@ const handler = async (
     await notify(
       conn,
       m,
-      `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
+      `🎵 *WHATSAPP-BOT — MULTIMEDIA*\n\n` +
       `🔎 Buscando: *${query}*\n` +
       `⏳ Preparando ${kind === 'audio' ? 'el audio' : 'el video'}, aguardá un momento...`
     )
@@ -685,7 +686,7 @@ const handler = async (
     const video = await findVideo(query)
 
     console.log(
-      `[PLAY] Encontrado: ${video.title} (${video.url})`
+      `[PLAY2] Encontrado: ${video.title} (${video.url})`
     )
 
     const seconds = Number(
@@ -756,7 +757,7 @@ const handler = async (
 
   } catch (error) {
     console.error(
-      '[PLAY] Error general:',
+      '[PLAY2] Error general:',
       error
     )
 
@@ -765,7 +766,7 @@ const handler = async (
     await notify(
       conn,
       m,
-      `❌ No se pudo completar PLAY: ${error?.message || 'Error desconocido'}`
+      `❌ No se pudo completar la descarga: ${error?.message || 'Error desconocido'}`
     )
 
   } finally {
@@ -778,7 +779,6 @@ const handler = async (
 // ============================================================
 
 handler.help = [
-  'play',
   'musica',
   'audio',
   'play2',
@@ -792,7 +792,7 @@ handler.help = [
 handler.tags = ['downloader']
 
 handler.command =
-  /^(play|musica|audio|play2|video|play3|playdoc|play4|playdoc2)$/i
+  /^(musica|audio|play2|video|play3|playdoc|play4|playdoc2)$/i
 
 handler.register = false
 

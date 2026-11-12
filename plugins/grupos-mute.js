@@ -1,112 +1,409 @@
-// 📂 plugins/mute.js
 
-let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
+/**
+ * 📂 plugins/mute.js
+ * 🤖 WHATSAPP-BOT — MUTE AUTOMÁTICO
+ *
+ * Comandos:
+ * .mute
+ * .silenciar
+ * .unmute
+ * .desilenciar
+ *
+ * ✅ Silencia por grupo
+ * ✅ Borra mensajes automáticamente
+ * ✅ Soporta número y LID
+ * ✅ Protege owners
+ * ✅ Admins exentos
+ * ✅ Sin mensajes de advertencia al muteado
+ *
+ * IMPORTANTE:
+ * El bot debe ser administrador.
+ * handler.js debe ejecutar handler.before
+ * para cada mensaje entrante.
+ */
 
-  if (!m.isGroup) return m.reply("❌ Solo funciona en grupos.")
-  if (!isAdmin) return m.reply("⚠️ Solo admins pueden usar este comando.")
-  if (!isBotAdmin) return m.reply("⚠️ El bot debe ser admin.")
+// ============================================================
+// 🗃️ BASE DE DATOS
+// ============================================================
 
-  let who
+function database() {
+  global.db = global.db || {}
+  global.db.data = global.db.data || {}
+  global.db.data.chats = global.db.data.chats || {}
 
-  if (m.mentionedJid && m.mentionedJid[0]) {
-    who = m.mentionedJid[0]
-  } else if (m.quoted) {
-    who = m.quoted.sender
+  return global.db.data.chats
+}
+
+function groupData(chat) {
+  const chats = database()
+
+  chats[chat] = chats[chat] || {}
+  chats[chat].mutedUsers =
+    chats[chat].mutedUsers || {}
+
+  return chats[chat]
+}
+
+// ============================================================
+// 🪪 IDENTIFICADORES
+// ============================================================
+
+function normalize(jid, conn) {
+  if (!jid) return ''
+
+  try {
+    return conn.decodeJid(String(jid)) ||
+      String(jid)
+  } catch {
+    return String(jid)
   }
+}
 
-  if (!who) return m.reply(`✏️ Uso:\n${usedPrefix + command} citando mensaje.`)
+function userPart(jid) {
+  return String(jid || '').split('@')[0].split(':')[0]
+}
 
-  who = conn.decodeJid(who)
+function sameJid(a, b, conn) {
+  const x = normalize(a, conn)
+  const y = normalize(b, conn)
 
-  // 🔐 PROTEGER OWNERS
-  const ownerJids = (global.owner || []).map(v => {
-    if (Array.isArray(v)) v = v[0]
-    return conn.decodeJid(
-      String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net'
+  if (!x || !y) return false
+
+  if (x === y) return true
+
+  const xd = x.split('@')[1]
+  const yd = y.split('@')[1]
+
+  return xd === yd &&
+    userPart(x) === userPart(y)
+}
+
+// ============================================================
+// 👑 PROTEGER OWNERS
+// ============================================================
+
+function isProtected(jid, conn) {
+  const owners = global.owner || []
+
+  return owners.some(entry => {
+    const value = Array.isArray(entry)
+      ? entry[0]
+      : entry
+
+    const raw = String(value || '')
+
+    const ownerJid = raw.includes('@')
+      ? raw
+      : `${raw.replace(/\D/g, '')}@s.whatsapp.net`
+
+    return sameJid(
+      jid,
+      ownerJid,
+      conn
     )
   })
+}
 
-  if (ownerJids.includes(who)) return m.react("❌")
+// ============================================================
+// 🔎 OBTENER PARTICIPANTE
+// ============================================================
 
-  // 📂 BASE
-  global.db.data = global.db.data || {}
-  global.db.data.users = global.db.data.users || {}
-  global.db.data.users[who] = global.db.data.users[who] || {}
+function findParticipant(meta, jid, conn) {
+  return meta?.participants?.find(p => {
+    return [
+      p.id,
+      p.lid,
+      p.phoneNumber,
+      p.jid
+    ].some(value => sameJid(value, jid, conn))
+  })
+}
 
-  let user = global.db.data.users[who]
+function participantIds(p, conn) {
+  if (!p) return []
 
-  user.mute = user.mute || {}
-  user.mute[m.chat] =
-    (command === "desilenciar" || command === "unmute") ? false : true
+  return [
+    p.id,
+    p.lid,
+    p.phoneNumber,
+    p.jid
+  ]
+    .filter(Boolean)
+    .map(jid => normalize(jid, conn))
+}
 
-  await m.react("✅")
+// ============================================================
+// 🔐 ADMINISTRADORES
+// ============================================================
 
-  m.reply(
-    user.mute[m.chat]
-      ? "🔇 Usuario silenciado correctamente."
-      : "🔊 Usuario desilenciado correctamente."
+function isParticipantAdmin(p) {
+  return (
+    p?.admin === 'admin' ||
+    p?.admin === 'superadmin'
   )
 }
 
-handler.command = ["silenciar", "mute", "desilenciar", "unmute"]
+// ============================================================
+// 🔇 GUARDAR MUTE
+// ============================================================
+
+function setMute(chat, ids, value) {
+  const group = groupData(chat)
+
+  for (const jid of ids) {
+    if (!jid) continue
+
+    if (value) {
+      group.mutedUsers[jid] = true
+    } else {
+      delete group.mutedUsers[jid]
+    }
+  }
+}
+
+function hasMute(chat, ids) {
+  const group = groupData(chat)
+
+  return ids.some(jid => {
+    return Boolean(group.mutedUsers[jid])
+  })
+}
+
+// ============================================================
+// 🤖 COMANDOS
+// ============================================================
+
+const handler = async (
+  m,
+  {
+    conn,
+    command,
+    usedPrefix = '.',
+    isAdmin,
+    isBotAdmin,
+    isOwner,
+    isROwner
+  }
+) => {
+  if (!m.isGroup) {
+    return m.reply(
+      '❌ Este comando solo funciona en grupos.'
+    )
+  }
+
+  if (!isAdmin && !isOwner && !isROwner) {
+    return m.reply(
+      '⚠️ Solo los administradores pueden usar este comando.'
+    )
+  }
+
+  if (!isBotAdmin) {
+    return m.reply(
+      '⚠️ Necesito ser administrador para borrar mensajes.'
+    )
+  }
+
+  let who =
+    m.mentionedJid?.[0] ||
+    m.quoted?.sender
+
+  if (!who) {
+    return m.reply(
+      `✏️ Uso: ${usedPrefix}${command} @usuario\n` +
+      `También podés responder a un mensaje.`
+    )
+  }
+
+  who = normalize(who, conn)
+
+  if (isProtected(who, conn)) {
+    await m.react('❌').catch(() => {})
+
+    return m.reply(
+      '👑 No podés silenciar a un owner.'
+    )
+  }
+
+  let meta
+
+  try {
+    meta = await conn.groupMetadata(m.chat)
+  } catch (error) {
+    console.error(
+      '[MUTE] Error obteniendo grupo:',
+      error
+    )
+
+    return m.reply(
+      '❌ No pude consultar los participantes.'
+    )
+  }
+
+  const participant = findParticipant(
+    meta,
+    who,
+    conn
+  )
+
+  if (!participant) {
+    return m.reply(
+      '❌ No encontré al usuario en el grupo.'
+    )
+  }
+
+  if (isParticipantAdmin(participant)) {
+    return m.reply(
+      '⚠️ No podés silenciar a un administrador.'
+    )
+  }
+
+  const ids = [
+    who,
+    ...participantIds(participant, conn)
+  ]
+
+  const unmute = [
+    'unmute',
+    'desilenciar'
+  ].includes(String(command).toLowerCase())
+
+  setMute(
+    m.chat,
+    ids,
+    !unmute
+  )
+
+  console.log(
+    `[MUTE] ${unmute ? 'Desilenciado' : 'Silenciado'}:`,
+    ids
+  )
+
+  await m.react('✅').catch(() => {})
+
+  return m.reply(
+    unmute
+      ? '🔊 Usuario desilenciado correctamente.'
+      : '🔇 Usuario silenciado correctamente. Sus próximos mensajes serán eliminados.'
+  )
+}
+
+// ============================================================
+// 🚨 BEFORE — BORRADO AUTOMÁTICO
+// ============================================================
+
+handler.before = async function (
+  m,
+  { conn, isBotAdmin }
+) {
+  try {
+    if (!m.isGroup) return
+    if (!m.sender) return
+    if (!m.key?.id) return
+    if (!m.message) return
+    if (m.fromMe || m.key.fromMe) return
+
+    const group = groupData(m.chat)
+
+    if (!Object.keys(group.mutedUsers).length) {
+      return
+    }
+
+    const sender = normalize(
+      m.sender,
+      conn
+    )
+
+    const meta = await conn.groupMetadata(m.chat)
+
+    const participant = findParticipant(
+      meta,
+      sender,
+      conn
+    )
+
+    const ids = [
+      sender,
+      m.key.participant,
+      m.key.participantAlt,
+      m.senderAlt,
+      ...participantIds(participant, conn)
+    ]
+      .filter(Boolean)
+      .map(jid => normalize(jid, conn))
+
+    if (!hasMute(m.chat, ids)) {
+      return
+    }
+
+    // 👑 Owners protegidos
+    if (ids.some(jid => isProtected(jid, conn))) {
+      return
+    }
+
+    // 🛡️ Administradores exentos
+    if (isParticipantAdmin(participant)) {
+      return
+    }
+
+    if (!isBotAdmin) {
+      console.warn(
+        '[MUTE] No puedo borrar: bot sin admin.'
+      )
+      return
+    }
+
+    // ======================================================
+    // 🗑️ BORRAR MENSAJE
+    // ======================================================
+
+    const participantJid =
+      m.key.participant ||
+      m.sender
+
+    const deleteKey = {
+      remoteJid: m.chat,
+      fromMe: false,
+      id: m.key.id,
+      participant: participantJid
+    }
+
+    await conn.sendMessage(
+      m.chat,
+      {
+        delete: deleteKey
+      }
+    )
+
+    console.log(
+      `[MUTE] Mensaje eliminado de ${sender}`
+    )
+
+  } catch (error) {
+    console.error(
+      '[MUTE] Error borrando mensaje:',
+      error?.message || error
+    )
+  }
+}
+
+// ============================================================
+// ⚙️ CONFIGURACIÓN
+// ============================================================
+
+handler.help = [
+  'mute',
+  'silenciar',
+  'unmute',
+  'desilenciar'
+]
+
+handler.tags = ['group']
+
+handler.command =
+  /^(mute|silenciar|unmute|desilenciar)$/i
+
 handler.group = true
 handler.admin = true
 handler.botAdmin = true
-
-// =============================
-// 🚨 BEFORE REAL — BORRAR MENSAJES
-// =============================
-
-handler.before = async function (m, { conn }) {
-
-  if (!m.isGroup) return
-  if (!m.sender) return
-  if (!m.message) return
-  if (m.fromMe) return
-
-  const sender = conn.decodeJid(m.sender)
-
-  global.db.data = global.db.data || {}
-  global.db.data.users = global.db.data.users || {}
-
-  let user = global.db.data.users[sender]
-  if (!user) return
-  if (!user.mute) return
-  if (!user.mute[m.chat]) return
-
-  // 🔎 Verificar admin
-  let isAdmin = false
-
-  try {
-    let meta = await conn.groupMetadata(m.chat)
-    let participant = meta.participants.find(
-      p => conn.decodeJid(p.id) === sender
-    )
-
-    if (participant) {
-      isAdmin =
-        participant.admin === 'admin' ||
-        participant.admin === 'superadmin'
-    }
-  } catch {}
-
-  if (isAdmin) return
-
-  try {
-
-    await conn.sendMessage(m.chat, {
-      delete: {
-        remoteJid: m.chat,
-        fromMe: false,
-        id: m.key.id,
-        participant: m.key.participant || sender
-      }
-    })
-
-  } catch (e) {
-    console.log("❌ Error borrando:", e)
-  }
-
-}
 
 export default handler

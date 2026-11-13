@@ -3,11 +3,11 @@
  * 📂 plugins/menugp.js
  * 🤖 WHATSAPP-BOT — MENÚ DE ADMINISTRADORES
  *
- * ✅ Diseño actualizado
- * ✅ Configuraciones del grupo
- * ✅ Estado de funciones
- * ✅ Comandos de moderación
- * ✅ Compatible con Baileys ES Modules
+ * ✅ Menú organizado
+ * ✅ Comandos de administración
+ * ✅ Moderación y seguridad
+ * ✅ Sin estados del grupo
+ * ✅ Baileys ES Modules
  */
 
 const handler = async (
@@ -33,38 +33,7 @@ const handler = async (
       )
     }
 
-    // ========================================================
-    // 🗃️ BASE DE DATOS
-    // ========================================================
-
-    global.db = global.db || {}
-    global.db.data = global.db.data || {}
-    global.db.data.chats =
-      global.db.data.chats || {}
-
-    const chat = global.db.data.chats[m.chat] || {}
-
-    // ========================================================
-    // ⚙️ ESTADOS
-    // ========================================================
-
-    const estado = (valor) =>
-      valor ? '🟢 Activado' : '🔴 Desactivado'
-
-    const bienvenida = estado(chat.welcome)
-    const despedida = estado(chat.leave)
-    const antifake = estado(chat.antifake)
-    const antispam = estado(chat.antispam)
-    const antilink = estado(chat.antilink)
-    const juegos = estado(chat.juegos || chat.games)
-    const autoFrase = estado(chat.autoFrase)
-    const aprobar = estado(chat.aprobar)
-
     const p = usedPrefix
-
-    // ========================================================
-    // 📋 MENÚ
-    // ========================================================
 
     const menuText = `
 ╭━━━〔 🤖 *WHATSAPP-BOT* 〕━━━╮
@@ -142,54 +111,26 @@ const handler = async (
 │
 ╰────────────────────
 
-╭─〔 ⚙️ *ESTADO DEL GRUPO* 〕
-│
-│ 👋 Bienvenida: ${bienvenida}
-│ 👋 Despedida: ${despedida}
-│ 🛡️ Antifake: ${antifake}
-│ 🚫 Antispam: ${antispam}
-│ 🔗 Antilink: ${antilink}
-│ 🎮 Juegos: ${juegos}
-│ 💬 AutoFrase: ${autoFrase}
-│ 📥 Aprobación: ${aprobar}
-│
-╰────────────────────
-
 ╭─〔 🐾 *WHATSAPP-BOT* 〕
 │ 👑 Panel administrativo
 │ 🛡️ Seguridad y moderación
 ╰━━━━━━━━━━━━━━━━━━━━
 `.trim()
 
-    // ========================================================
-    // 📤 ENVIAR MENÚ
-    // ========================================================
-
     await conn.sendMessage(
       m.chat,
-      {
-        text: menuText
-      },
-      {
-        quoted: m
-      }
+      { text: menuText },
+      { quoted: m }
     )
 
   } catch (error) {
-    console.error(
-      '[MENUGP] Error:',
-      error
-    )
+    console.error('[MENUGP] Error:', error)
 
     await m.reply(
       '❌ Ocurrió un error al mostrar el menú de administradores.'
     )
   }
 }
-
-// ============================================================
-// ⚙️ CONFIGURACIÓN
-// ============================================================
 
 handler.help = ['menugp']
 handler.tags = ['group']

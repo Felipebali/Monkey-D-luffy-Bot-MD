@@ -1,624 +1,685 @@
-// 📂 plugins/ver.js
-// ♻️ Sistema de archivos recuperados
-// 🔢 ID numéricos consecutivos: 1, 2, 3...
-// 💾 Almacenamiento físico + JSON
-// 🗑️ Papelera y restauración
-// 📡 Envío a grupos A, B y grupo de origen C
-// 👑 Solo propietario
-// ============================================================
+
+/**
+ * 📂 plugins/_ver2.js
+ * 🤖 WHATSAPP-BOT — RECUPERACIÓN DE ARCHIVOS
+ *
+ * Comandos:
+ * .ver / .r
+ * .recovered
+ * .recovered 1
+ * .recoveredlist
+ * .recovered borrar 1
+ * .recovered papelera
+ * .recovered restaurar 1
+ * .recovered ayuda
+ *
+ * Baileys ES Modules
+ */
 
 import fs from 'fs'
 import path from 'path'
+import {
+  downloadContentFromMessage
+} from '@whiskeysockets/baileys'
 
 // ============================================================
-// 📂 CONFIGURACIÓN
+// ⚙️ CONFIGURACIÓN
 // ============================================================
 
-const RECOVERED_DIR = './database/recovered-media-files'
-const RECOVERED_DB = './database/recovered-media.json'
+const DIR = './database/recovered-media-files'
+const DB = './database/recovered-media.json'
 
-// Grupos A y B
 const RECOVERY_GROUPS = [
-    '120363410955044864@g.us'
+  '120363410955044864@g.us'
 ]
 
-// Crear carpeta y JSON si no existen
-if (!fs.existsSync(RECOVERED_DIR)) {
-    fs.mkdirSync(RECOVERED_DIR, { recursive: true })
-}
+const MAX_SIZE = 50 * 1024 * 1024
 
-if (!fs.existsSync(RECOVERED_DB)) {
-    fs.writeFileSync(RECOVERED_DB, '[]', 'utf8')
+fs.mkdirSync(DIR, { recursive: true })
+
+if (!fs.existsSync(DB)) {
+  fs.writeFileSync(DB, '[]', 'utf8')
 }
 
 // ============================================================
-// 💾 GUARDAR BASE DE DATOS
+// 💾 BASE DE DATOS
 // ============================================================
 
-function saveRecoveredDB(list) {
-    fs.writeFileSync(
-        RECOVERED_DB,
-        JSON.stringify(list, null, 2),
-        'utf8'
+function readDB() {
+  try {
+    const data = JSON.parse(
+      fs.readFileSync(DB, 'utf8')
     )
+
+    return Array.isArray(data) ? data : []
+  } catch (e) {
+    console.error('[VER] Error leyendo DB:', e)
+    return []
+  }
 }
 
-// ============================================================
-// 🗃️ LEER BASE DE DATOS
-// ============================================================
+function saveDB(data) {
+  const temp = DB + '.tmp'
 
-function getRecoveredDB() {
-    try {
-        const data = fs.readFileSync(RECOVERED_DB, 'utf8')
-        const parsed = JSON.parse(data)
+  fs.writeFileSync(
+    temp,
+    JSON.stringify(data, null, 2),
+    'utf8'
+  )
 
-        if (!Array.isArray(parsed)) return []
-
-        // Convertir los ID antiguos a números consecutivos.
-        // Se conserva el orden y el archivo físico de cada registro.
-        let changed = false
-
-        parsed.forEach((item, index) => {
-            const simpleId = String(index + 1)
-
-            if (String(item.id) !== simpleId) {
-                item.id = simpleId
-                changed = true
-            }
-        })
-
-        if (changed) {
-            saveRecoveredDB(parsed)
-        }
-
-        return parsed
-
-    } catch (error) {
-        console.error('[RECOVERED] Error leyendo JSON:', error)
-        return []
-    }
+  fs.renameSync(temp, DB)
 }
 
-// ============================================================
-// 👑 COMPROBAR PROPIETARIO
-// ============================================================
-
-function isBotOwner(m, isOwner) {
-    if (isOwner) return true
-
-    const sender = (m.sender || '')
-        .split('@')[0]
-        .split(':')[0]
-
-    const owners = global.owner || []
-
-    return owners.some(owner => {
-        const number = Array.isArray(owner)
-            ? owner[0]
-            : owner
-
-        return String(number).replace(/\D/g, '') ===
-            sender.replace(/\D/g, '')
-    })
+function nextId(list) {
+  return String(
+    Math.max(
+      0,
+      ...list.map(x => Number(x.id) || 0)
+    ) + 1
+  )
 }
 
-// ============================================================
-// 🎞️ DETECTAR TIPO DE ARCHIVO
-// ============================================================
+function getFile(item) {
+  if (!item?.filename) return null
 
-function getMediaType(quoted) {
-    const type = quoted?.mtype || ''
-    const mime = quoted?.mimetype || ''
-
-    if (type === 'stickerMessage' || mime.includes('webp')) {
-        return 'sticker'
-    }
-
-    if (type === 'imageMessage' || mime.startsWith('image/')) {
-        return 'image'
-    }
-
-    if (type === 'videoMessage' || mime.startsWith('video/')) {
-        return 'video'
-    }
-
+  if (path.basename(item.filename) !== item.filename) {
     return null
+  }
+
+  const file = path.resolve(DIR, item.filename)
+
+  return fs.existsSync(file) ? file : null
+}
+
+function findMessage(list, chat, id) {
+  if (!chat || !id) return null
+
+  return list.find(x =>
+    x.chat === chat &&
+    x.messageId === id
+  )
 }
 
 // ============================================================
-// 📁 OBTENER RUTA DEL ARCHIVO
+// 👑 OWNER
 // ============================================================
 
-function getFilePath(item) {
-    if (!item?.filename) return null
+function checkOwner(m, isOwner, isROwner) {
+  if (isOwner || isROwner) return true
 
-    if (path.basename(item.filename) !== item.filename) {
-        return null
-    }
+  const sender = String(m.sender || '')
 
-    const directory = path.resolve(RECOVERED_DIR)
-    const filePath = path.resolve(directory, item.filename)
-
-    if (!filePath.startsWith(directory + path.sep)) {
-        return null
-    }
-
-    return fs.existsSync(filePath) ? filePath : null
-}
-
-// ============================================================
-// 📤 ENVIAR ARCHIVO A UN CHAT
-// ============================================================
-
-async function sendRecoveredMedia(conn, chat, item) {
-    const filePath = getFilePath(item)
-
-    if (!filePath) {
-        console.error(
-            `[RECOVERED] No se encontró el archivo del ID ${item.id}`
-        )
-        return false
-    }
-
-    try {
-        const buffer = fs.readFileSync(filePath)
-        const caption = `♻️ *Archivo recuperado*\n🆔 ID: ${item.id}`
-
-        if (item.type === 'image') {
-            await conn.sendMessage(chat, {
-                image: buffer,
-                caption
-            })
-
-        } else if (item.type === 'video') {
-            await conn.sendMessage(chat, {
-                video: buffer,
-                caption
-            })
-
-        } else if (item.type === 'sticker') {
-            await conn.sendMessage(chat, {
-                sticker: buffer
-            })
-
-        } else {
-            console.error(
-                `[RECOVERED] Tipo desconocido: ${item.type}`
-            )
-            return false
-        }
-
-        return true
-
-    } catch (error) {
-        console.error(
-            `[RECOVERED] Error enviando a ${chat}:`,
-            error
-        )
-        return false
-    }
-}
-
-// ============================================================
-// 📡 ENVIAR A LOS GRUPOS A Y B
-// ============================================================
-
-async function sendToRecoveryGroups(conn, currentChat, item) {
-    const filePath = getFilePath(item)
-
-    if (!filePath) {
-        console.error(
-            `[RECOVERED] No existe el archivo físico: ${item.id}`
-        )
-        return
-    }
-
-    // Si el comando se usa en A o B, evitar duplicados.
-    // Si se usa en C, enviar a A y B.
-    // Si se usa por privado, enviar a A y B.
-    const destinations = RECOVERY_GROUPS.filter(
-        group => group !== currentChat
+  return (global.owner || []).some(x => {
+    const owner = String(
+      Array.isArray(x) ? x[0] : x
     )
 
-    if (!destinations.length) {
-        console.error('[RECOVERED] No hay destinos disponibles.')
-        return
+    if (owner.includes('@')) {
+      return owner === sender
     }
 
-    for (const chat of destinations) {
-        await sendRecoveredMedia(conn, chat, item)
-    }
+    return (
+      sender.endsWith('@s.whatsapp.net') &&
+      owner.replace(/\D/g, '') ===
+        sender.split('@')[0].split(':')[0]
+    )
+  })
 }
 
 // ============================================================
-// 📋 FORMATEAR LISTAS
+// 🖼️ DETECTAR MULTIMEDIA
+// ============================================================
+
+function getMedia(message) {
+  let msg = message
+
+  for (let i = 0; i < 5; i++) {
+    if (msg?.ephemeralMessage) {
+      msg = msg.ephemeralMessage.message
+    } else if (msg?.documentWithCaptionMessage) {
+      msg = msg.documentWithCaptionMessage.message
+    } else {
+      break
+    }
+  }
+
+  // No descargar contenido de una sola visualización.
+  if (
+    msg?.viewOnceMessage ||
+    msg?.viewOnceMessageV2 ||
+    msg?.viewOnceMessageV2Extension ||
+    msg?.imageMessage?.viewOnce ||
+    msg?.videoMessage?.viewOnce
+  ) {
+    return null
+  }
+
+  if (msg?.imageMessage) {
+    return {
+      type: 'image',
+      extension: 'jpg',
+      streamType: 'image',
+      data: msg.imageMessage
+    }
+  }
+
+  if (msg?.videoMessage) {
+    return {
+      type: 'video',
+      extension: 'mp4',
+      streamType: 'video',
+      data: msg.videoMessage
+    }
+  }
+
+  if (msg?.stickerMessage) {
+    return {
+      type: 'sticker',
+      extension: 'webp',
+      streamType: 'sticker',
+      data: msg.stickerMessage
+    }
+  }
+
+  return null
+}
+
+// ============================================================
+// 🔐 VALIDAR CLAVE
+// ============================================================
+
+function hasKey(data) {
+  const key = data?.mediaKey
+
+  if (!key) return false
+
+  if (typeof key === 'string') {
+    return key.length > 0
+  }
+
+  return (key.length || key.byteLength || 0) > 0
+}
+
+// ============================================================
+// 📥 DESCARGAR ARCHIVO
+// ============================================================
+
+async function downloadMedia(info) {
+  if (!info?.data || !hasKey(info.data)) {
+    throw new Error('MEDIA_KEY_MISSING')
+  }
+
+  if (!info.data.url && !info.data.directPath) {
+    throw new Error('MEDIA_URL_MISSING')
+  }
+
+  const stream = await downloadContentFromMessage(
+    info.data,
+    info.streamType
+  )
+
+  const chunks = []
+  let size = 0
+
+  for await (const chunk of stream) {
+    size += chunk.length
+
+    if (size > MAX_SIZE) {
+      throw new Error('FILE_TOO_LARGE')
+    }
+
+    chunks.push(chunk)
+  }
+
+  const buffer = Buffer.concat(chunks)
+
+  if (!buffer.length) {
+    throw new Error('EMPTY_FILE')
+  }
+
+  return buffer
+}
+
+// ============================================================
+// 📦 GUARDAR
+// ============================================================
+
+function saveMedia(buffer, info, chat, sender, messageId) {
+  const list = readDB()
+
+  const previous = findMessage(
+    list,
+    chat,
+    messageId
+  )
+
+  if (previous && getFile(previous)) {
+    return previous
+  }
+
+  const id = nextId(list)
+  const filename = `recovered_${id}.${info.extension}`
+
+  fs.writeFileSync(
+    path.join(DIR, filename),
+    buffer
+  )
+
+  const item = {
+    id,
+    type: info.type,
+    filename,
+    date: new Date().toLocaleString('es-UY'),
+    chat,
+    sender: sender || null,
+    messageId: messageId || null,
+    mimetype: info.data?.mimetype || null,
+    deleted: false
+  }
+
+  list.push(item)
+  saveDB(list)
+
+  console.log(
+    `[VER] Archivo guardado: ${id} (${info.type})`
+  )
+
+  return item
+}
+
+// ============================================================
+// 📤 ENVIAR ARCHIVO
+// ============================================================
+
+async function sendMedia(conn, chat, item) {
+  const file = getFile(item)
+
+  if (!file) return false
+
+  try {
+    const buffer = fs.readFileSync(file)
+
+    const caption =
+      `♻️ *WHATSAPP-BOT*\n` +
+      `🆔 Archivo recuperado: ${item.id}`
+
+    if (item.type === 'image') {
+      await conn.sendMessage(chat, {
+        image: buffer,
+        caption
+      })
+    } else if (item.type === 'video') {
+      await conn.sendMessage(chat, {
+        video: buffer,
+        caption
+      })
+    } else if (item.type === 'sticker') {
+      await conn.sendMessage(chat, {
+        sticker: buffer
+      })
+    } else {
+      return false
+    }
+
+    return true
+  } catch (e) {
+    console.error(
+      `[VER] Error enviando a ${chat}:`,
+      e
+    )
+
+    return false
+  }
+}
+
+// ============================================================
+// 📡 DISTRIBUIR
+// ============================================================
+
+async function distribute(conn, currentChat, item) {
+  const destinations = new Set(RECOVERY_GROUPS)
+
+  if (currentChat.endsWith('@g.us')) {
+    destinations.add(currentChat)
+  }
+
+  let sent = 0
+
+  for (const chat of destinations) {
+    if (await sendMedia(conn, chat, item)) {
+      sent++
+    }
+  }
+
+  return sent
+}
+
+// ============================================================
+// 📋 FORMATEAR LISTA
 // ============================================================
 
 function formatList(items) {
-    if (!items.length) {
-        return '📂 No hay registros para mostrar.'
-    }
+  if (!items.length) {
+    return '📂 No hay archivos.'
+  }
 
-    return items.map(item =>
-        `🔢 *N.º ${item.id}*\n` +
-        `📁 Tipo: ${item.type}\n` +
-        `📅 Fecha: ${item.date}\n` +
-        `📄 Archivo: ${item.filename}` +
-        (item.deletedAt
-            ? `\n🗑️ Eliminado: ${item.deletedAt}`
-            : '')
-    ).join('\n\n')
+  return items.map(x =>
+    `🔢 *N.º ${x.id}*\n` +
+    `📁 Tipo: ${x.type}\n` +
+    `📅 Fecha: ${x.date}\n` +
+    `📄 Archivo: ${x.filename}`
+  ).join('\n\n')
 }
 
 // ============================================================
-// ♻️ COMANDOS PRINCIPALES
+// 🤖 HANDLER
 // ============================================================
 
-let handler = async (m, { conn, isOwner }) => {
-    try {
-        if (!isBotOwner(m, isOwner)) {
-            return conn.sendMessage(m.chat, {
-                text: '⛔ Este comando solo puede usarlo el propietario del bot.'
-            }, { quoted: m })
-        }
-
-        const text = (m.text || '').trim()
-        const args = text.split(/\s+/)
-
-        const command = (args[0] || '')
-            .replace(/^[.!#]/, '')
-            .toLowerCase()
-
-        const subcommand = (args[1] || '').toLowerCase()
-        const idArg = args[2] || ''
-
-        const list = getRecoveredDB()
-
-        // --------------------------------------------------------
-        // 📖 AYUDA
-        // .recovered ayuda
-        // --------------------------------------------------------
-
-        if (
-            ['recovered', 'recoveredlist'].includes(command) &&
-            subcommand === 'ayuda'
-        ) {
-            return conn.sendMessage(m.chat, {
-                text:
-`🗃️ *ARCHIVOS RECUPERADOS*
-
-♻️ *Recuperar*
-• .ver
-• .r
-
-📋 *Consultar*
-• .recovered
-• .recovered 1
-• .recoveredlist
-
-🗑️ *Papelera*
-• .recovered borrar 1
-• .recovered papelera
-
-♻️ *Restaurar*
-• .recovered restaurar 1
-
-🔢 Los ID son números consecutivos: 1, 2, 3...
-
-📡 En un grupo C, el archivo se envía a C, A y B.
-📩 Por privado, se envía únicamente a A y B.
-
-💾 Los archivos se conservan en el almacenamiento local.`
-            }, { quoted: m })
-        }
-
-        // --------------------------------------------------------
-        // 🗑️ ENVIAR A LA PAPELERA
-        // .recovered borrar 1
-        // --------------------------------------------------------
-
-        if (
-            command === 'recovered' &&
-            ['borrar', 'eliminar'].includes(subcommand)
-        ) {
-            const id = idArg
-
-            if (!id) {
-                return conn.sendMessage(m.chat, {
-                    text: '❌ Indicá el número del archivo.\nEjemplo: .recovered borrar 1'
-                }, { quoted: m })
-            }
-
-            const item = list.find(
-                entry => String(entry.id) === id
-            )
-
-            if (!item) {
-                return conn.sendMessage(m.chat, {
-                    text: `❌ No existe el archivo número ${id}.`
-                }, { quoted: m })
-            }
-
-            if (item.deleted) {
-                return conn.sendMessage(m.chat, {
-                    text:
-`⚠️ El archivo número ${id} ya está en la papelera.
-
-Para restaurarlo:
-.recovered restaurar ${id}`
-                }, { quoted: m })
-            }
-
-            // Solo marcar como eliminado.
-            // No borrar el archivo físico.
-            item.deleted = true
-            item.deletedAt = new Date().toLocaleString('es-UY')
-
-            saveRecoveredDB(list)
-
-            return conn.sendMessage(m.chat, {
-                text:
-`🗑️ *ARCHIVO EN LA PAPELERA*
-
-🔢 Número: ${id}
-💾 La copia física sigue guardada.
-
-Para restaurarlo:
-.recovered restaurar ${id}`
-            }, { quoted: m })
-        }
-
-        // --------------------------------------------------------
-        // ♻️ RESTAURAR ARCHIVO
-        // .recovered restaurar 1
-        // --------------------------------------------------------
-
-        if (
-            command === 'recovered' &&
-            ['restaurar', 'restore'].includes(subcommand)
-        ) {
-            const id = idArg
-
-            if (!id) {
-                return conn.sendMessage(m.chat, {
-                    text: '❌ Indicá el número.\nEjemplo: .recovered restaurar 1'
-                }, { quoted: m })
-            }
-
-            const item = list.find(
-                entry => String(entry.id) === id
-            )
-
-            if (!item) {
-                return conn.sendMessage(m.chat, {
-                    text: `❌ No existe el archivo número ${id}.`
-                }, { quoted: m })
-            }
-
-            if (!getFilePath(item)) {
-                return conn.sendMessage(m.chat, {
-                    text:
-`❌ Falta el archivo físico.
-
-🔢 Número: ${id}
-📂 Carpeta: ${RECOVERED_DIR}`
-                }, { quoted: m })
-            }
-
-            if (!item.deleted) {
-                return conn.sendMessage(m.chat, {
-                    text: `ℹ️ El archivo número ${id} ya está activo.`
-                }, { quoted: m })
-            }
-
-            item.deleted = false
-            delete item.deletedAt
-
-            saveRecoveredDB(list)
-
-            return conn.sendMessage(m.chat, {
-                text:
-`✅ *ARCHIVO RESTAURADO*
-
-🔢 Número: ${id}
-📁 Tipo: ${item.type}
-💾 La copia física se conservó.
-📋 El archivo vuelve a la lista activa.`
-            }, { quoted: m })
-        }
-
-        // --------------------------------------------------------
-        // 🗑️ MOSTRAR PAPELERA
-        // .recovered papelera
-        // --------------------------------------------------------
-
-        if (
-            command === 'recovered' &&
-            ['papelera', 'borrados', 'deleted'].includes(subcommand)
-        ) {
-            const deleted = list
-                .filter(item => item.deleted === true)
-                .reverse()
-
-            if (!deleted.length) {
-                return conn.sendMessage(m.chat, {
-                    text: '🗑️ La papelera está vacía.'
-                }, { quoted: m })
-            }
-
-            return conn.sendMessage(m.chat, {
-                text:
-`🗑️ *PAPELERA DE ARCHIVOS*
-
-${formatList(deleted.slice(0, 50))}
-
-♻️ Para restaurar:
-.recovered restaurar NÚMERO`
-            }, { quoted: m })
-        }
-
-        // --------------------------------------------------------
-        // 📋 LISTAR O CONSULTAR ARCHIVOS
-        // .recovered
-        // .recovered 1
-        // .recoveredlist
-        // --------------------------------------------------------
-
-        if (
-            command === 'recovered' ||
-            command === 'recoveredlist'
-        ) {
-            if (subcommand) {
-                const item = list.find(
-                    entry => String(entry.id) === subcommand
-                )
-
-                if (!item) {
-                    return conn.sendMessage(m.chat, {
-                        text: `❌ No existe el archivo número ${subcommand}.`
-                    }, { quoted: m })
-                }
-
-                if (item.deleted) {
-                    return conn.sendMessage(m.chat, {
-                        text:
-`🗑️ El archivo número ${item.id} está en la papelera.
-
-Para restaurarlo:
-.recovered restaurar ${item.id}`
-                    }, { quoted: m })
-                }
-
-                return sendRecoveredMedia(conn, m.chat, item)
-            }
-
-            const active = list
-                .filter(item => item.deleted !== true)
-                .reverse()
-                .slice(0, 50)
-
-            if (!active.length) {
-                return conn.sendMessage(m.chat, {
-                    text: '📂 No hay archivos activos guardados.'
-                }, { quoted: m })
-            }
-
-            return conn.sendMessage(m.chat, {
-                text:
-`🗃️ *ARCHIVOS RECUPERADOS*
-
-${formatList(active)}
-
-📌 Mostrando hasta 50 archivos activos.`
-            }, { quoted: m })
-        }
-
-        // --------------------------------------------------------
-        // ♻️ RECUPERAR Y DISTRIBUIR
-        // .ver
-        // .r
-        // --------------------------------------------------------
-
-        if (command === 'ver' || command === 'r') {
-            const quoted = m.quoted
-
-            if (!quoted) {
-                return conn.sendMessage(m.chat, {
-                    text:
-`❌ Respondé a una imagen, video o sticker.
-
-Ejemplos:
-• .ver
-• .r`
-                }, { quoted: m })
-            }
-
-            const type = getMediaType(quoted)
-
-            if (!type) {
-                return conn.sendMessage(m.chat, {
-                    text: '❌ El mensaje citado no es una imagen, video o sticker compatible.'
-                }, { quoted: m })
-            }
-
-            const buffer = await quoted.download()
-
-            if (!buffer || !buffer.length) {
-                return conn.sendMessage(m.chat, {
-                    text: '❌ No se pudo descargar el archivo citado.'
-                }, { quoted: m })
-            }
-
-            // ID sencillo y consecutivo: 1, 2, 3...
-            const id = String(list.length + 1)
-
-            const extension = type === 'image'
-                ? 'jpg'
-                : type === 'video'
-                    ? 'mp4'
-                    : 'webp'
-
-            const filename = `recovered_${id}.${extension}`
-            const filePath = path.join(RECOVERED_DIR, filename)
-
-            // Guardar archivo físico
-            fs.writeFileSync(filePath, buffer)
-
-            // Registrar en JSON
-            const item = {
-                id,
-                type,
-                filename,
-                date: new Date().toLocaleString('es-UY'),
-                chat: m.chat,
-                sender: m.sender || null,
-                mimetype: quoted.mimetype || null,
-                deleted: false
-            }
-
-            list.push(item)
-            saveRecoveredDB(list)
-
-            // Si se ejecuta en un grupo, enviar al grupo de origen.
-            // Por lo tanto, si se usa en C, aparece también en C.
-            if (m.isGroup) {
-                await sendRecoveredMedia(conn, m.chat, item)
-            }
-
-            // Enviar también a A y B.
-            // Si el origen es A o B, evitar el duplicado.
-            // Si se usa por privado, no enviar al privado.
-            await sendToRecoveryGroups(conn, m.chat, item)
-
-            // No enviar confirmación de guardado al chat de origen.
-        }
-
-    } catch (error) {
-        console.error('[RECOVERED] Error:', error)
-
-        return conn.sendMessage(m.chat, {
-            text: '❌ Ocurrió un error al procesar el archivo.'
-        }, { quoted: m })
+const handler = async (
+  m,
+  {
+    conn,
+    command,
+    args = [],
+    usedPrefix = '.',
+    isOwner,
+    isROwner
+  }
+) => {
+  try {
+    if (!checkOwner(m, isOwner, isROwner)) {
+      return m.reply(
+        '⛔ Solo los propietarios pueden usar este comando.'
+      )
     }
+
+    const cmd = String(command || '').toLowerCase()
+    const sub = String(args[0] || '').toLowerCase()
+    const id = String(args[1] || '')
+
+    const list = readDB()
+
+    // ========================================================
+    // 📖 AYUDA
+    // ========================================================
+
+    if (sub === 'ayuda') {
+      return m.reply(
+        `🗃️ *WHATSAPP-BOT — RECUPERADOS*\n\n` +
+        `♻️ ${usedPrefix}ver\n` +
+        `♻️ ${usedPrefix}r\n` +
+        `📋 ${usedPrefix}recovered\n` +
+        `📁 ${usedPrefix}recovered 1\n` +
+        `🗑️ ${usedPrefix}recovered borrar 1\n` +
+        `🗑️ ${usedPrefix}recovered papelera\n` +
+        `♻️ ${usedPrefix}recovered restaurar 1\n` +
+        `📋 ${usedPrefix}recoveredlist`
+      )
+    }
+
+    // ========================================================
+    // 🗑️ BORRAR
+    // ========================================================
+
+    if (
+      cmd === 'recovered' &&
+      ['borrar', 'eliminar'].includes(sub)
+    ) {
+      const item = list.find(
+        x => String(x.id) === id
+      )
+
+      if (!item) {
+        return m.reply('❌ ID inexistente.')
+      }
+
+      if (item.deleted) {
+        return m.reply(
+          '⚠️ Ya está en la papelera.'
+        )
+      }
+
+      item.deleted = true
+      item.deletedAt =
+        new Date().toLocaleString('es-UY')
+
+      saveDB(list)
+
+      return m.reply(
+        `🗑️ Archivo ${id} enviado a la papelera.`
+      )
+    }
+
+    // ========================================================
+    // ♻️ RESTAURAR
+    // ========================================================
+
+    if (
+      cmd === 'recovered' &&
+      ['restaurar', 'restore'].includes(sub)
+    ) {
+      const item = list.find(
+        x => String(x.id) === id
+      )
+
+      if (!item) {
+        return m.reply('❌ ID inexistente.')
+      }
+
+      if (!getFile(item)) {
+        return m.reply(
+          '❌ No existe la copia física.'
+        )
+      }
+
+      item.deleted = false
+      delete item.deletedAt
+
+      saveDB(list)
+
+      return m.reply(
+        `♻️ Archivo ${id} restaurado.`
+      )
+    }
+
+    // ========================================================
+    // 🗑️ PAPELERA
+    // ========================================================
+
+    if (
+      cmd === 'recovered' &&
+      ['papelera', 'borrados'].includes(sub)
+    ) {
+      const deleted = list
+        .filter(x => x.deleted)
+        .slice(-50)
+        .reverse()
+
+      return m.reply(
+        `🗑️ *PAPELERA*\n\n` +
+        formatList(deleted)
+      )
+    }
+
+    // ========================================================
+    // 📋 LISTAR / CONSULTAR
+    // ========================================================
+
+    if (
+      cmd === 'recovered' ||
+      cmd === 'recoveredlist'
+    ) {
+      if (sub) {
+        const item = list.find(
+          x => String(x.id) === sub
+        )
+
+        if (!item) {
+          return m.reply('❌ ID inexistente.')
+        }
+
+        if (item.deleted) {
+          return m.reply(
+            `🗑️ Está en la papelera.\n` +
+            `${usedPrefix}recovered restaurar ${sub}`
+          )
+        }
+
+        const sent = await sendMedia(
+          conn,
+          m.chat,
+          item
+        )
+
+        if (!sent) {
+          return m.reply(
+            '❌ No se pudo enviar el archivo.'
+          )
+        }
+
+        return
+      }
+
+      const active = list
+        .filter(x => !x.deleted)
+        .slice(-50)
+        .reverse()
+
+      return m.reply(
+        `🗃️ *ARCHIVOS RECUPERADOS*\n\n` +
+        formatList(active)
+      )
+    }
+
+    // ========================================================
+    // ♻️ VER / RECUPERAR
+    // ========================================================
+
+    if (cmd === 'ver' || cmd === 'r') {
+      if (!m.quoted) {
+        return m.reply(
+          '❌ Respondé a una imagen, video o sticker.'
+        )
+      }
+
+      const quotedId =
+        m.quoted.id ||
+        m.quoted.key?.id ||
+        m.quoted.fakeObj?.key?.id
+
+      const quotedChat =
+        m.quoted.chat ||
+        m.chat
+
+      let item = findMessage(
+        list,
+        quotedChat,
+        quotedId
+      )
+
+      // Buscar primero una copia existente.
+      if (item && getFile(item)) {
+        if (item.deleted) {
+          return m.reply(
+            `🗑️ Archivo en la papelera.\n` +
+            `${usedPrefix}recovered restaurar ${item.id}`
+          )
+        }
+
+        const sent = await distribute(
+          conn,
+          m.chat,
+          item
+        )
+
+        if (!sent) {
+          return m.reply(
+            '❌ No pude enviar el archivo guardado.'
+          )
+        }
+
+        return
+      }
+
+      const raw =
+        m.quoted.fakeObj?.message ||
+        m.quoted.message
+
+      const info = getMedia(raw)
+
+      if (!info) {
+        return m.reply(
+          '❌ No hay una copia disponible o el archivo no es compatible.'
+        )
+      }
+
+      if (!hasKey(info.data)) {
+        return m.reply(
+          '❌ La foto no tiene una clave multimedia válida. No se puede descargar sin una copia guardada.'
+        )
+      }
+
+      let buffer
+
+      try {
+        buffer = await downloadMedia(info)
+      } catch (error) {
+        console.error(
+          '[VER] Error de descarga:',
+          error?.message || error
+        )
+
+        return m.reply(
+          '❌ WhatsApp no permitió descargar ese archivo.'
+        )
+      }
+
+      item = saveMedia(
+        buffer,
+        info,
+        quotedChat,
+        m.quoted.sender,
+        quotedId
+      )
+
+      const sent = await distribute(
+        conn,
+        m.chat,
+        item
+      )
+
+      if (!sent) {
+        return m.reply(
+          '⚠️ Guardé el archivo, pero no pude enviarlo.'
+        )
+      }
+
+      return
+    }
+
+  } catch (error) {
+    console.error('[VER] Error:', error)
+
+    return m.reply(
+      '❌ Ocurrió un error al procesar el archivo.'
+    )
+  }
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN DEL PLUGIN
+// ⚙️ REGISTRO
 // ============================================================
 
 handler.help = [
-    'ver',
-    'r',
-    'recovered',
-    'recovered <numero>',
-    'recovered borrar <numero>',
-    'recovered papelera',
-    'recovered restaurar <numero>',
-    'recoveredlist',
-    'recovered ayuda'
+  'ver',
+  'r',
+  'recovered',
+  'recoveredlist'
 ]
 
 handler.tags = ['owner']
-handler.command = /^(ver|r|recovered|recoveredlist)$/i
+
+handler.command =
+  /^(ver|r|recovered|recoveredlist)$/i
 
 export default handler

@@ -1,17 +1,18 @@
 
 /**
  * 📂 plugins/perfil.js
- * 🤖 WHATSAPP-BOT — PERFIL COMPLETO
+ * 🤖 WHATSAPP-BOT — SISTEMA COMPLETO DE PERFILES
  *
  * Baileys ES Modules
  *
- * Comandos:
+ * COMANDOS:
  * .perfil
- * .setbr
- * .bio
- * .genero
- * .otorgar
- * .quitar
+ * .perfil @usuario
+ * .setbr 31/12/1998
+ * .bio Mi biografía
+ * .genero Masculino
+ * .otorgar 🏆 Insignia @usuario
+ * .quitar 1 @usuario
  * .insignias
  * .verinsignias
  * .clearinsignias
@@ -59,14 +60,14 @@ function loadJSON(file) {
       !Array.isArray(data)
       ? data
       : {}
-  } catch (e) {
-    console.error('[PERFIL] Error leyendo:', file, e)
+  } catch (error) {
+    console.error('[PERFIL] Error leyendo JSON:', error)
     return {}
   }
 }
 
 function saveJSON(file, data) {
-  const temp = file + '.tmp'
+  const temp = `${file}.tmp`
 
   fs.writeFileSync(
     temp,
@@ -78,7 +79,7 @@ function saveJSON(file, data) {
 }
 
 // ============================================================
-// 🔧 JID
+// 🔧 IDENTIFICADORES
 // ============================================================
 
 function normalizeJid(value, conn) {
@@ -108,6 +109,7 @@ function normalizeJid(value, conn) {
 
   if (jid.includes('@')) {
     const [left, domain] = jid.split('@')
+
     return `${left.split(':')[0]}@${domain}`
   }
 
@@ -147,10 +149,6 @@ function tag(jid) {
     .split(':')[0]
 }
 
-// ============================================================
-// 🎯 USUARIO OBJETIVO
-// ============================================================
-
 function getTarget(m, conn) {
   const mentioned =
     m.mentionedJid?.[0] ||
@@ -165,7 +163,7 @@ function getTarget(m, conn) {
 }
 
 // ============================================================
-// 👑 OWNERS
+// 👑 PERMISOS
 // ============================================================
 
 function ownerAllowed(m, conn, extra = {}) {
@@ -173,11 +171,13 @@ function ownerAllowed(m, conn, extra = {}) {
     extra.isOwner ||
     extra.isROwner ||
     m.fromMe
-  ) return true
+  ) {
+    return true
+  }
 
-  return (global.owner || []).some(x =>
+  return (global.owner || []).some(owner =>
     sameUser(
-      Array.isArray(x) ? x[0] : x,
+      Array.isArray(owner) ? owner[0] : owner,
       m.sender,
       conn
     )
@@ -207,7 +207,9 @@ function getDateParts(value) {
     date.getFullYear() !== y ||
     date.getMonth() !== m - 1 ||
     date.getDate() !== d
-  ) return null
+  ) {
+    return null
+  }
 
   return { y, m, d }
 }
@@ -231,7 +233,9 @@ function parseBirth(value) {
   if (
     y < 1900 ||
     y > new Date().getFullYear()
-  ) return null
+  ) {
+    return null
+  }
 
   return getDateParts(iso) ? iso : null
 }
@@ -275,7 +279,9 @@ function ageOf(value) {
       now.getMonth() + 1 === birth.m &&
       now.getDate() < birth.d
     )
-  ) age--
+  ) {
+    age--
+  }
 
   return Math.max(0, age)
 }
@@ -367,8 +373,8 @@ function zodiac(value) {
   ]
 
   return d <= limits[m - 1]
-    ? signs[(m + 10) % 12]
-    : signs[(m + 11) % 12]
+    ? signs[m - 1]
+    : signs[m % 12]
 }
 
 // ============================================================
@@ -386,7 +392,9 @@ function badgesOf(profile) {
 }
 
 function formatBadges(badges) {
-  if (!badges.length) return 'Sin insignias'
+  if (!badges.length) {
+    return 'Sin insignias'
+  }
 
   return badges.map(
     (badge, index) =>
@@ -395,7 +403,7 @@ function formatBadges(badges) {
 }
 
 // ============================================================
-// ❤️ PAREJAS
+// ❤️ RELACIONES
 // ============================================================
 
 function partnerJid(value, conn) {
@@ -537,9 +545,9 @@ function brotherRank(level) {
 async function roleOf(m, conn, target, extra = {}) {
   const owners = global.owner || []
 
-  if (owners.some(x =>
+  if (owners.some(owner =>
     sameUser(
-      Array.isArray(x) ? x[0] : x,
+      Array.isArray(owner) ? owner[0] : owner,
       target,
       conn
     )
@@ -554,7 +562,9 @@ async function roleOf(m, conn, target, extra = {}) {
     return '👑 Dueño'
   }
 
-  if (!m.isGroup) return '👤 Usuario'
+  if (!m.isGroup) {
+    return '👤 Usuario'
+  }
 
   try {
     const metadata = await conn.groupMetadata(m.chat)
@@ -580,7 +590,7 @@ async function roleOf(m, conn, target, extra = {}) {
 }
 
 // ============================================================
-// 📤 ENVIAR MENSAJES
+// 📤 RESPUESTAS
 // ============================================================
 
 async function replyMention(
@@ -602,32 +612,71 @@ async function replyMention(
 }
 
 // ============================================================
-// 🧠 LEER COMANDO
+// 🧠 COMANDOS
 // ============================================================
 
-function getCommandData(m, extra = {}) {
-  const raw = String(
+const COMMANDS = [
+  'perfil',
+  'setbr',
+  'bio',
+  'genero',
+  'otorgar',
+  'quitar',
+  'insignias',
+  'verinsignias',
+  'clearinsignias',
+  'clearins',
+  'probarbio'
+]
+
+const COMMAND_REGEX =
+  /^(perfil|setbr|bio|genero|otorgar|quitar|insignias|verinsignias|clearinsignias|clearins|probarbio)$/i
+
+function extractMessageText(m) {
+  const message =
+    m.message?.ephemeralMessage?.message ||
+    m.message?.viewOnceMessage?.message ||
+    m.message ||
+    {}
+
+  return String(
     m.text ||
     m.body ||
-    m.message?.conversation ||
-    m.message?.extendedTextMessage?.text ||
-    m.message?.imageMessage?.caption ||
+    message.conversation ||
+    message.extendedTextMessage?.text ||
+    message.imageMessage?.caption ||
     ''
   ).trim()
+}
+
+function getCommandData(m, extra = {}) {
+  const raw = extractMessageText(m)
 
   const match = raw.match(
     /^[.!#/](perfil|setbr|bio|genero|otorgar|quitar|insignias|verinsignias|clearinsignias|clearins|probarbio)(?:\s+([\s\S]*))?$/i
   )
 
-  return {
-    command: String(
-      extra.command || match?.[1] || ''
-    ).toLowerCase(),
+  const rawCommand = String(extra.command || '')
+    .replace(/^[.!#/]/, '')
+    .trim()
+    .toLowerCase()
 
-    text: String(
-      extra.text || match?.[2] || ''
-    ).trim()
-  }
+  const command =
+    match?.[1]?.toLowerCase() ||
+    rawCommand
+
+  const text = match
+    ? String(match[2] || '').trim()
+    : String(
+        extra.text ||
+        (
+          Array.isArray(extra.args)
+            ? extra.args.join(' ')
+            : ''
+        )
+      ).trim()
+
+  return { command, text }
 }
 
 // ============================================================
@@ -642,38 +691,68 @@ const handler = async (m, extra = {}) => {
     text
   } = getCommandData(m, extra)
 
-  console.log(
-    '[PERFIL] Comando recibido:',
-    cmd,
-    '| Texto:',
-    text
-  )
-
-  // ==========================================================
-  // 🧪 PRUEBA DE COMANDOS
-  // ==========================================================
-
-  if (cmd === 'probarbio') {
-    return conn.sendMessage(
-      m.chat,
-      {
-        text:
-          '✅ *WHATSAPP-BOT*\n\n' +
-          'El comando de prueba funciona correctamente.\n' +
-          'El plugin perfil.js está recibiendo comandos.'
-      },
-      { quoted: m }
-    )
-  }
+  console.log('[PERFIL DEBUG]', {
+    comando: cmd,
+    texto: text,
+    comandoHandler: extra.command,
+    textoHandler: extra.text
+  })
 
   try {
-    const perfiles = loadJSON(PERFIL_FILE)
-    const parejas = loadJSON(PAREJAS_FILE)
-    const hermanos = loadJSON(HERMANOS_FILE)
+    if (!conn?.sendMessage) {
+      console.error(
+        '[PERFIL] No se recibió conn.sendMessage'
+      )
+      return
+    }
 
-    const sender = normalizeJid(m.sender, conn)
+    // ========================================================
+    // 🧪 PROBAR BIO
+    // ========================================================
+
+    if (cmd === 'probarbio') {
+      return replyMention(
+        conn,
+        m,
+        `🧪 *PRUEBA DEL PERFIL*
+
+✅ El plugin recibió el comando.
+✅ El sistema de respuestas está disponible.
+
+Probá:
+📝 .bio Soy Feli
+🎂 .setbr 31/12/1998
+⚧️ .genero Masculino
+
+🤖 WHATSAPP-BOT`
+      )
+    }
+
+    if (!COMMANDS.includes(cmd)) {
+      console.warn(
+        '[PERFIL] Comando desconocido:',
+        cmd
+      )
+      return
+    }
+
+    const perfiles = loadJSON(PERFIL_FILE)
+
+    const sender = normalizeJid(
+      m.sender,
+      conn
+    )
+
     const selected = getTarget(m, conn)
     const target = selected || sender
+
+    if (!sender) {
+      return replyMention(
+        conn,
+        m,
+        '❌ No pude identificar tu usuario.'
+      )
+    }
 
     const targetId = findJid(
       perfiles,
@@ -681,27 +760,36 @@ const handler = async (m, extra = {}) => {
       conn
     )
 
-    if (!sender || !targetId) {
-      return m.reply(
-        '❌ No pude identificar al usuario.'
-      )
-    }
-
     // ========================================================
-    // 🎂 SETBR
+    // 🎂 REGISTRAR CUMPLEAÑOS
     // ========================================================
 
     if (cmd === 'setbr') {
-      const birth = parseBirth(text)
-
-      if (!birth) {
-        return m.reply(
+      if (!text) {
+        return replyMention(
+          conn,
+          m,
           '🎂 *REGISTRAR CUMPLEAÑOS*\n\n' +
-          'Usá: *.setbr 31/12/1998*'
+          'Uso: *.setbr 31/12/1998*'
         )
       }
 
-      const id = findJid(perfiles, sender, conn)
+      const birth = parseBirth(text)
+
+      if (!birth) {
+        return replyMention(
+          conn,
+          m,
+          '❌ Fecha inválida.\n\n' +
+          'Ejemplo: *.setbr 31/12/1998*'
+        )
+      }
+
+      const id = findJid(
+        perfiles,
+        sender,
+        conn
+      )
 
       perfiles[id] ||= {}
       perfiles[id].birth = birth
@@ -718,7 +806,7 @@ const handler = async (m, extra = {}) => {
 
 📅 Nacimiento: ${formatDate(birth)}
 🎉 Edad: ${ageOf(birth)} años
-♑ Signo: ${zodiac(birth)}
+✨ Signo: ${zodiac(birth)}
 
 🤖 WHATSAPP-BOT`,
         [id]
@@ -726,26 +814,34 @@ const handler = async (m, extra = {}) => {
     }
 
     // ========================================================
-    // 📝 BIO
+    // 📝 BIOGRAFÍA
     // ========================================================
 
     if (cmd === 'bio') {
-      const bio = String(text).trim()
+      const bio = String(text || '').trim()
 
       if (!bio) {
-        return m.reply(
+        return replyMention(
+          conn,
+          m,
           '📝 *BIOGRAFÍA*\n\n' +
-          'Usá: *.bio Me gusta la música*'
+          'Uso: *.bio Me gusta la música*'
         )
       }
 
       if (bio.length > 300) {
-        return m.reply(
+        return replyMention(
+          conn,
+          m,
           '❌ Máximo 300 caracteres.'
         )
       }
 
-      const id = findJid(perfiles, sender, conn)
+      const id = findJid(
+        perfiles,
+        sender,
+        conn
+      )
 
       perfiles[id] ||= {}
       perfiles[id].bio = bio
@@ -760,7 +856,7 @@ const handler = async (m, extra = {}) => {
 👤 Usuario: ${tag(id)}
 ✅ Tu biografía fue guardada correctamente.
 
-📖 Nueva biografía:
+📖 *Nueva biografía:*
 ${bio}
 
 🤖 WHATSAPP-BOT`,
@@ -773,22 +869,30 @@ ${bio}
     // ========================================================
 
     if (cmd === 'genero') {
-      const genero = String(text).trim()
+      const genero = String(text || '').trim()
 
       if (!genero) {
-        return m.reply(
+        return replyMention(
+          conn,
+          m,
           '⚧️ *REGISTRAR GÉNERO*\n\n' +
-          'Usá: *.genero Masculino*'
+          'Uso: *.genero Masculino*'
         )
       }
 
       if (genero.length > 40) {
-        return m.reply(
+        return replyMention(
+          conn,
+          m,
           '❌ Máximo 40 caracteres.'
         )
       }
 
-      const id = findJid(perfiles, sender, conn)
+      const id = findJid(
+        perfiles,
+        sender,
+        conn
+      )
 
       perfiles[id] ||= {}
       perfiles[id].genero = genero
@@ -819,7 +923,9 @@ ${bio}
       cmd === 'clearins'
     ) {
       if (!ownerAllowed(m, conn, extra)) {
-        return m.reply(
+        return replyMention(
+          conn,
+          m,
           '🚫 Solo los dueños pueden limpiar insignias.'
         )
       }
@@ -827,7 +933,10 @@ ${bio}
       let total = 0
 
       for (const profile of Object.values(perfiles)) {
-        if (!profile || typeof profile !== 'object') {
+        if (
+          !profile ||
+          typeof profile !== 'object'
+        ) {
           continue
         }
 
@@ -837,7 +946,9 @@ ${bio}
 
       saveJSON(PERFIL_FILE, perfiles)
 
-      return m.reply(
+      return replyMention(
+        conn,
+        m,
         '🧹 *INSIGNIAS LIMPIADAS*\n\n' +
         `✅ Se eliminaron ${total} insignias.`
       )
@@ -852,13 +963,17 @@ ${bio}
       cmd === 'quitar'
     ) {
       if (!ownerAllowed(m, conn, extra)) {
-        return m.reply(
+        return replyMention(
+          conn,
+          m,
           '🚫 Solo los dueños pueden administrar insignias.'
         )
       }
 
       if (!selected) {
-        return m.reply(
+        return replyMention(
+          conn,
+          m,
           '❌ Mencioná o respondé al usuario.\n\n' +
           (
             cmd === 'otorgar'
@@ -887,13 +1002,18 @@ ${bio}
 
       if (cmd === 'otorgar') {
         if (!content) {
-          return m.reply(
-            '🏅 Usá:\n*.otorgar 🏆 Mejor Admin @usuario*'
+          return replyMention(
+            conn,
+            m,
+            '🏅 Uso:\n' +
+            '*.otorgar 🏆 Mejor Admin @usuario*'
           )
         }
 
         if (content.length > 100) {
-          return m.reply(
+          return replyMention(
+            conn,
+            m,
             '❌ Máximo 100 caracteres.'
           )
         }
@@ -901,7 +1021,9 @@ ${bio}
         if (badges.some(x =>
           x.toLowerCase() === content.toLowerCase()
         )) {
-          return m.reply(
+          return replyMention(
+            conn,
+            m,
             '⚠️ Esa insignia ya existe.'
           )
         }
@@ -913,12 +1035,17 @@ ${bio}
         return replyMention(
           conn,
           m,
-          '🏅 *INSIGNIA OTORGADA*\n\n' +
-          `👤 ${tag(id)}\n` +
-          `${badges.length}. ${content}\n\n` +
-          '━━━━━━━━━━━━━━━━━━━━\n' +
-          '*Insignias actuales:*\n' +
-          formatBadges(badges),
+          `🏅 *INSIGNIA OTORGADA*
+
+👤 Usuario: ${tag(id)}
+🏆 Insignia: ${content}
+
+━━━━━━━━━━━━━━━━━━━━
+*INSIGNIAS ACTUALES*
+
+${formatBadges(badges)}
+
+🤖 WHATSAPP-BOT`,
           [id]
         )
       }
@@ -930,7 +1057,9 @@ ${bio}
         numero < 1 ||
         numero > badges.length
       ) {
-        return m.reply(
+        return replyMention(
+          conn,
+          m,
           '❌ Indicá un número válido.\n\n' +
           formatBadges(badges)
         )
@@ -946,11 +1075,17 @@ ${bio}
       return replyMention(
         conn,
         m,
-        '🗑️ *INSIGNIA ELIMINADA*\n\n' +
-        `👤 ${tag(id)}\n` +
-        `❌ ${numero}. ${eliminada}\n\n` +
-        '🏅 *Insignias restantes:*\n' +
-        formatBadges(badges),
+        `🗑️ *INSIGNIA ELIMINADA*
+
+👤 Usuario: ${tag(id)}
+❌ Insignia: ${eliminada}
+
+━━━━━━━━━━━━━━━━━━━━
+*INSIGNIAS RESTANTES*
+
+${formatBadges(badges)}
+
+🤖 WHATSAPP-BOT`,
         [id]
       )
     }
@@ -969,18 +1104,24 @@ ${bio}
         conn
       )
 
-      const badges = badgesOf(perfiles[id])
+      const badges = badgesOf(
+        perfiles[id]
+      )
 
       return replyMention(
         conn,
         m,
-        '╭━━━〔 🏅 INSIGNIAS 〕━━━╮\n\n' +
-        `👤 Usuario: ${tag(id)}\n\n` +
-        '━━━━━━━━━━━━━━━━━━━━\n\n' +
-        formatBadges(badges) +
-        '\n\n━━━━━━━━━━━━━━━━━━━━\n' +
-        `🏅 Total: ${badges.length}\n` +
-        '╰━━━━━━━━━━━━━━━━━━━━╯',
+        `╭━━━〔 🏅 INSIGNIAS 〕━━━╮
+
+👤 Usuario: ${tag(id)}
+
+━━━━━━━━━━━━━━━━━━━━
+
+${formatBadges(badges)}
+
+━━━━━━━━━━━━━━━━━━━━
+🏅 Total: ${badges.length}
+╰━━━━━━━━━━━━━━━━━━━━╯`,
         [id]
       )
     }
@@ -1003,6 +1144,9 @@ ${bio}
       )
 
       const badges = badgesOf(perfil)
+
+      const parejas = loadJSON(PAREJAS_FILE)
+      const hermanos = loadJSON(HERMANOS_FILE)
 
       const parejaInfo = getPartner(
         parejas,
@@ -1076,7 +1220,7 @@ ${perfil.bio || 'Sin biografía'}
     : `${edad} años`
 }
 
-♈ *Signo:* ${zodiac(perfil.birth)}
+✨ *Signo:* ${zodiac(perfil.birth)}
 
 🎂 *Cumpleaños:* ${
   cumple === null
@@ -1117,7 +1261,8 @@ ${formatBadges(badges)}
 🤝 Hermanos: ${brothers.length}/3
 🏅 Insignias: ${badges.length}
 
-━━━━━━━━━━━━━━━━━━━━`
+━━━━━━━━━━━━━━━━━━━━
+🤖 WHATSAPP-BOT`
 
       try {
         const photo = await conn.profilePictureUrl(
@@ -1136,10 +1281,10 @@ ${formatBadges(badges)}
             { quoted: m }
           )
         }
-      } catch (e) {
+      } catch (error) {
         console.log(
-          '[PERFIL] Sin foto disponible:',
-          e.message
+          '[PERFIL] Foto no disponible:',
+          error.message
         )
       }
 
@@ -1151,38 +1296,45 @@ ${formatBadges(badges)}
       )
     }
 
-  } catch (e) {
-    console.error('[PERFIL] Error:', e)
-
-    return m.reply(
-      '❌ Ocurrió un error al procesar el perfil.'
+  } catch (error) {
+    console.error(
+      '[PERFIL] ERROR EN COMANDO:',
+      cmd,
+      error
     )
+
+    try {
+      return await replyMention(
+        conn,
+        m,
+        `❌ Error al ejecutar *.${cmd}*.\n\n` +
+        'Revisá la consola del bot.'
+      )
+    } catch (sendError) {
+      console.error(
+        '[PERFIL] Error enviando respuesta:',
+        sendError
+      )
+    }
   }
 }
 
 // ============================================================
-// 📋 COMANDOS
+// 📋 REGISTRO DE COMANDOS
 // ============================================================
 
-handler.help = [
-  'perfil',
-  'setbr',
-  'bio',
-  'genero',
-  'otorgar',
-  'quitar',
-  'insignias',
-  'verinsignias',
-  'clearinsignias',
-  'clearins',
-  'probarbio'
-]
+handler.help = COMMANDS
 
-handler.tags = ['perfil', 'owner']
+handler.tags = [
+  'perfil',
+  'owner'
+]
 
 handler.command =
   /^(perfil|setbr|bio|genero|otorgar|quitar|insignias|verinsignias|clearinsignias|clearins|probarbio)$/i
 
-console.log('✅ [PERFIL] Plugin cargado correctamente')
+console.log(
+  '✅ [PERFIL] Plugin cargado correctamente'
+)
 
 export default handler

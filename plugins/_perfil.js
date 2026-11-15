@@ -10,7 +10,19 @@
  * ⚧️ Género
  * ❤️ Pareja
  * 🧬 Hasta 3 hermanos
- * 🏅 Insignias numeradas
+ * 🏅 Insignias personalizadas y numeradas
+ *
+ * Comandos:
+ * .perfil
+ * .setbr
+ * .bio
+ * .genero
+ * .otorgar
+ * .quitar
+ * .insignias
+ * .verinsignias
+ * .clearinsignias
+ * .clearins
  *
  * Baileys ES Modules
  */
@@ -153,6 +165,7 @@ function tag(jid) {
 function getTarget(m, conn) {
   const mentioned =
     m.mentionedJid?.[0] ||
+    m.mentions?.[0] ||
     m.message?.extendedTextMessage
       ?.contextInfo?.mentionedJid?.[0]
 
@@ -602,17 +615,45 @@ async function replyMention(
 }
 
 // ============================================================
+// 🧠 OBTENER TEXTO Y COMANDO
+// ============================================================
+
+function getCommandData(m, extra = {}) {
+  const raw = String(
+    m.text ||
+    m.body ||
+    m.message?.conversation ||
+    m.message?.extendedTextMessage?.text ||
+    m.message?.imageMessage?.caption ||
+    ''
+  ).trim()
+
+  const match = raw.match(
+    /^[.!#/](perfil|setbr|bio|genero|otorgar|quitar|insignias|verinsignias|clearinsignias|clearins)(?:\s+([\s\S]*))?$/i
+  )
+
+  return {
+    command: String(
+      extra.command || match?.[1] || ''
+    ).toLowerCase(),
+
+    text: String(
+      extra.text || match?.[2] || ''
+    ).trim()
+  }
+}
+
+// ============================================================
 // 🚀 HANDLER PRINCIPAL
 // ============================================================
 
-const handler = async (m, extra) => {
-  const {
-    conn,
-    command,
-    text = ''
-  } = extra
+const handler = async (m, extra = {}) => {
+  const { conn } = extra
 
-  const cmd = String(command || '').toLowerCase()
+  const {
+    command: cmd,
+    text
+  } = getCommandData(m, extra)
 
   try {
     const perfiles = loadJSON(PERFIL_FILE)
@@ -636,7 +677,7 @@ const handler = async (m, extra) => {
     }
 
     // ========================================================
-    // 🎂 SETBR
+    // 🎂 REGISTRAR CUMPLEAÑOS
     // ========================================================
 
     if (cmd === 'setbr') {
@@ -645,7 +686,7 @@ const handler = async (m, extra) => {
       if (!birth) {
         return m.reply(
           '🎂 *REGISTRAR CUMPLEAÑOS*\n\n' +
-          'Usá:\n*.setbr 31/12/1998*'
+          '📅 Usá: *.setbr 31/12/1998*'
         )
       }
 
@@ -656,16 +697,26 @@ const handler = async (m, extra) => {
 
       saveJSON(PERFIL_FILE, perfiles)
 
-      return m.reply(
-        '✅ *Cumpleaños registrado*\n\n' +
-        `🎂 ${formatDate(birth)}\n` +
-        `👤 Edad: ${ageOf(birth)} años\n` +
-        `♑ Signo: ${zodiac(birth)}`
+      return replyMention(
+        conn,
+        m,
+        `🎂 *CUMPLEAÑOS REGISTRADO*
+
+👤 Usuario: ${tag(id)}
+
+✅ Tu cumpleaños fue registrado correctamente.
+
+📅 *Nacimiento:* ${formatDate(birth)}
+🎉 *Edad:* ${ageOf(birth)} años
+♑ *Signo:* ${zodiac(birth)}
+
+🤖 *WHATSAPP-BOT*`,
+        [id]
       )
     }
 
     // ========================================================
-    // 📝 BIO
+    // 📝 BIOGRAFÍA
     // ========================================================
 
     if (cmd === 'bio') {
@@ -674,7 +725,7 @@ const handler = async (m, extra) => {
       if (!bio) {
         return m.reply(
           '📝 *BIOGRAFÍA*\n\n' +
-          'Usá:\n*.bio Tu biografía acá*'
+          'Usá: *.bio Me gusta la música*'
         )
       }
 
@@ -691,8 +742,20 @@ const handler = async (m, extra) => {
 
       saveJSON(PERFIL_FILE, perfiles)
 
-      return m.reply(
-        '✅ Biografía actualizada correctamente.'
+      return replyMention(
+        conn,
+        m,
+        `📝 *BIOGRAFÍA ACTUALIZADA*
+
+👤 Usuario: ${tag(id)}
+
+✅ Tu biografía fue guardada correctamente.
+
+📖 *Nueva biografía:*
+${bio}
+
+🤖 *WHATSAPP-BOT*`,
+        [id]
       )
     }
 
@@ -705,8 +768,8 @@ const handler = async (m, extra) => {
 
       if (!genero) {
         return m.reply(
-          '⚧️ *GÉNERO*\n\n' +
-          'Usá:\n*.genero Masculino*'
+          '⚧️ *REGISTRAR GÉNERO*\n\n' +
+          'Usá: *.genero Masculino*'
         )
       }
 
@@ -723,8 +786,19 @@ const handler = async (m, extra) => {
 
       saveJSON(PERFIL_FILE, perfiles)
 
-      return m.reply(
-        `✅ Género actualizado: *${genero}*`
+      return replyMention(
+        conn,
+        m,
+        `⚧️ *GÉNERO ACTUALIZADO*
+
+👤 Usuario: ${tag(id)}
+
+✅ Tu género fue guardado correctamente.
+
+⚧️ *Género:* ${genero}
+
+🤖 *WHATSAPP-BOT*`,
+        [id]
       )
     }
 

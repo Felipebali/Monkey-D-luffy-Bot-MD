@@ -3,14 +3,7 @@
  * 📂 plugins/perfil.js
  * 🤖 WHATSAPP-BOT — PERFIL COMPLETO
  *
- * 👤 Perfil
- * 🎂 Cumpleaños
- * ♑ Signo zodiacal
- * 📝 Biografía
- * ⚧️ Género
- * ❤️ Pareja
- * 🧬 Hasta 3 hermanos
- * 🏅 Insignias personalizadas y numeradas
+ * Baileys ES Modules
  *
  * Comandos:
  * .perfil
@@ -23,8 +16,7 @@
  * .verinsignias
  * .clearinsignias
  * .clearins
- *
- * Baileys ES Modules
+ * .probarbio
  */
 
 import fs from 'fs'
@@ -86,7 +78,7 @@ function saveJSON(file, data) {
 }
 
 // ============================================================
-// 🔧 NORMALIZAR JID
+// 🔧 JID
 // ============================================================
 
 function normalizeJid(value, conn) {
@@ -116,7 +108,6 @@ function normalizeJid(value, conn) {
 
   if (jid.includes('@')) {
     const [left, domain] = jid.split('@')
-
     return `${left.split(':')[0]}@${domain}`
   }
 
@@ -131,9 +122,7 @@ function sameUser(a, b, conn) {
   const A = normalizeJid(a, conn)
   const B = normalizeJid(b, conn)
 
-  if (!A || !B) return false
-
-  return A === B
+  return Boolean(A && B && A === B)
 }
 
 function findJid(data, jid, conn) {
@@ -159,7 +148,7 @@ function tag(jid) {
 }
 
 // ============================================================
-// 🎯 OBTENER USUARIO
+// 🎯 USUARIO OBJETIVO
 // ============================================================
 
 function getTarget(m, conn) {
@@ -224,9 +213,7 @@ function getDateParts(value) {
 }
 
 function parseBirth(value) {
-  const text = String(value || '').trim()
-
-  const match = text.match(
+  const match = String(value || '').trim().match(
     /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/
   )
 
@@ -306,9 +293,11 @@ function birthdayIn(value) {
     now.getDate()
   )
 
-  let year = now.getFullYear()
-
-  while (year <= now.getFullYear() + 8) {
+  for (
+    let year = now.getFullYear();
+    year <= now.getFullYear() + 8;
+    year++
+  ) {
     const next = Date.UTC(
       year,
       birth.m - 1,
@@ -326,8 +315,6 @@ function birthdayIn(value) {
         (next - today) / 86400000
       )
     }
-
-    year++
   }
 
   return null
@@ -349,7 +336,7 @@ function daysSince(value) {
 }
 
 // ============================================================
-// ♑ SIGNO ZODIACAL
+// ♑ ZODIACO
 // ============================================================
 
 function zodiac(value) {
@@ -615,7 +602,7 @@ async function replyMention(
 }
 
 // ============================================================
-// 🧠 OBTENER TEXTO Y COMANDO
+// 🧠 LEER COMANDO
 // ============================================================
 
 function getCommandData(m, extra = {}) {
@@ -629,7 +616,7 @@ function getCommandData(m, extra = {}) {
   ).trim()
 
   const match = raw.match(
-    /^[.!#/](perfil|setbr|bio|genero|otorgar|quitar|insignias|verinsignias|clearinsignias|clearins)(?:\s+([\s\S]*))?$/i
+    /^[.!#/](perfil|setbr|bio|genero|otorgar|quitar|insignias|verinsignias|clearinsignias|clearins|probarbio)(?:\s+([\s\S]*))?$/i
   )
 
   return {
@@ -655,6 +642,30 @@ const handler = async (m, extra = {}) => {
     text
   } = getCommandData(m, extra)
 
+  console.log(
+    '[PERFIL] Comando recibido:',
+    cmd,
+    '| Texto:',
+    text
+  )
+
+  // ==========================================================
+  // 🧪 PRUEBA DE COMANDOS
+  // ==========================================================
+
+  if (cmd === 'probarbio') {
+    return conn.sendMessage(
+      m.chat,
+      {
+        text:
+          '✅ *WHATSAPP-BOT*\n\n' +
+          'El comando de prueba funciona correctamente.\n' +
+          'El plugin perfil.js está recibiendo comandos.'
+      },
+      { quoted: m }
+    )
+  }
+
   try {
     const perfiles = loadJSON(PERFIL_FILE)
     const parejas = loadJSON(PAREJAS_FILE)
@@ -677,7 +688,7 @@ const handler = async (m, extra = {}) => {
     }
 
     // ========================================================
-    // 🎂 REGISTRAR CUMPLEAÑOS
+    // 🎂 SETBR
     // ========================================================
 
     if (cmd === 'setbr') {
@@ -686,7 +697,7 @@ const handler = async (m, extra = {}) => {
       if (!birth) {
         return m.reply(
           '🎂 *REGISTRAR CUMPLEAÑOS*\n\n' +
-          '📅 Usá: *.setbr 31/12/1998*'
+          'Usá: *.setbr 31/12/1998*'
         )
       }
 
@@ -703,20 +714,19 @@ const handler = async (m, extra = {}) => {
         `🎂 *CUMPLEAÑOS REGISTRADO*
 
 👤 Usuario: ${tag(id)}
-
 ✅ Tu cumpleaños fue registrado correctamente.
 
-📅 *Nacimiento:* ${formatDate(birth)}
-🎉 *Edad:* ${ageOf(birth)} años
-♑ *Signo:* ${zodiac(birth)}
+📅 Nacimiento: ${formatDate(birth)}
+🎉 Edad: ${ageOf(birth)} años
+♑ Signo: ${zodiac(birth)}
 
-🤖 *WHATSAPP-BOT*`,
+🤖 WHATSAPP-BOT`,
         [id]
       )
     }
 
     // ========================================================
-    // 📝 BIOGRAFÍA
+    // 📝 BIO
     // ========================================================
 
     if (cmd === 'bio') {
@@ -748,13 +758,12 @@ const handler = async (m, extra = {}) => {
         `📝 *BIOGRAFÍA ACTUALIZADA*
 
 👤 Usuario: ${tag(id)}
-
 ✅ Tu biografía fue guardada correctamente.
 
-📖 *Nueva biografía:*
+📖 Nueva biografía:
 ${bio}
 
-🤖 *WHATSAPP-BOT*`,
+🤖 WHATSAPP-BOT`,
         [id]
       )
     }
@@ -792,12 +801,11 @@ ${bio}
         `⚧️ *GÉNERO ACTUALIZADO*
 
 👤 Usuario: ${tag(id)}
-
 ✅ Tu género fue guardado correctamente.
 
-⚧️ *Género:* ${genero}
+⚧️ Género: ${genero}
 
-🤖 *WHATSAPP-BOT*`,
+🤖 WHATSAPP-BOT`,
         [id]
       )
     }
@@ -877,7 +885,6 @@ ${bio}
         .replace(/\s+/g, ' ')
         .trim()
 
-      // 🏅 OTORGAR
       if (cmd === 'otorgar') {
         if (!content) {
           return m.reply(
@@ -916,7 +923,6 @@ ${bio}
         )
       }
 
-      // ❌ QUITAR
       const numero = Number(content)
 
       if (
@@ -1019,7 +1025,6 @@ ${bio}
         ...brothers.map(b => b.jid)
       ].filter(Boolean)
 
-      // ❤️ RELACIÓN
       let relacion = ''
 
       if (parejaJid) {
@@ -1040,7 +1045,6 @@ ${bio}
           'No tiene pareja registrada.'
       }
 
-      // 🧬 HERMANOS
       const hermanosTexto = brothers.length
         ? brothers.map((b, index) =>
           `${index + 1}. 🤝 ${tag(b.jid)}\n` +
@@ -1052,7 +1056,6 @@ ${bio}
         ).join('\n\n')
         : '😹 No tiene hermanos registrados.'
 
-      // 📋 TEXTO
       const texto =
 `╭━━━━━━━━━━━━━━━━━━━━╮
         👤 *PERFIL*
@@ -1116,7 +1119,6 @@ ${formatBadges(badges)}
 
 ━━━━━━━━━━━━━━━━━━━━`
 
-      // 📸 FOTO DE PERFIL
       try {
         const photo = await conn.profilePictureUrl(
           targetId,
@@ -1141,7 +1143,6 @@ ${formatBadges(badges)}
         )
       }
 
-      // 📤 SIN FOTO
       return replyMention(
         conn,
         m,
@@ -1173,12 +1174,15 @@ handler.help = [
   'insignias',
   'verinsignias',
   'clearinsignias',
-  'clearins'
+  'clearins',
+  'probarbio'
 ]
 
 handler.tags = ['perfil', 'owner']
 
 handler.command =
-  /^(perfil|setbr|bio|genero|otorgar|quitar|insignias|verinsignias|clearinsignias|clearins)$/i
+  /^(perfil|setbr|bio|genero|otorgar|quitar|insignias|verinsignias|clearinsignias|clearins|probarbio)$/i
+
+console.log('✅ [PERFIL] Plugin cargado correctamente')
 
 export default handler

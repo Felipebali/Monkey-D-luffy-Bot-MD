@@ -1,123 +1,66 @@
 
 /**
  * 📂 plugins/_play.js
- * 🤖 WHATSAPP-BOT — DESCARGAR AUDIO DE YOUTUBE
- * Compatible con Baileys ES Modules y sistema handler
+ * 🤖 WHATSAPP-BOT — PLAY AUDIO
  *
- * Comandos:
- * .play
- * .mp3
- * .ytmp3
- * .ytaudio
- * .playaudio
+ * ✅ API original conservada
+ * ✅ Búsqueda de YouTube
+ * ✅ Miniatura e información
+ * ✅ Descarga y envío de MP3
+ * ✅ Sistema handler
+ * ✅ Baileys ES Modules
  */
 
 import ytsearch from 'yt-search'
+import { getBuffer } from '#serialize'
 import fetch from 'node-fetch'
-
-// ============================================================
-// ⚙️ CONFIGURACIÓN DE API
-// ============================================================
-
-const getApiConfig = () => {
-  const config = global.api || {}
-
-  return {
-    url: config.url || process.env.API_URL || '',
-    key: config.key || process.env.API_KEY || ''
-  }
-}
-
-// ============================================================
-// 📥 DESCARGAR ARCHIVOS
-// ============================================================
-
-async function getBuffer(url) {
-  if (!url) throw new Error('URL de descarga vacía')
-
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(60000)
-  })
-
-  if (!response.ok) {
-    throw new Error(`Error HTTP ${response.status}`)
-  }
-
-  const contentType = response.headers.get('content-type') || ''
-
-  if (
-    contentType.includes('text/html') ||
-    contentType.includes('application/json')
-  ) {
-    throw new Error('La URL no devolvió un archivo multimedia')
-  }
-
-  return Buffer.from(await response.arrayBuffer())
-}
 
 // ============================================================
 // 🎵 HANDLER PRINCIPAL
 // ============================================================
 
-const handler = async (m, { conn, text, args, usedPrefix, command }) => {
+const handler = async (m, { conn, args, text, usedPrefix, command }) => {
   try {
-    const query = text?.trim() || args?.join(' ').trim()
-
-    if (!query) {
+    if (!args?.[0] && !text) {
       return m.reply(
-        `《✧》 Por favor, escribí el nombre o URL del video.\n\n` +
-        `Ejemplo: ${usedPrefix || '.'}${command} Linkin Park Numb`
+        '《✧》 Por favor, menciona el nombre o URL del video que deseas descargar.'
       )
     }
 
-    const { url: apiUrl, key: apiKey } = getApiConfig()
-
-    if (!apiUrl || !apiKey) {
-      return m.reply('❌ La API de descargas no está configurada.')
-    }
-
-    await conn.sendMessage(m.chat, {
-      react: { text: '⏳', key: m.key }
-    }).catch(() => {})
+    const query = text || args.join(' ')
 
     // ========================================================
     // 🔎 BUSCAR VIDEO
     // ========================================================
 
-    let videoUrl = query
+    const searchResult = await ytsearch(query)
 
-    if (!/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(query)) {
-      const search = await ytsearch(query)
+    if (!searchResult.videos || !searchResult.videos.length) {
+      return m.reply(
+        '《✧》 No se encontró información del video.'
+      )
+    }
 
-      if (!search?.videos?.length) {
-        return m.reply('《✧》 No se encontró información del video.')
-      }
+    const videoUrl = searchResult.videos[0].url
 
-      videoUrl = search.videos[0].url
+    // ========================================================
+    // 🌐 API ORIGINAL
+    // ========================================================
+
+    const dlEndpoint =
+      `${api.url}/dl/youtubeplay?query=${encodeURIComponent(videoUrl)}&key=${api.key}`
+
+    const resDl = await fetch(dlEndpoint).then(r => r.json())
+
+    if (!resDl?.status || !resDl?.result?.dl) {
+      return m.reply(
+        '《✧》 No se pudo descargar el *audio*, intenta más tarde.'
+      )
     }
 
     // ========================================================
-    // 🌐 CONSULTAR API
+    // 📋 INFORMACIÓN DEL VIDEO
     // ========================================================
-
-    const endpoint =
-      `${apiUrl.replace(/\/$/, '')}/dl/youtubeplay` +
-      `?query=${encodeURIComponent(videoUrl)}` +
-      `&key=${encodeURIComponent(apiKey)}`
-
-    const response = await fetch(endpoint, {
-      signal: AbortSignal.timeout(60000)
-    })
-
-    if (!response.ok) {
-      throw new Error(`API HTTP ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    if (!data?.status || !data?.result?.dl) {
-      return m.reply('《✧》 No se pudo descargar el audio. Intentá más tarde.')
-    }
 
     const {
       title,
@@ -126,39 +69,36 @@ const handler = async (m, { conn, text, args, usedPrefix, command }) => {
       views,
       thumbnail,
       dl
-    } = data.result
+    } = resDl.result
 
-    const titulo = title || 'Audio de YouTube'
+    const vistas = (views || 0).toLocaleString()
     const canal = channel || 'Desconocido'
-    const vistas = Number(views || 0).toLocaleString('es-UY')
 
-    const caption = `【　✿　】 _\`୨୧ Download\` ───── *${titulo}*_
+    const thumbBuffer = await getBuffer(thumbnail)
+
+    const caption = `【　✿　】 _\`୨୧  Download\` ───── *${title}*_
 
 > _✐ \`Canal\` ── ${canal}_
-> _ⴵ \`Duración\` ── ${duration || 'Desconocida'}_
+> _ⴵ \`Duración\` ── ${duration || ''}s_
 > _✰ \`Vistas\` ── ${vistas}_
 > _🜸 \`Enlace\` ── ${videoUrl}_
 
-> _── ִ ۟ *¡Enviando audio, por favor esperá!*_`
+> _──  ִ    ۟  *¡Enviando audio, por favor espera!*_`
 
     // ========================================================
     // 🖼️ ENVIAR MINIATURA
     // ========================================================
 
-    if (thumbnail) {
-      try {
-        const thumbBuffer = await getBuffer(thumbnail)
-
-        await conn.sendMessage(m.chat, {
-          image: thumbBuffer,
-          caption
-        }, { quoted: m })
-      } catch {
-        await m.reply(caption)
+    await conn.sendMessage(
+      m.chat,
+      {
+        image: thumbBuffer,
+        caption
+      },
+      {
+        quoted: m
       }
-    } else {
-      await m.reply(caption)
-    }
+    )
 
     // ========================================================
     // 🎧 DESCARGAR AUDIO
@@ -166,45 +106,56 @@ const handler = async (m, { conn, text, args, usedPrefix, command }) => {
 
     const audioBuffer = await getBuffer(dl)
 
-    if (!audioBuffer.length) {
-      throw new Error('El archivo de audio está vacío')
+    if (!audioBuffer || audioBuffer.length === 0) {
+      return m.reply(
+        '《✧》 No se pudo descargar el *audio*, intenta más tarde.'
+      )
     }
 
     // ========================================================
     // 📤 ENVIAR AUDIO
     // ========================================================
 
-    await conn.sendMessage(m.chat, {
+    const mensaje = {
       audio: audioBuffer,
       mimetype: 'audio/mpeg',
-      fileName: `${titulo.replace(/[\\/:*?"<>|]/g, '')}.mp3`,
+      fileName: `${title}.mp3`,
       ptt: false
-    }, { quoted: m })
+    }
 
-    await conn.sendMessage(m.chat, {
-      react: { text: '✅', key: m.key }
-    }).catch(() => {})
+    await conn.sendMessage(
+      m.chat,
+      mensaje,
+      {
+        quoted: m
+      }
+    )
 
-  } catch (error) {
-    console.error('❌ PLAY ERROR:', error)
-
-    await conn.sendMessage(m.chat, {
-      react: { text: '❌', key: m.key }
-    }).catch(() => {})
+  } catch (e) {
+    console.error('❌ PLAY ERROR:', e)
 
     await m.reply(
-      '❌ Ocurrió un error al descargar el audio.\n' +
-      'Intentá nuevamente más tarde.'
+      typeof msgglobal !== 'undefined'
+        ? msgglobal
+        : '❌ Ocurrió un error al descargar el audio.'
     )
   }
 }
 
 // ============================================================
-// 🧩 CONFIGURACIÓN HANDLER
+// ⚙️ CONFIGURACIÓN HANDLER
 // ============================================================
 
-handler.help = ['play', 'mp3', 'ytmp3', 'ytaudio', 'playaudio']
+handler.help = [
+  'play',
+  'mp3',
+  'ytmp3',
+  'ytaudio',
+  'playaudio'
+]
+
 handler.tags = ['descargas']
+
 handler.command = /^(play|mp3|ytmp3|ytaudio|playaudio)$/i
 
 export default handler

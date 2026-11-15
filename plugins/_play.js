@@ -3,6 +3,12 @@
  * 📂 plugins/_play.js
  * 🤖 WHATSAPP-BOT — PLAY AUDIO
  *
+ * Requiere:
+ * npm install @distube/ytdl-core yt-search axios
+ *
+ * Audio MP4/AAC sin FFmpeg ni yt-dlp.
+ *
+ * Comandos:
  * .play
  * .playaudio
  * .audio
@@ -14,119 +20,121 @@
 
 import yts from 'yt-search'
 import axios from 'axios'
-import { spawn, spawnSync } from 'node:child_process'
-import fs from 'node:fs/promises'
-import os from 'node:os'
-import path from 'node:path'
 
 const MAX_SECONDS = 420
-const COOLDOWN_MS = 300000
 const MAX_BYTES = 25 * 1024 * 1024
+const COOLDOWN = 5 * 60 * 1000
+
 const cooldowns = new Map()
+const inProgress = new Set()
 
 // ============================================================
-// ⚙️ PROGRAMAS DISPONIBLES
+// 📝 REGISTROS
 // ============================================================
 
-function available(name) {
-  try {
-    const result = spawnSync(
-      name,
-      ['--version'],
-      { timeout: 5000, stdio: 'ignore' }
-    )
-
-    return result.status === 0
-  } catch {
-    return false
-  }
+function log(message) {
+  console.log('[PLAY]', message)
 }
 
-const HAS_FFMPEG = available('ffmpeg')
-const HAS_YTDLP = available('yt-dlp')
-
-console.log(
-  `[PLAY] yt-dlp=${HAS_YTDLP} | FFmpeg=${HAS_FFMPEG}`
-)
+function errorText(error) {
+  return String(
+    (error && error.message) || error
+  )
+}
 
 // ============================================================
 // 👑 PERMISOS
 // ============================================================
 
-function userId(value, conn) {
-  if (!value) return ''
-
+function normalized(jid, conn) {
   try {
-    if (conn && conn.decodeJid) {
-      value = conn.decodeJid(value) || value
-    }
-  } catch {}
-
-  return String(value)
-    .split(':')[0]
-    .split('@')[0]
+    return String(
+      conn.decodeJid(jid) || jid
+    )
+  } catch {
+    return String(jid || '')
+  }
 }
 
-function owner(m, conn, ctx) {
+function isOwner(m, conn, ctx) {
   if (
     ctx.isOwner ||
     ctx.isROwner ||
     m.fromMe ||
     (m.key && m.key.fromMe)
-  ) return true
+  ) {
+    return true
+  }
 
-  const sender = m.sender || m.participant || ''
+  const sender = normalized(
+    m.sender || m.participant,
+    conn
+  )
 
   const owners = Array.isArray(global.owner)
     ? global.owner
     : []
 
-  return owners.some(function(o) {
-    const value = Array.isArray(o) ? o[0] : o
+  return owners.some(entry => {
+    const value = Array.isArray(entry)
+      ? entry[0]
+      : entry
 
-    if (String(value) === String(sender)) {
+    const configured = String(value || '')
+
+    if (sender === configured) {
       return true
     }
 
-    if (String(sender).endsWith('@lid')) {
+    // No equiparar LID con un número
+    // telefónico sin un mapeo confiable.
+    if (sender.endsWith('@lid')) {
       return false
     }
 
-    return (
-      userId(value, conn) ===
-      userId(sender, conn)
+    const digits = s => String(s)
+      .split('@')[0]
+      .split(':')[0]
+      .replace(/\D/g, '')
+
+    return Boolean(
+      digits(sender) &&
+      digits(sender) === digits(configured)
     )
   })
 }
 
 async function privileged(m, conn, ctx) {
   if (
-    owner(m, conn, ctx) ||
+    isOwner(m, conn, ctx) ||
     ctx.isAdmin
-  ) return true
+  ) {
+    return true
+  }
 
-  if (!m.isGroup) return false
+  if (!m.isGroup) {
+    return false
+  }
 
   try {
-    const metadata = await conn.groupMetadata(m.chat)
-    const sender = m.sender || m.participant
-
-    const participant = metadata.participants.find(
-      function(p) {
-        return [p.id, p.jid, p.lid].some(
-          function(id) {
-            return id && id === sender
-          }
-        )
-      }
+    const metadata = await conn.groupMetadata(
+      m.chat
     )
 
-    return Boolean(
-      participant &&
-      (
-        participant.admin ||
-        participant.isAdmin ||
-        participant.isSuperAdmin
+    const sender = normalized(
+      m.sender || m.participant,
+      conn
+    )
+
+    return metadata.participants.some(p =>
+      [p.id, p.jid, p.lid].some(id =>
+        id &&
+        normalized(id, conn) === sender
+      ) &&
+      Boolean(
+        p.admin ||
+        p.isAdmin ||
+        p.isSuperAdmin
       )
     )
   } catch {
@@ -135,7 +143,7 @@ async function privileged(m, conn, ctx) {
 }
 
 // ============================================================
-// 😀 REACCIONES Y RESPUESTAS
+// 😀 REACCIONES
 // ============================================================
 
 async function react(conn, m, emoji) {
@@ -149,7 +157,7 @@ async function react(conn, m, emoji) {
   } catch {}
 }
 
-async function respond(conn, m, text) {
+function reply(conn, m, text) {
   if (typeof m.reply === 'function') {
     return m.reply(text)
   }
@@ -162,26 +170,28 @@ async function respond(conn, m, text) {
 }
 
 // ============================================================
-// 🔎 BUSCAR EN YOUTUBE
+// 🔎 YOUTUBE
 // ============================================================
 
-function videoId(text) {
+function idFromUrl(text) {
   const match = String(text).match(
-    /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#\s]*?&)?v=|shorts\/|embed\/|live\/))([a-zA-Z0-9_-]{11})/
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#\s]*?&)?v=|shorts\/|embed\/|live\/))([\w-]{11})/
   )
 
   return match ? match[1] : ''
 }
 
 async function findVideo(query) {
-  const id = videoId(query)
+  const id = idFromUrl(query)
 
   if (id) {
-    const info = await yts({ videoId: id })
+    const info = await yts({
+      videoId: id
+    })
 
     if (!info || !info.videoId) {
       throw new Error(
-        'No pude consultar ese video.'
+        'No se encontró ese video.'
       )
     }
 
@@ -190,92 +200,24 @@ async function findVideo(query) {
 
   const result = await yts(query)
 
-  if (!result || !result.videos || !result.videos.length) {
-    throw new Error('No encontré esa canción.')
+  if (
+    !result ||
+    !result.videos ||
+    !result.videos.length
+  ) {
+    throw new Error(
+      'No se encontraron canciones.'
+    )
   }
 
   return result.videos[0]
 }
 
 // ============================================================
-// 🛠️ EJECUTAR PROGRAMAS
+// 🎧 VALIDAR AUDIO
 // ============================================================
 
-function run(bin, args, timeout = 120000) {
-  return new Promise(function(resolve, reject) {
-    let done = false
-    let stderr = ''
-    let child
-
-    try {
-      child = spawn(bin, args, {
-        stdio: ['ignore', 'ignore', 'pipe']
-      })
-    } catch (error) {
-      reject(error)
-      return
-    }
-
-    const timer = setTimeout(function() {
-      child.kill('SIGKILL')
-      finish(new Error(bin + ': tiempo agotado'))
-    }, timeout)
-
-    function finish(error) {
-      if (done) return
-
-      done = true
-      clearTimeout(timer)
-
-      if (error) reject(error)
-      else resolve()
-    }
-
-    child.stderr.on('data', function(buffer) {
-      stderr = (
-        stderr + buffer.toString()
-      ).slice(-3000)
-    })
-
-    child.on('error', finish)
-
-    child.on('close', function(code) {
-      finish(
-        code === 0
-          ? null
-          : new Error(
-              stderr.slice(-500) ||
-              bin + ': código ' + code
-            )
-      )
-    })
-  })
-}
-
-// ============================================================
-// 🎧 VALIDAR ARCHIVOS
-// ============================================================
-
-function isMP3(buffer) {
-  return (
-    buffer.length > 4 &&
-    (
-      buffer.toString('ascii', 0, 3) === 'ID3' ||
-      (
-        buffer[0] === 255 &&
-        (buffer[1] & 224) === 224
-      )
-    )
-  )
-}
-
-function isAudio(buffer, type = '') {
-  if (
-    !Buffer.isBuffer(buffer) ||
-    buffer.length < 1024 ||
-    buffer.length > MAX_BYTES
-  ) return false
-
+function audioType(buffer, contentType = '') {
   const head = buffer
     .subarray(0, 200)
     .toString('utf8')
@@ -283,176 +225,242 @@ function isAudio(buffer, type = '') {
     .toLowerCase()
 
   if (
-    head.startsWith('<!doctype') ||
-    head.startsWith('<html') ||
+    head.startsWith('<') ||
     head.startsWith('{') ||
     head.startsWith('[')
-  ) return false
+  ) {
+    return ''
+  }
 
   if (
-    /text\/html|application\/json|text\/plain/.test(type)
-  ) return false
+    /html|json|text\/plain/i.test(contentType)
+  ) {
+    return ''
+  }
 
-  return (
-    isMP3(buffer) ||
-    buffer.toString('ascii', 0, 4) === 'OggS' ||
-    buffer.toString('ascii', 0, 4) === 'fLaC' ||
-    buffer.toString('ascii', 4, 8) === 'ftyp' ||
-    buffer.toString('ascii', 0, 4) === 'RIFF' ||
+  if (
+    buffer.subarray(0, 3).toString() === 'ID3' ||
     (
-      buffer[0] === 0x1a &&
-      buffer[1] === 0x45 &&
-      buffer[2] === 0xdf &&
-      buffer[3] === 0xa3
+      buffer[0] === 255 &&
+      (buffer[1] & 224) === 224
     )
-  )
+  ) {
+    return 'audio/mpeg'
+  }
+
+  if (
+    buffer.subarray(4, 8).toString() === 'ftyp'
+  ) {
+    return 'audio/mp4'
+  }
+
+  if (
+    buffer.subarray(0, 4).toString() === 'OggS'
+  ) {
+    return 'audio/ogg; codecs=opus'
+  }
+
+  return ''
 }
 
-// ============================================================
-// 🔄 CONVERTIR A MP3
-// ============================================================
-
-async function convertMP3(buffer) {
-  if (isMP3(buffer)) return buffer
-
-  if (!HAS_FFMPEG) {
+function verifyAudio(buffer, type = '') {
+  if (
+    !Buffer.isBuffer(buffer) ||
+    buffer.length < 1024 ||
+    buffer.length > MAX_BYTES
+  ) {
     throw new Error(
-      'El archivo no es MP3 y FFmpeg no está instalado.'
+      'Audio vacío o demasiado grande.'
     )
   }
 
-  const folder = await fs.mkdtemp(
-    path.join(os.tmpdir(), 'wa-convert-')
-  )
+  const mime = audioType(buffer, type)
 
-  try {
-    const input = path.join(folder, 'in.bin')
-    const output = path.join(folder, 'out.mp3')
+  if (!mime) {
+    throw new Error(
+      'El servidor devolvió datos que no son audio compatible.'
+    )
+  }
 
-    await fs.writeFile(input, buffer)
+  return {
+    buffer,
+    mimetype: mime
+  }
+}
 
-    await run('ffmpeg', [
-      '-y',
-      '-hide_banner',
-      '-loglevel', 'error',
-      '-i', input,
-      '-vn',
-      '-c:a', 'libmp3lame',
-      '-b:a', '128k',
-      output
-    ], 90000)
+// ============================================================
+// 📥 STREAM A BUFFER
+// ============================================================
 
-    const result = await fs.readFile(output)
+async function streamToBuffer(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let size = 0
+    let done = false
 
-    if (
-      !isMP3(result) ||
-      result.length > MAX_BYTES
-    ) {
-      throw new Error(
-        'FFmpeg no generó un MP3 válido.'
+    const timer = setTimeout(() => {
+      finish(
+        new Error(
+          'La descarga agotó el tiempo de espera.'
+        )
       )
+    }, 90000)
+
+    function finish(err, value) {
+      if (done) return
+
+      done = true
+      clearTimeout(timer)
+
+      if (err) {
+        if (
+          typeof stream.destroy === 'function'
+        ) {
+          stream.destroy()
+        }
+
+        reject(err)
+      } else {
+        resolve(value)
+      }
     }
 
-    return result
+    stream.on('data', chunk => {
+      size += chunk.length
 
-  } finally {
-    await fs.rm(folder, {
-      recursive: true,
-      force: true
-    }).catch(function() {})
-  }
-}
+      if (size > MAX_BYTES) {
+        return finish(
+          new Error(
+            'El audio supera los 25 MB.'
+          )
+        )
+      }
 
-// ============================================================
-// 🎵 DESCARGA CON YT-DLP
-// ============================================================
-
-async function localDownload(url) {
-  if (!HAS_YTDLP || !HAS_FFMPEG) {
-    throw new Error(
-      'yt-dlp o FFmpeg no están instalados.'
-    )
-  }
-
-  const folder = await fs.mkdtemp(
-    path.join(os.tmpdir(), 'wa-play-')
-  )
-
-  try {
-    const template = path.join(
-      folder,
-      'audio.%(ext)s'
-    )
-
-    await run('yt-dlp', [
-      '--no-playlist',
-      '--no-progress',
-      '--no-warnings',
-      '--socket-timeout', '20',
-      '--retries', '2',
-      '-f', 'bestaudio/best',
-      '-x',
-      '--audio-format', 'mp3',
-      '--audio-quality', '128K',
-      '-o', template,
-      url
-    ], 120000)
-
-    const files = await fs.readdir(folder)
-
-    const mp3 = files.find(function(file) {
-      return file.endsWith('.mp3')
+      chunks.push(chunk)
     })
 
-    if (!mp3) {
-      throw new Error(
-        'yt-dlp no generó el archivo MP3.'
+    stream.on('end', () => {
+      finish(
+        null,
+        Buffer.concat(chunks)
       )
-    }
+    })
 
-    const audio = await fs.readFile(
-      path.join(folder, mp3)
-    )
-
-    if (
-      !isMP3(audio) ||
-      audio.length > MAX_BYTES
-    ) {
-      throw new Error(
-        'MP3 inválido o demasiado grande.'
-      )
-    }
-
-    return audio
-
-  } finally {
-    await fs.rm(folder, {
-      recursive: true,
-      force: true
-    }).catch(function() {})
-  }
+    stream.on('error', err => {
+      finish(err)
+    })
+  })
 }
 
 // ============================================================
-// 🌐 RESPALDO DELIRIUS
+// 🎵 DESCARGA DIRECTA YOUTUBE
 // ============================================================
 
-function findAudioUrl(data, depth = 0) {
-  if (depth > 5 || !data) return null
+async function youtubeDownload(url) {
+  let module
 
-  if (typeof data === 'string') {
-    if (
-      /^https:\/\//i.test(data) &&
-      !/(youtube\.com|youtu\.be)/i.test(data)
-    ) {
-      return data
-    }
-
-    return null
+  try {
+    module = await import(
+      '@distube/ytdl-core'
+    )
+  } catch {
+    throw new Error(
+      'Falta @distube/ytdl-core. Instalá la dependencia con npm.'
+    )
   }
 
-  if (typeof data !== 'object') {
-    return null
+  const ytdl = module.default || module
+
+  const info = await ytdl.getInfo(url)
+
+  const formats = (
+    info.formats || []
+  ).filter(f =>
+    f.hasAudio &&
+    !f.hasVideo &&
+    f.container === 'mp4' &&
+    (
+      !f.contentLength ||
+      Number(f.contentLength) <= MAX_BYTES
+    )
+  )
+
+  formats.sort(
+    (a, b) =>
+      (b.audioBitrate || 0) -
+      (a.audioBitrate || 0)
+  )
+
+  if (!formats.length) {
+    throw new Error(
+      'YouTube no ofreció audio MP4/AAC compatible.'
+    )
+  }
+
+  let lastError
+
+  for (const format of formats.slice(0, 3)) {
+    try {
+      const stream = ytdl.downloadFromInfo(
+        info,
+        {
+          format,
+          highWaterMark: 1 << 25
+        }
+      )
+
+      const buffer = await streamToBuffer(
+        stream
+      )
+
+      const audio = verifyAudio(buffer)
+
+      if (
+        audio.mimetype !== 'audio/mp4'
+      ) {
+        throw new Error(
+          'El formato descargado no es MP4.'
+        )
+      }
+
+      return audio
+
+    } catch (err) {
+      lastError = err
+    }
+  }
+
+  throw (
+    lastError ||
+    new Error(
+      'Falló la descarga directa de YouTube.'
+    )
+  )
+}
+
+// ============================================================
+// 🌐 EXTRAER URL DE RESPALDO
+// ============================================================
+
+function findLink(obj, depth = 0) {
+  if (
+    depth > 5 ||
+    obj == null
+  ) {
+    return ''
+  }
+
+  if (typeof obj === 'string') {
+    return (
+      /^https:\/\//i.test(obj) &&
+      !/youtu(?:be\.com|\.be)/i.test(obj)
+    )
+      ? obj
+      : ''
+  }
+
+  if (typeof obj !== 'object') {
+    return ''
   }
 
   const keys = [
@@ -468,111 +476,96 @@ function findAudioUrl(data, depth = 0) {
   ]
 
   for (const key of keys) {
-    if (data[key] != null) {
-      const found = findAudioUrl(
-        data[key],
+    if (obj[key] != null) {
+      const found = findLink(
+        obj[key],
         depth + 1
       )
 
-      if (found) return found
+      if (found) {
+        return found
+      }
     }
   }
 
-  return null
+  return ''
 }
 
-async function apiDownload(url) {
-  console.log('[PLAY] Probando Delirius')
+// ============================================================
+// 🌐 RESPALDO DELIRIUS
+// ============================================================
 
+async function deliriusDownload(url) {
   const response = await axios.get(
     'https://api.delirius.online/download/ytmp3',
     {
       params: { url },
-      timeout: 25000,
+      timeout: 20000,
       headers: {
         'User-Agent': 'Mozilla/5.0'
       }
     }
   )
 
-  const direct = findAudioUrl(response.data)
+  const link = findLink(response.data)
 
-  if (!direct) {
+  if (!link) {
     throw new Error(
-      'Delirius no devolvió enlace de audio.'
+      'Delirius no entregó un enlace válido.'
     )
   }
 
-  const file = await axios.get(direct, {
+  const file = await axios.get(link, {
     responseType: 'arraybuffer',
     timeout: 45000,
-    maxRedirects: 5,
+    maxRedirects: 4,
     maxContentLength: MAX_BYTES,
     maxBodyLength: MAX_BYTES,
     headers: {
       'User-Agent': 'Mozilla/5.0',
-      Accept: 'audio/*,application/octet-stream,*/*'
+      Accept: 'audio/*,application/octet-stream'
     }
   })
 
-  const buffer = Buffer.from(file.data)
-
-  const type = String(
-    file.headers['content-type'] || ''
-  ).toLowerCase()
-
-  if (!isAudio(buffer, type)) {
-    throw new Error(
-      'Delirius devolvió HTML, JSON o datos que no son audio.'
+  return verifyAudio(
+    Buffer.from(file.data),
+    String(
+      file.headers['content-type'] || ''
     )
-  }
-
-  return convertMP3(buffer)
+  )
 }
 
 // ============================================================
-// 🎵 OBTENER AUDIO
+// 🔄 MÉTODOS DE DESCARGA
 // ============================================================
 
 async function getAudio(url) {
   const errors = []
 
-  if (HAS_YTDLP && HAS_FFMPEG) {
+  const methods = [
+    ['YouTube directo', youtubeDownload],
+    ['Delirius', deliriusDownload]
+  ]
+
+  for (const [name, download] of methods) {
     try {
-      console.log('[PLAY] Probando yt-dlp')
-      return await localDownload(url)
-    } catch (error) {
-      console.warn(
-        '[PLAY] yt-dlp:',
-        error.message
+      log('Probando ' + name)
+
+      return await download(url)
+
+    } catch (err) {
+      log(
+        name + ': ' + errorText(err)
       )
 
       errors.push(
-        'yt-dlp: ' + error.message
+        name + ': ' + errorText(err)
       )
     }
-  } else {
-    console.warn(
-      '[PLAY] yt-dlp/FFmpeg no disponibles. Usando respaldo.'
-    )
-  }
-
-  try {
-    return await apiDownload(url)
-  } catch (error) {
-    console.warn(
-      '[PLAY] Delirius:',
-      error.message
-    )
-
-    errors.push(
-      'Delirius: ' + error.message
-    )
   }
 
   throw new Error(
-    errors.join(' | ') ||
-    'No hay método de descarga disponible.'
+    errors.join(' | ')
   )
 }
 
@@ -593,7 +586,7 @@ const handler = async (m, ctx = {}) => {
   ).trim()
 
   if (!query) {
-    return respond(
+    return reply(
       conn,
       m,
       '🎵 *PLAY AUDIO*\n\n' +
@@ -607,125 +600,156 @@ const handler = async (m, ctx = {}) => {
     ctx
   )
 
-  const sender =
+  const sender = normalized(
     m.sender ||
     m.participant ||
-    m.chat
+    m.chat,
+    conn
+  )
 
-  const now = Date.now()
+  const expiresAt =
+    cooldowns.get(sender) || 0
 
   if (
     !bypass &&
-    now < (cooldowns.get(sender) || 0)
+    Date.now() < expiresAt
   ) {
-    const left = Math.ceil(
-      (cooldowns.get(sender) - now) / 1000
+    const seconds = Math.ceil(
+      (expiresAt - Date.now()) / 1000
     )
 
-    return respond(
+    return reply(
       conn,
       m,
       '⏳ *¡No atomices! JAJAJA* 🐾\n\n' +
-      `Esperá ${Math.floor(left / 60)} min ${left % 60} seg.`
+      `Esperá ${Math.floor(seconds / 60)} min ${seconds % 60} seg.`
     )
   }
+
+  if (inProgress.has(sender)) {
+    return reply(
+      conn,
+      m,
+      '⏳ Ya estoy preparando tu audio.'
+    )
+  }
+
+  inProgress.add(sender)
 
   await react(conn, m, '🎧')
 
   try {
+    // Buscar video.
     const video = await findVideo(query)
 
     const id =
       video.videoId ||
-      videoId(query)
+      idFromUrl(query)
 
     if (!id) {
       throw new Error(
-        'No encontré el ID del video.'
+        'No se pudo obtener el ID de YouTube.'
       )
     }
 
-    const seconds = Number(
-      video.seconds
-    ) || 0
+    const seconds =
+      Number(video.seconds) || 0
 
+    // Límite de 7 minutos.
     if (seconds > MAX_SECONDS) {
       await react(conn, m, '❌')
 
-      return respond(
+      return reply(
         conn,
         m,
-        '❌ *Audio demasiado largo*\n\n' +
-        `🎵 ${video.title}\n` +
-        '⏱️ Máximo: 7 minutos.'
+        '❌ *Audio demasiado largo.*\n\n' +
+        'Máximo permitido: 7 minutos.'
       )
     }
 
-    const url = `https://youtu.be/${id}`
+    if (!seconds) {
+      throw new Error(
+        'No pude comprobar la duración del video.'
+      )
+    }
 
-    // Descargar primero para evitar mensajes
-    // de preparación cuando falla el servicio.
+    const url =
+      'https://youtu.be/' + id
+
+    // Descargar antes de enviar la miniatura.
     const audio = await getAudio(url)
 
     const caption =
       `🎵 *${video.title || 'Canción'}*\n` +
       `👤 ${
-        video.author && video.author.name
-          ? video.author.name
-          : 'Desconocido'
+        (
+          video.author &&
+          video.author.name
+        ) || 'Desconocido'
       }\n` +
       `⏱️ ${video.timestamp || 'Sin datos'}\n` +
       `🔗 ${url}`
 
+    // Enviar información.
     try {
       await conn.sendMessage(
         m.chat,
         {
           image: {
-            url: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
+            url:
+              `https://i.ytimg.com/vi/${id}/mqdefault.jpg`
           },
           caption
         },
         { quoted: m }
       )
     } catch {
-      await respond(conn, m, caption)
+      await reply(
+        conn,
+        m,
+        caption
+      )
     }
 
+    // Enviar audio.
     await conn.sendMessage(
       m.chat,
       {
-        audio,
-        mimetype: 'audio/mpeg',
+        audio: audio.buffer,
+        mimetype: audio.mimetype,
         ptt: false
       },
       { quoted: m }
     )
 
+    // Aplicar cooldown solo después
+    // de enviar el audio correctamente.
     if (!bypass) {
       cooldowns.set(
         sender,
-        Date.now() + COOLDOWN_MS
+        Date.now() + COOLDOWN
       )
     }
 
     await react(conn, m, '✅')
 
-  } catch (error) {
+  } catch (err) {
     console.error(
       '❌ PLAY ERROR:',
-      error.stack || error.message
+      err.stack || err.message
     )
 
     await react(conn, m, '❌')
 
-    return respond(
+    await reply(
       conn,
       m,
       '❌ *No pude descargar el audio.*\n\n' +
-      'El servicio de descarga no respondió correctamente. ' +
       'Revisá la consola del bot.'
     )
+
+  } finally {
+    inProgress.delete(sender)
   }
 }
 
@@ -741,7 +765,8 @@ handler.help = [
 
 handler.tags = ['download']
 
-handler.command = /^(play|playaudio|audio)$/i
+handler.command =
+  /^(play|playaudio|audio)$/i
 
 handler.group = true
 

@@ -1,7 +1,7 @@
 
 /**
  * 📂 plugins/_play.js
- * 🤖 WHATSAPP-BOT — PLAY AUDIO Y VIDEO
+ * 🤖 WHATSAPP-BOT — PLAY COMPLETO
  *
  * Comandos:
  * .play / .playaudio / .audio / .musica
@@ -9,42 +9,78 @@
  * .play3 / .playdoc
  * .play4 / .playdoc2
  *
- * Cooldown: 5 minutos
- * Admins y owners: sin cooldown
  * Duración máxima: 7 minutos
+ * Cooldown: 5 minutos
+ * Admins y owners sin cooldown
  *
- * No requiere yt-dlp ni FFmpeg.
+ * Dependencias:
+ * npm install yt-search axios
+ *
+ * SaveTube y OGMP3 son opcionales.
+ * No requiere FFmpeg ni yt-dlp.
  */
 
 import yts from 'yt-search'
 import axios from 'axios'
-import { savetube } from '../lib/yt-savetube.js'
-import { ogmp3 } from '../lib/youtubedl.js'
 
+const MAX_DURATION = 420
 const COOLDOWN = 300000
-const MAX_SECONDS = 420
 const MAX_AUDIO = 25 * 1024 * 1024
 const MAX_VIDEO = 80 * 1024 * 1024
 
 const cooldowns = new Map()
-const pending = new Set()
+const processing = new Set()
 
 // ============================================================
-// 🔧 UTILIDADES
+// 📦 CARGAR SERVICIOS OPCIONALES
 // ============================================================
 
-function idOf(text) {
+let savetube = null
+let ogmp3 = null
+
+try {
+  const module = await import('../lib/yt-savetube.js')
+  savetube = module.savetube || module.default
+  console.log('[PLAY] SaveTube cargado')
+} catch {
+  console.log('[PLAY] SaveTube no disponible')
+}
+
+try {
+  const module = await import('../lib/youtubedl.js')
+  ogmp3 = module.ogmp3 || module.default
+  console.log('[PLAY] OGMP3 cargado')
+} catch {
+  console.log('[PLAY] OGMP3 no disponible')
+}
+
+// ============================================================
+// 🔧 FUNCIONES GENERALES
+// ============================================================
+
+function errorMessage(error) {
+  return String(error?.message || error)
+}
+
+function youtubeId(text) {
   const match = String(text).match(
     /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#\s]*?&)?v=|shorts\/|embed\/|live\/))([\w-]{11})/
   )
 
-  return match ? match[1] : ''
+  return match?.[1] || ''
 }
 
-function msg(error) {
+function getSender(m) {
   return String(
-    error && error.message || error
+    m.sender || m.participant || m.chat
   )
+}
+
+function phone(jid) {
+  return String(jid || '')
+    .split('@')[0]
+    .split(':')[0]
+    .replace(/\D/g, '')
 }
 
 async function react(conn, m, emoji) {
@@ -55,7 +91,7 @@ async function react(conn, m, emoji) {
         key: m.key
       }
     })
-  } catch (error) {}
+  } catch {}
 }
 
 async function reply(conn, m, text) {
@@ -74,75 +110,56 @@ async function reply(conn, m, text) {
 // 👑 OWNERS Y ADMINS
 // ============================================================
 
-function owner(m, conn, ctx) {
+function isOwner(m, conn, ctx) {
   if (
     ctx.isOwner ||
     ctx.isROwner ||
     m.fromMe ||
-    (m.key && m.key.fromMe)
-  ) {
-    return true
-  }
+    m.key?.fromMe
+  ) return true
 
-  const sender = String(
-    m.sender || m.participant || ''
-  )
+  const sender = getSender(m)
 
   const owners = Array.isArray(global.owner)
     ? global.owner
     : []
 
-  return owners.some(function(item) {
-    const configured = String(
+  return owners.some(item => {
+    const value = String(
       Array.isArray(item) ? item[0] : item
     )
 
-    if (configured === sender) {
-      return true
-    }
+    if (value === sender) return true
 
+    // Evitar confundir LID con número.
     if (sender.endsWith('@lid')) {
       return false
     }
 
-    function number(value) {
-      return String(value)
-        .split('@')[0]
-        .split(':')[0]
-        .replace(/\D/g, '')
-    }
-
     return Boolean(
-      number(sender) &&
-      number(sender) === number(configured)
+      phone(sender) &&
+      phone(sender) === phone(value)
     )
   })
 }
 
-async function privileged(m, conn, ctx) {
+async function isPrivileged(m, conn, ctx) {
   if (
-    owner(m, conn, ctx) ||
+    isOwner(m, conn, ctx) ||
     ctx.isAdmin
-  ) {
-    return true
-  }
+  ) return true
 
-  if (!m.isGroup) {
-    return false
-  }
+  if (!m.isGroup) return false
 
   try {
-    const group = await conn.groupMetadata(
-      m.chat
-    )
+    const group = await conn.groupMetadata(m.chat)
+    const sender = getSender(m)
 
-    const sender = String(
-      m.sender || m.participant
-    )
+    return group.participants.some(p => {
+      const ids = [p.id, p.jid, p.lid]
 
-    return group.participants.some(function(p) {
       return (
-        [p.id, p.jid, p.lid].includes(sender) &&
+        ids.includes(sender) &&
         Boolean(
           p.admin ||
           p.isAdmin ||
@@ -150,54 +167,45 @@ async function privileged(m, conn, ctx) {
         )
       )
     })
-  } catch (error) {
+  } catch {
     return false
   }
 }
 
 // ============================================================
-// 🔎 BUSCAR VIDEO
+// 🔎 BUSCAR YOUTUBE
 // ============================================================
 
-async function findVideo(query) {
-  const id = idOf(query)
+async function searchVideo(query) {
+  const id = youtubeId(query)
 
   if (id) {
-    const info = await yts({
+    const result = await yts({
       videoId: id
     })
 
-    if (!info || !info.videoId) {
-      throw new Error(
-        'No encontré el video.'
-      )
+    if (!result?.videoId) {
+      throw new Error('Video no encontrado')
     }
 
-    return info
+    return result
   }
 
-  const results = await yts(query)
+  const result = await yts(query)
 
-  if (
-    !results.videos ||
-    !results.videos.length
-  ) {
-    throw new Error(
-      'No encontré esa canción.'
-    )
+  if (!result?.videos?.length) {
+    throw new Error('No encontré la canción')
   }
 
-  return results.videos[0]
+  return result.videos[0]
 }
 
 // ============================================================
-// 🔗 EXTRAER ENLACES
+// 🔗 EXTRAER ENLACES DE APIs
 // ============================================================
 
-function extract(value, depth = 0) {
-  if (depth > 5 || !value) {
-    return ''
-  }
+function extractUrl(value, depth = 0) {
+  if (!value || depth > 6) return ''
 
   if (typeof value === 'string') {
     if (
@@ -216,11 +224,14 @@ function extract(value, depth = 0) {
 
   const keys = [
     'download',
-    'dl_download',
+    'downloadUrl',
+    'download_url',
     'download_url_full',
-    'stream_url_full',
+    'dl_download',
     'dl_url',
+    'stream_url_full',
     'audio',
+    'video',
     'media',
     'url',
     'link',
@@ -231,28 +242,24 @@ function extract(value, depth = 0) {
   ]
 
   for (const key of keys) {
-    if (value[key]) {
-      const result = extract(
+    if (value[key] != null) {
+      const result = extractUrl(
         value[key],
         depth + 1
       )
 
-      if (result) {
-        return result
-      }
+      if (result) return result
     }
   }
 
   if (Array.isArray(value)) {
-    for (const entry of value) {
-      const result = extract(
-        entry,
+    for (const item of value) {
+      const result = extractUrl(
+        item,
         depth + 1
       )
 
-      if (result) {
-        return result
-      }
+      if (result) return result
     }
   }
 
@@ -260,59 +267,70 @@ function extract(value, depth = 0) {
 }
 
 // ============================================================
-// 🎧 DETECTAR FORMATO
+// 🎧 VALIDAR FORMATO
 // ============================================================
 
-function mimeOf(buffer) {
+function detectFormat(buffer) {
+  if (buffer.length < 12) return ''
+
   if (
-    buffer.subarray(0, 3).toString() === 'ID3' ||
+    buffer.toString('ascii', 0, 3) === 'ID3' ||
     (
-      buffer[0] === 255 &&
-      (buffer[1] & 224) === 224
+      buffer[0] === 0xff &&
+      (buffer[1] & 0xe0) === 0xe0
     )
   ) {
     return 'audio/mpeg'
   }
 
   if (
-    buffer.subarray(0, 4).toString() === 'OggS'
+    buffer.toString('ascii', 0, 4) === 'OggS'
   ) {
     return 'audio/ogg; codecs=opus'
   }
 
   if (
-    buffer.subarray(4, 8).toString() === 'ftyp'
+    buffer.toString('ascii', 0, 4) === 'fLaC'
   ) {
-    return 'audio/mp4'
+    return 'audio/flac'
   }
 
   if (
-    buffer.subarray(0, 4).toString() === 'RIFF'
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WAVE'
   ) {
     return 'audio/wav'
   }
 
   if (
-    buffer.subarray(0, 4).toString() === 'fLaC'
+    buffer.toString('ascii', 4, 8) === 'ftyp'
   ) {
-    return 'audio/flac'
+    const brand = buffer
+      .toString('ascii', 8, 12)
+      .toLowerCase()
+
+    if (brand.startsWith('m4a')) {
+      return 'audio/mp4'
+    }
+
+    return 'video/mp4'
   }
 
   return ''
 }
 
 // ============================================================
-// 📥 DESCARGAR Y VALIDAR
+// 📥 DESCARGAR ARCHIVO
 // ============================================================
 
-async function fetchMedia(url, kind) {
-  if (!/^https?:\/\//i.test(url)) {
-    throw new Error('URL inválida')
-  }
-
+async function downloadFile(url, kind) {
   const limit = kind === 'video'
     ? MAX_VIDEO
     : MAX_AUDIO
+
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error('Enlace inválido')
+  }
 
   const response = await axios.get(url, {
     responseType: 'arraybuffer',
@@ -326,68 +344,84 @@ async function fetchMedia(url, kind) {
     }
   })
 
-  const buffer = Buffer.from(
-    response.data
-  )
+  const buffer = Buffer.from(response.data)
 
-  const type = String(
+  if (
+    buffer.length < 1024 ||
+    buffer.length > limit
+  ) {
+    throw new Error(
+      'Archivo vacío o demasiado grande'
+    )
+  }
+
+  const contentType = String(
     response.headers['content-type'] || ''
   ).toLowerCase()
 
   if (
-    buffer.length < 1024 ||
-    buffer.length > limit ||
-    /text\/html|application\/json|text\/plain/.test(type)
+    /text\/html|application\/json|text\/plain/.test(contentType)
   ) {
     throw new Error(
-      'Respuesta inválida o archivo demasiado grande.'
+      'El servidor devolvió HTML o JSON'
     )
   }
 
   const header = buffer
-    .subarray(0, 150)
+    .subarray(0, 100)
     .toString('utf8')
     .trimStart()
 
   if (/^(<|\{|\[)/.test(header)) {
     throw new Error(
-      'La URL devolvió HTML o JSON.'
+      'La respuesta no contiene audio o video'
     )
   }
 
-  const mime = mimeOf(buffer)
+  let mimetype = detectFormat(buffer)
 
   if (
     kind === 'audio' &&
-    !mime.startsWith('audio/')
+    mimetype === 'video/mp4'
+  ) {
+    // Algunos proveedores entregan M4A
+    // con marca MP4 genérica.
+    // Solo aceptar cuando el servidor
+    // identifica el contenido como audio.
+    if (contentType.startsWith('audio/')) {
+      mimetype = 'audio/mp4'
+    }
+  }
+
+  if (
+    kind === 'audio' &&
+    !mimetype.startsWith('audio/')
   ) {
     throw new Error(
-      'No se reconoció audio compatible.'
+      'El archivo no es audio compatible'
     )
   }
 
   if (
     kind === 'video' &&
-    buffer.subarray(4, 8).toString() !== 'ftyp'
+    mimetype !== 'video/mp4'
   ) {
     throw new Error(
-      'No se reconoció video MP4.'
+      'El archivo no es video MP4 compatible'
     )
   }
 
   return {
     buffer,
-    mimetype: kind === 'video'
-      ? 'video/mp4'
-      : mime
+    mimetype
   }
 }
 
 // ============================================================
-// 🌐 CONSULTAR API
+// 🌐 CONSULTAR SERVICIOS
 // ============================================================
 
-async function json(url) {
+async function requestApi(url) {
   const response = await axios.get(url, {
     timeout: 18000,
     headers: {
@@ -399,10 +433,10 @@ async function json(url) {
 }
 
 // ============================================================
-// 🌐 PROVEEDORES
+// 🎵 LISTA DE PROVEEDORES
 // ============================================================
 
-function providers(video, kind) {
+function getProviders(video, kind) {
   const url = video.url
   const encoded = encodeURIComponent(url)
   const title = encodeURIComponent(
@@ -410,152 +444,159 @@ function providers(video, kind) {
   )
 
   const audio = kind === 'audio'
+  const providers = []
 
-  const list = [
-    [
-      'SaveTube',
-      function() {
-        return savetube.download(
-          url,
-          audio ? 'mp3' : '720'
-        )
-      }
-    ],
-    [
-      'OGMP3',
-      function() {
-        return ogmp3.download(
-          url,
-          audio ? '128' : '720',
-          kind
-        )
-      }
-    ],
-    [
-      'Mitzuki',
-      function() {
-        return json(
-          'https://api.mitzuki.xyz/download/youtube' +
-          '?url=' + encoded +
-          '&type=' + kind +
-          '&format=' + (audio ? 'mp3' : 'mp4') +
-          '&apikey=' +
-          encodeURIComponent(
-            process.env.API_KEY || ''
-          )
-        )
-      }
-    ],
-    [
-      'Mitzuki V2',
-      function() {
-        return json(
-          'https://api.mitzuki.xyz/download/youtube2' +
-          '?url=' + encoded +
-          '&apikey=' +
-          encodeURIComponent(
-            process.env.API_KEY || ''
-          )
-        )
-      }
-    ],
-    [
-      'Dorratz',
-      function() {
-        return json(
-          'https://api.dorratz.com/v3/ytdl?url=' +
-          encoded
-        )
-      }
-    ],
-    [
-      'Exonity',
-      function() {
-        return json(
-          'https://exonity.tech/api/dl/' +
-          (audio ? 'playmp3' : 'playmp4') +
-          '?query=' + title
-        )
-      }
-    ]
-  ]
-
-  if (audio) {
-    list.push([
-      'DV-YER',
-      function() {
-        return json(
-          'https://dv-yer-api.online/ytmp3' +
-          '?mode=link&url=' + encoded
-        )
-      }
-    ])
-
-    list.push([
-      'Zenkey',
-      function() {
-        return json(
-          'https://api.zenkey.my.id/api/download/ytmp3' +
-          '?apikey=zenkey&url=' + encoded
-        )
-      }
-    ])
-  } else {
-    list.push([
-      'Siputzx',
-      function() {
-        return json(
-          'https://api.siputzx.my.id/api/d/ytmp4?url=' +
-          encoded
-        )
-      }
-    ])
+  // SaveTube, si existe.
+  if (savetube?.download) {
+    providers.push({
+      name: 'SaveTube',
+      run: () => savetube.download(
+        url,
+        audio ? 'mp3' : '720'
+      )
+    })
   }
 
-  return list
+  // OGMP3, si existe.
+  if (ogmp3?.download) {
+    providers.push({
+      name: 'OGMP3',
+      run: () => ogmp3.download(
+        url,
+        audio ? '128' : '720',
+        kind
+      )
+    })
+  }
+
+  // Mitzuki, si hay API_KEY.
+  if (process.env.API_KEY) {
+    providers.push({
+      name: 'Mitzuki',
+      run: () => requestApi(
+        'https://api.mitzuki.xyz/download/youtube' +
+        '?url=' + encoded +
+        '&type=' + kind +
+        '&format=' + (audio ? 'mp3' : 'mp4') +
+        '&apikey=' +
+        encodeURIComponent(process.env.API_KEY)
+      )
+    })
+
+    providers.push({
+      name: 'Mitzuki V2',
+      run: () => requestApi(
+        'https://api.mitzuki.xyz/download/youtube2' +
+        '?url=' + encoded +
+        '&apikey=' +
+        encodeURIComponent(process.env.API_KEY)
+      )
+    })
+  }
+
+  providers.push({
+    name: 'Dorratz',
+    run: () => requestApi(
+      'https://api.dorratz.com/v3/ytdl?url=' +
+      encoded
+    )
+  })
+
+  providers.push({
+    name: 'Exonity',
+    run: () => requestApi(
+      'https://exonity.tech/api/dl/' +
+      (audio ? 'playmp3' : 'playmp4') +
+      '?query=' + title
+    )
+  })
+
+  if (audio) {
+    providers.push({
+      name: 'DV-YER',
+      run: () => requestApi(
+        'https://dv-yer-api.online/ytmp3' +
+        '?mode=link&url=' + encoded
+      )
+    })
+
+    providers.push({
+      name: 'Zenkey',
+      run: () => requestApi(
+        'https://api.zenkey.my.id/api/download/ytmp3' +
+        '?apikey=zenkey&url=' + encoded
+      )
+    })
+
+    providers.push({
+      name: 'Delirius',
+      run: () => requestApi(
+        'https://api.delirius.online/download/ytmp3' +
+        '?url=' + encoded
+      )
+    })
+  } else {
+    providers.push({
+      name: 'Siputzx',
+      run: () => requestApi(
+        'https://api.siputzx.my.id/api/d/ytmp4' +
+        '?url=' + encoded
+      )
+    })
+  }
+
+  return providers
 }
 
 // ============================================================
 // 🔄 DESCARGA CON RESPALDOS
 // ============================================================
 
-async function download(video, kind) {
-  const failures = []
+async function getMedia(video, kind) {
+  const errors = []
+  const providers = getProviders(video, kind)
 
-  for (const [name, method] of providers(video, kind)) {
+  for (const provider of providers) {
     try {
       console.log(
-        '[PLAY] Probando ' + name
+        '[PLAY] Probando ' + provider.name
       )
 
-      const result = await method()
-      const link = extract(result)
+      const result = await provider.run()
+      const url = extractUrl(result)
 
-      if (!link) {
+      if (!url) {
         throw new Error(
-          'Sin enlace de descarga.'
+          'No devolvió enlace de descarga'
         )
       }
 
-      return await fetchMedia(
-        link,
+      const media = await downloadFile(
+        url,
         kind
       )
 
-    } catch (error) {
-      const failure =
-        name + ': ' + msg(error)
-
-      failures.push(failure)
-
-      console.warn(
-        '[PLAY] ' + failure
+      console.log(
+        '[PLAY] Descarga correcta: ' +
+        provider.name
       )
+
+      return media
+
+    } catch (error) {
+      const message =
+        provider.name + ': ' +
+        errorMessage(error)
+
+      console.warn('[PLAY]', message)
+
+      errors.push(message)
     }
   }
 
   throw new Error(
-    failures.join(' | ')
+    'Todos los proveedores fallaron: ' +
+    errors.join(' | ')
   )
 }
 
@@ -570,7 +611,7 @@ const handler = async (m, ctx = {}) => {
     ctx.command || 'play'
   ).toLowerCase()
 
-  const query = String(
+  const text = String(
     ctx.text ||
     (
       Array.isArray(ctx.args)
@@ -579,26 +620,27 @@ const handler = async (m, ctx = {}) => {
     )
   ).trim()
 
-  if (!query) {
+  if (!text) {
     return reply(
       conn,
       m,
-      '🎵 Escribí una canción.\n\n' +
+      '🎵 *WHATSAPP-BOT PLAY*\n\n' +
+      'Escribí el nombre de una canción.\n\n' +
       'Ejemplo: *.play emilia 420*'
     )
   }
 
-  const sender = String(
-    m.sender ||
-    m.participant ||
-    m.chat
-  )
+  const sender = getSender(m)
 
-  const bypass = await privileged(
+  const bypass = await isPrivileged(
     m,
     conn,
     ctx
   )
+
+  // ==========================================================
+  // ⏳ COOLDOWN
+  // ==========================================================
 
   const remaining =
     (cooldowns.get(sender) || 0) -
@@ -608,90 +650,105 @@ const handler = async (m, ctx = {}) => {
     !bypass &&
     remaining > 0
   ) {
+    const seconds = Math.ceil(
+      remaining / 1000
+    )
+
     return reply(
       conn,
       m,
       '⏳ *¡No atomices! JAJAJA* 🐾\n\n' +
       'Esperá ' +
-      Math.floor(remaining / 60000) +
+      Math.floor(seconds / 60) +
       ' min ' +
-      Math.ceil(
-        (remaining % 60000) / 1000
-      ) +
+      (seconds % 60) +
       ' seg.'
     )
   }
 
-  if (pending.has(sender)) {
+  if (processing.has(sender)) {
     return reply(
       conn,
       m,
-      '⏳ Ya estoy preparando tu archivo.'
+      '⏳ Ya estoy descargando tu archivo.'
     )
   }
 
-  pending.add(sender)
+  processing.add(sender)
 
   await react(conn, m, '🎧')
 
   try {
-    const video = await findVideo(query)
+    // ========================================================
+    // 🔎 BUSCAR VIDEO
+    // ========================================================
+
+    const video = await searchVideo(text)
 
     const seconds = Number(
       video.seconds ||
-      (
-        video.duration &&
-        video.duration.seconds
-      ) ||
+      video.duration?.seconds ||
       0
     )
 
     if (
       !seconds ||
-      seconds > MAX_SECONDS
+      seconds > MAX_DURATION
     ) {
       await react(conn, m, '❌')
 
       return reply(
         conn,
         m,
-        seconds > MAX_SECONDS
+        seconds > MAX_DURATION
           ? '❌ Máximo permitido: 7 minutos.'
           : '❌ No pude verificar la duración.'
       )
     }
 
-    const kind = [
-      'play2',
-      'video',
-      'play4',
-      'playdoc2'
-    ].includes(command)
-      ? 'video'
-      : 'audio'
-
-    const asDocument = [
-      'play3',
-      'playdoc',
-      'play4',
-      'playdoc2'
-    ].includes(command)
-
     const id =
       video.videoId ||
-      idOf(query)
+      youtubeId(text)
 
     if (!id) {
       throw new Error(
-        'No se pudo obtener el ID del video.'
+        'No se encontró el ID del video'
       )
     }
 
     const url =
       'https://youtu.be/' + id
 
-    // Descargar antes de enviar.
-    const media = await download(
+    // ========================================================
+    // 🎬 TIPO DE ARCHIVO
+    // ========================================================
+
+    const videoCommands = [
+      'play2',
+      'video',
+      'play4',
+      'playdoc2'
+    ]
+
+    const documentCommands = [
+      'play3',
+      'playdoc',
+      'play4',
+      'playdoc2'
+    ]
+
+    const kind = videoCommands.includes(command)
+      ? 'video'
+      : 'audio'
+
+    const asDocument =
+      documentCommands.includes(command)
+
+    // ========================================================
+    // 📥 DESCARGAR
+    // ========================================================
+
+    const media = await getMedia(
       {
         url,
         title: video.title
@@ -699,32 +756,45 @@ const handler = async (m, ctx = {}) => {
       kind
     )
 
+    // ========================================================
+    // 📝 INFORMACIÓN
+    // ========================================================
+
     const title = String(
       video.title || 'Archivo'
     )
       .replace(/[\\/:*?"<>|]/g, '')
       .slice(0, 90)
 
+    const duration =
+      video.timestamp ||
+      (
+        Math.floor(seconds / 60) +
+        ':' +
+        String(seconds % 60).padStart(2, '0')
+      )
+
     const caption =
       '🎵 *' + title + '*\n' +
-      '⏱️ ' +
-      (
-        video.timestamp ||
-        (
-          Math.floor(seconds / 60) +
-          ':' +
-          String(seconds % 60).padStart(2, '0')
-        )
-      ) +
-      '\n🔗 ' + url
+      '⏱️ ' + duration + '\n' +
+      '🔗 ' + url
+
+    // ========================================================
+    // 📤 ENVIAR ARCHIVO
+    // ========================================================
 
     if (asDocument) {
-      const extension =
-        kind === 'video'
-          ? '.mp4'
-          : media.mimetype === 'audio/mpeg'
-            ? '.mp3'
-            : '.m4a'
+      const extension = kind === 'video'
+        ? '.mp4'
+        : media.mimetype === 'audio/mpeg'
+          ? '.mp3'
+          : media.mimetype === 'audio/ogg; codecs=opus'
+            ? '.ogg'
+            : media.mimetype === 'audio/wav'
+              ? '.wav'
+              : media.mimetype === 'audio/flac'
+                ? '.flac'
+                : '.m4a'
 
       await conn.sendMessage(
         m.chat,
@@ -760,8 +830,10 @@ const handler = async (m, ctx = {}) => {
       )
     }
 
-    // Cooldown únicamente después
-    // de enviar el archivo.
+    // ========================================================
+    // ⏳ GUARDAR COOLDOWN
+    // ========================================================
+
     if (!bypass) {
       cooldowns.set(
         sender,
@@ -782,17 +854,17 @@ const handler = async (m, ctx = {}) => {
     await reply(
       conn,
       m,
-      '❌ No pude descargar el archivo.\n' +
-      'Revisá los registros del bot.'
+      '❌ *No pude descargar el archivo.*\n\n' +
+      'Revisá los registros de WHATSAPP-BOT.'
     )
 
   } finally {
-    pending.delete(sender)
+    processing.delete(sender)
   }
 }
 
 // ============================================================
-// 📋 COMANDOS
+// 📋 CONFIGURACIÓN
 // ============================================================
 
 handler.help = [

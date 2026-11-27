@@ -1,87 +1,208 @@
 
 /**
- * 📂 plugins/_suicidarse.js
- * 💙 WHATSAPP-BOT — SISTEMA DE APOYO Y PREVENCIÓN
+ * 📂 plugins/_sortear.js
+ * 🤖 whatsapp-bot — SORTEOS
  *
- * Comando: .suicidarse
- * Disponible: grupos
- * Objetivo: ofrecer apoyo y orientar hacia ayuda humana
+ * 🎁 Premio personalizado
+ * 🎲 Ganador completamente aleatorio
+ * 👑 Exclusivo para owners
+ * 👥 Solo grupos
+ * 🛡️ Compatible con LID
+ * 🚫 Excluye al bot
+ * 🔇 Sin mensajes privados
  */
 
-const mensajesApoyo = [
-  '💙 No tienes que resolverlo todo en este momento. Mereces apoyo y compañía.',
-  '🫂 No tienes que pasar por un momento difícil en soledad. Hablar con alguien de confianza puede ayudar.',
-  '🌱 Lo que estás sintiendo merece ser escuchado. No tengas miedo de pedir ayuda.',
-  '💙 Tu vida importa. Mereces que te escuchen sin juzgarte.',
-  '🤍 Está bien no sentirse bien todo el tiempo. Busca a alguien de confianza y cuéntale cómo te encuentras.',
-  '🌤️ No necesitas tener todas las respuestas hoy. Da un paso a la vez y permite que alguien te acompañe.',
-  '🫶 Pedir ayuda no es una debilidad. Mereces cuidado, respeto y apoyo.'
-]
+import { randomInt } from 'node:crypto'
+import { jidNormalizedUser } from '@whiskeysockets/baileys'
 
-const elegirAleatorio = (lista) =>
-  lista[Math.floor(Math.random() * lista.length)]
+const processing = new Set()
 
-const handler = async (m, { conn }) => {
-  if (!m.isGroup) {
-    return conn.sendMessage(m.chat, {
-      text: '💙 Este comando de apoyo está disponible en los grupos.'
-    })
-  }
+const handler = async (m, {
+    conn,
+    text = '',
+    args = [],
+    isOwner,
+    isROwner
+}) => {
 
-  try {
-    const usuario = m.sender
-    const frase = elegirAleatorio(mensajesApoyo)
+    if (!m.isGroup) return
 
-    const mensaje = [
-      '╭━━━〔 💙 ESPACIO DE APOYO 〕━━━⬣',
-      '',
-      `🫂 @${usuario.split('@')[0]}, queremos recordarte algo importante:`,
-      '',
-      frase,
-      '',
-      '━━━━━━━━━━━━━━━━━━━━',
-      '💬 *NO TIENES QUE AFRONTARLO A SOLAS*',
-      '',
-      'Si este tema tiene que ver con cómo te estás sintiendo, intenta hablar con alguien de confianza y decirle claramente que necesitas compañía y ayuda.',
-      '',
-      '🇺🇾 *AYUDA EN URUGUAY*',
-      '',
-      '📞 *Línea Vida: 0800 0767 o *0767 desde celular.*',
-      '🚨 *Emergencia inmediata: 911.*',
-      '',
-      'Si existe peligro inmediato, busca a una persona que pueda quedarse contigo y contacta los servicios de emergencia.',
-      '',
-      '💙 _Tu bienestar importa. Mereces ser escuchado/a._',
-      '',
-      '╰━━━━━━━━━━━━━━━━━━━━⬣',
-      '_WHATSAPP-BOT | Apoyo y prevención_'
-    ].join('\n')
+    // 👑 Exclusivo para owners.
 
-    await conn.sendMessage(m.chat, {
-      text: mensaje,
-      mentions: [usuario]
-    })
+    if (!(isOwner || isROwner || m.fromMe)) return
 
-    // Reacción de apoyo
-    await conn.sendMessage(m.chat, {
-      react: {
-        text: '💙',
-        key: m.key
-      }
-    }).catch(() => {})
+    if (processing.has(m.chat)) return
 
-  } catch (error) {
-    console.error('[WHATSAPP-BOT | APOYO Y PREVENCIÓN]', error)
+    const premio = String(
+        text || args.join(' ') || ''
+    ).trim()
 
-    await conn.sendMessage(m.chat, {
-      text: '💙 No pudimos mostrar el mensaje completo. Si alguien necesita ayuda, puede acudir a una persona de confianza o a los servicios de emergencia.'
-    }).catch(() => {})
-  }
+    if (!premio) {
+
+        return m.reply(
+            '🎁 *Ingresá el premio del sorteo.*\n\n' +
+            'Ejemplo:\n' +
+            '.sortear una noche en un jacuzzi'
+        )
+
+    }
+
+    processing.add(m.chat)
+
+    try {
+
+        await react(conn, m, '🎲')
+
+        // 👥 Obtener participantes.
+
+        const metadata = await conn.groupMetadata(m.chat)
+
+        const botIds = new Set(
+            [
+                conn.user?.id,
+                conn.user?.lid,
+                conn.user?.phoneNumber
+            ]
+                .filter(Boolean)
+                .map(id => jidNormalizedUser(id))
+        )
+
+        const participantes = new Map()
+
+        for (const p of metadata.participants || []) {
+
+            const ids = [
+                p.id,
+                p.lid,
+                p.phoneNumber,
+                p.jid
+            ]
+                .filter(id =>
+                    typeof id === 'string' &&
+                    id.includes('@')
+                )
+                .map(id => jidNormalizedUser(id))
+
+            if (!ids.length) continue
+
+            // Excluir al bot.
+
+            if (ids.some(id => botIds.has(id))) continue
+
+            // Evitar participantes duplicados.
+
+            const key = ids.find(
+                id => id.endsWith('@s.whatsapp.net')
+            ) || ids[0]
+
+            participantes.set(key, ids[0])
+
+        }
+
+        const elegibles = [...participantes.values()]
+
+        if (!elegibles.length) {
+
+            await react(conn, m, '❌')
+
+            return m.reply(
+                '❌ No hay participantes disponibles.'
+            )
+
+        }
+
+        // 🎉 Anunciar sorteo.
+
+        await conn.sendMessage(m.chat, {
+            text: `╭━━━〔 🎲 *SORTEO* 〕━━━╮
+┃
+┃ 🎁 *Premio:* ${premio}
+┃ 👥 *Participantes:* ${elegibles.length}
+┃ 🏠 *Grupo:* ${metadata.subject}
+┃
+┃ ⏳ Seleccionando ganador...
+┃
+╰━━━━━━━━━━━━━━━━━━╯`
+        }, { quoted: m })
+
+        await new Promise(
+            resolve => setTimeout(resolve, 3000)
+        )
+
+        // 🎲 Elegir ganador aleatorio.
+
+        const ganador = elegibles[
+            randomInt(elegibles.length)
+        ]
+
+        const mention = ganador.split('@')[0]
+
+        // 🏆 Anunciar ganador.
+
+        await conn.sendMessage(m.chat, {
+
+            text: `╭━━━〔 🎉 *SORTEO FINALIZADO* 〕━━━╮
+┃
+┃ 🏆 *Ganador:* @${mention}
+┃ 🎁 *Premio:* ${premio}
+┃ 👥 *Participantes:* ${elegibles.length}
+┃
+┃ 🥳 ¡Muchas felicidades!
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+> 🤖 WHATSAPP-BOT`,
+
+            mentions: [ganador]
+
+        }, { quoted: m })
+
+        await react(conn, m, '🎉')
+
+    } catch (error) {
+
+        console.error('[SORTEAR] ERROR:', error)
+
+        await react(conn, m, '❌')
+
+        await m.reply(
+            '❌ No se pudo realizar el sorteo.'
+        )
+
+    } finally {
+
+        processing.delete(m.chat)
+
+    }
+
 }
 
-handler.help = ['suicidarse']
-handler.tags = ['prevencion']
-handler.command = ['suicidarse']
+// 🎭 Reacciones.
+
+async function react(conn, m, emoji) {
+
+    try {
+
+        await conn.sendMessage(m.chat, {
+            react: {
+                text: emoji,
+                key: m.key
+            }
+        })
+
+    } catch {}
+
+}
+
+// ⚙️ Configuración.
+
+handler.help = ['sortear <premio>']
+handler.tags = ['game']
+handler.command = /^sortear$/i
+
 handler.group = true
+handler.rowner = true
+handler.register = false
+handler.limit = false
 
 export default handler

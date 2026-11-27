@@ -1,6 +1,6 @@
 
 /**
- * 📂 plugins/tagall.js
+ * 📂 plugins/grupos-tagall.js
  * 🤖 WHATSAPP-BOT — TAGALL SYSTEM
  *
  * 📢 Menciones masivas
@@ -39,6 +39,7 @@ if (!fs.existsSync(DB_FILE)) {
 // ============================================================
 
 function leerDB() {
+
     const data = JSON.parse(
         fs.readFileSync(DB_FILE, 'utf8')
     )
@@ -55,6 +56,7 @@ function leerDB() {
 // ============================================================
 
 function guardarDB(data) {
+
     const temporal = `${DB_FILE}.tmp`
 
     fs.writeFileSync(
@@ -71,6 +73,7 @@ function guardarDB(data) {
 // ============================================================
 
 function normalizarJid(jid) {
+
     if (typeof jid !== 'string') return null
 
     jid = jid.trim().toLowerCase()
@@ -91,6 +94,7 @@ function normalizarJid(jid) {
 }
 
 function obtenerIds(...valores) {
+
     return [...new Set(
         valores
             .flat(Infinity)
@@ -100,10 +104,11 @@ function obtenerIds(...valores) {
 }
 
 // ============================================================
-// 👤 OBTENER IDENTIFICADORES DEL PARTICIPANTE
+// 👤 IDENTIFICADORES DEL PARTICIPANTE
 // ============================================================
 
 function idsParticipante(p) {
+
     if (!p) return []
 
     return obtenerIds(
@@ -120,23 +125,28 @@ function idsParticipante(p) {
 // ============================================================
 
 async function resolverIds(conn, ids) {
+
     const resultado = new Set(ids)
 
-    const mapping =
-        conn.signalRepository?.lidMapping
+    const mapping = conn.signalRepository
+        ? conn.signalRepository.lidMapping
+        : null
 
     if (!mapping) {
         return [...resultado]
     }
 
     for (const id of ids) {
+
         try {
+
             let alternativo
 
             if (
                 id.endsWith('@lid') &&
                 typeof mapping.getPNForLID === 'function'
             ) {
+
                 alternativo =
                     await mapping.getPNForLID(id)
 
@@ -144,6 +154,7 @@ async function resolverIds(conn, ids) {
                 id.endsWith('@s.whatsapp.net') &&
                 typeof mapping.getLIDForPN === 'function'
             ) {
+
                 alternativo =
                     await mapping.getLIDForPN(id)
             }
@@ -155,12 +166,45 @@ async function resolverIds(conn, ids) {
                 resultado.add(normalizado)
             }
 
-        } catch {
+        } catch (error) {
+
             // Continuar con los identificadores disponibles.
         }
     }
 
     return [...resultado]
+}
+
+// ============================================================
+// 👥 OBTENER PARTICIPANTES
+// ============================================================
+
+async function obtenerParticipantes(
+    conn,
+    chatId,
+    groupMetadata
+) {
+
+    if (
+        groupMetadata &&
+        Array.isArray(groupMetadata.participants)
+    ) {
+
+        return groupMetadata.participants
+    }
+
+    const metadata =
+        await conn.groupMetadata(chatId)
+
+    if (
+        metadata &&
+        Array.isArray(metadata.participants)
+    ) {
+
+        return metadata.participants
+    }
+
+    return []
 }
 
 // ============================================================
@@ -172,12 +216,15 @@ async function identificarUsuario(
     m,
     participantes
 ) {
+
+    const key = m.key || {}
+
     let ids = obtenerIds(
         m.sender,
         m.senderPn,
         m.senderLid,
-        m.key?.participant,
-        m.key?.participantAlt
+        key.participant,
+        key.participantAlt
     )
 
     ids = await resolverIds(conn, ids)
@@ -189,6 +236,7 @@ async function identificarUsuario(
     )
 
     if (participante) {
+
         ids = obtenerIds(
             ids,
             idsParticipante(participante)
@@ -203,9 +251,16 @@ async function identificarUsuario(
 // ============================================================
 
 function estaExcluido(data, ids) {
+
     return data.usuarios.some(usuario =>
+
+        usuario &&
+
         Array.isArray(usuario.ids) &&
-        usuario.ids.some(id => ids.includes(id))
+
+        usuario.ids.some(id =>
+            ids.includes(id)
+        )
     )
 }
 
@@ -214,14 +269,19 @@ function estaExcluido(data, ids) {
 // ============================================================
 
 async function react(conn, m, emoji) {
+
     try {
+
         await conn.sendMessage(m.chat, {
+
             react: {
                 text: emoji,
                 key: m.key
             }
+
         })
-    } catch {}
+
+    } catch (error) {}
 }
 
 // ============================================================
@@ -229,6 +289,7 @@ async function react(conn, m, emoji) {
 // ============================================================
 
 let handler = async function (m, {
+
     conn,
     groupMetadata,
     args = [],
@@ -236,6 +297,7 @@ let handler = async function (m, {
     isOwner,
     isROwner,
     command = ''
+
 }) {
 
     // 🔇 No responder en privados.
@@ -259,9 +321,11 @@ let handler = async function (m, {
         if (command === 'notagall') {
 
             const participantes =
-                groupMetadata?.participants ||
-                (await conn.groupMetadata(chatId)).participants ||
-                []
+                await obtenerParticipantes(
+                    conn,
+                    chatId,
+                    groupMetadata
+                )
 
             const ids = await identificarUsuario(
                 conn,
@@ -270,6 +334,7 @@ let handler = async function (m, {
             )
 
             if (!ids.length) {
+
                 return m.reply(
                     '❌ No pude identificar tu usuario.'
                 )
@@ -277,7 +342,8 @@ let handler = async function (m, {
 
             const data = leerDB()
 
-            const excluido = estaExcluido(data, ids)
+            const excluido =
+                estaExcluido(data, ids)
 
             // ================================================
             // 🔔 VOLVER A RECIBIR MENCIONES
@@ -286,10 +352,20 @@ let handler = async function (m, {
             if (excluido) {
 
                 data.usuarios = data.usuarios.filter(
-                    usuario =>
-                        !usuario.ids?.some(id =>
+                    usuario => {
+
+                        if (
+                            !usuario ||
+                            !Array.isArray(usuario.ids)
+                        ) {
+
+                            return true
+                        }
+
+                        return !usuario.ids.some(id =>
                             ids.includes(id)
                         )
+                    }
                 )
 
                 guardarDB(data)
@@ -315,8 +391,11 @@ let handler = async function (m, {
             // ================================================
 
             data.usuarios.push({
+
                 ids,
+
                 fecha: new Date().toISOString()
+
             })
 
             guardarDB(data)
@@ -346,6 +425,7 @@ let handler = async function (m, {
         // ====================================================
 
         if (!autorizado) {
+
             return m.reply(
                 '❌ Solo administradores y owners pueden usar este comando.'
             )
@@ -355,12 +435,24 @@ let handler = async function (m, {
         // 💾 CONFIGURACIÓN DEL GRUPO
         // ====================================================
 
-        if (!global.db?.data) {
-            throw new Error('Base de datos global no disponible.')
+        if (!global.db || !global.db.data) {
+
+            throw new Error(
+                'Base de datos global no disponible.'
+            )
         }
 
-        global.db.data.chats ??= {}
-        global.db.data.chats[chatId] ??= {}
+        // Compatible con analizadores de sintaxis antiguos.
+
+        if (!global.db.data.chats) {
+
+            global.db.data.chats = {}
+        }
+
+        if (!global.db.data.chats[chatId]) {
+
+            global.db.data.chats[chatId] = {}
+        }
 
         const chatData =
             global.db.data.chats[chatId]
@@ -374,14 +466,14 @@ let handler = async function (m, {
             chatData.tagallEnabled =
                 !chatData.tagallEnabled
 
+            const estado = chatData.tagallEnabled
+                ? 'Activado ✅'
+                : 'Desactivado ❌'
+
             await m.reply(
                 `╭━━〔 ⚙️ *TAGALL* 〕━━╮
 ┃
-┃ Estado: ${
-    chatData.tagallEnabled
-        ? 'Activado ✅'
-        : 'Desactivado ❌'
-}
+┃ Estado: ${estado}
 ┃
 ┃ 👥 Configuración del grupo.
 ╰━━━━━━━━━━━━━━━━━━━━╯`
@@ -399,8 +491,10 @@ let handler = async function (m, {
         // ====================================================
 
         if (!chatData.tagallEnabled) {
+
             return m.reply(
-                '⚠️ El TagAll está desactivado.\n\nUsa *.antitagall* para activarlo.'
+                '⚠️ El TagAll está desactivado.\n\n' +
+                'Usa *.antitagall* para activarlo.'
             )
         }
 
@@ -409,11 +503,14 @@ let handler = async function (m, {
         // ====================================================
 
         const participantes =
-            groupMetadata?.participants ||
-            (await conn.groupMetadata(chatId)).participants ||
-            []
+            await obtenerParticipantes(
+                conn,
+                chatId,
+                groupMetadata
+            )
 
         if (!participantes.length) {
+
             return m.reply(
                 '❌ No pude obtener los participantes.'
             )
@@ -429,12 +526,18 @@ let handler = async function (m, {
 
         for (const usuario of data.usuarios) {
 
+            if (!usuario) continue
+
             const ids = await resolverIds(
+
                 conn,
+
                 obtenerIds(usuario.ids || [])
+
             )
 
             for (const id of ids) {
+
                 excluidosDB.add(id)
             }
         }
@@ -443,12 +546,16 @@ let handler = async function (m, {
         // 🤖 IDENTIFICAR AL BOT
         // ====================================================
 
+        const bot = conn.user || {}
+
         const botIds = await resolverIds(
+
             conn,
+
             obtenerIds(
-                conn.user?.id,
-                conn.user?.jid,
-                conn.user?.lid
+                bot.id,
+                bot.jid,
+                bot.lid
             )
         )
 
@@ -457,13 +564,17 @@ let handler = async function (m, {
         // ====================================================
 
         const mencionados = []
+
         const registrados = new Set()
 
         let excluidos = 0
 
         for (const participante of participantes) {
 
-            const ids = idsParticipante(participante)
+            if (!participante) continue
+
+            const ids =
+                idsParticipante(participante)
 
             const jid =
                 normalizarJid(participante.id) ||
@@ -471,26 +582,37 @@ let handler = async function (m, {
 
             if (!jid) continue
 
-            // No mencionar al propio bot.
+            // ================================================
+            // 🤖 NO MENCIONAR AL PROPIO BOT
+            // ================================================
 
             if (ids.some(id => botIds.includes(id))) {
+
                 continue
             }
 
-            // Evitar usuarios duplicados.
+            // ================================================
+            // 🔄 EVITAR USUARIOS DUPLICADOS
+            // ================================================
 
             if (ids.some(id => registrados.has(id))) {
+
                 continue
             }
 
             for (const id of ids) {
+
                 registrados.add(id)
             }
 
-            // Respetar las preferencias de NoTagAll.
+            // ================================================
+            // 🔕 RESPETAR NOTAGALL
+            // ================================================
 
             if (ids.some(id => excluidosDB.has(id))) {
+
                 excluidos++
+
                 continue
             }
 
@@ -502,6 +624,7 @@ let handler = async function (m, {
         // ====================================================
 
         if (!mencionados.length) {
+
             return m.reply(
                 '🔕 No hay usuarios disponibles para mencionar.'
             )
@@ -519,9 +642,11 @@ let handler = async function (m, {
         // ====================================================
 
         const listaUsuarios = mencionados
+
             .map(jid =>
                 `┃ 🐾 @${jid.split('@')[0]}`
             )
+
             .join('\n')
 
         // ====================================================
@@ -565,21 +690,33 @@ Usa *.notagall*
         // ====================================================
 
         await conn.sendMessage(chatId, {
+
             text: mensaje,
+
             mentions: mencionados
+
         })
 
         console.log(
+
             `[TAGALL] Grupo: ${chatId} | ` +
+
             `Mencionados: ${mencionados.length} | ` +
+
             `Excluidos: ${excluidos}`
+
         )
 
     } catch (error) {
 
         console.error(
+
             '[TAGALL] ERROR:',
-            error.stack || error.message || error
+
+            error.stack ||
+            error.message ||
+            error
+
         )
 
         await react(conn, m, '❌')
@@ -594,7 +731,8 @@ Usa *.notagall*
 // ⚙️ CONFIGURACIÓN DEL HANDLER
 // ============================================================
 
-handler.command = /^(invocar|todos|tagall|antitagall|notagall)$/i
+handler.command =
+    /^(invocar|todos|tagall|antitagall|notagall)$/i
 
 handler.help = [
     'tagall <mensaje>',

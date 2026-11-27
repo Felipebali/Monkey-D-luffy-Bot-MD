@@ -1,306 +1,251 @@
-// 📂 plugins/_HD.js
-// 🖼️ FelixCat_Bot — Mejorador HD
-// 🚀 Real-ESRGAN local
 
-import fetch from 'node-fetch'
-import FormData from 'form-data'
+/**
+ * 📂 plugins/_HD.js
+ * 🤖 whatsapp-bot — MEJORADOR HD
+ *
+ * 🖼️ Procesamiento local con Sharp
+ * 🔍 Resolución x2 y x4
+ * ✨ Mejora de nitidez y contraste
+ * 🚫 Sin APIs externas
+ * 🚫 Sin Python
+ * 👥 Solo grupos
+ * 🔇 Sin spam
+ */
+
+import sharp from 'sharp'
 
 // ============================================================
 // ⚙️ CONFIGURACIÓN
 // ============================================================
 
-const ESRGAN_URL =
-  process.env.ESRGAN_URL ||
-  'http://127.0.0.1:5000/upscale'
+const MAX_SIZE = 4096
+const MAX_FILE_SIZE = 15 * 1024 * 1024
+const MAX_CONCURRENT = 2
 
-// ============================================================
-// 🖼️ OBTENER MIME
-// ============================================================
-
-function getMime(media) {
-  return (
-    media?.mimetype ||
-    media?.msg?.mimetype ||
-    media?.mediaType ||
-    ''
-  )
-}
-
-// ============================================================
-// 📦 OBTENER IMAGEN
-// ============================================================
-
-async function getImage(m) {
-  const quoted = m.quoted || m
-  const mime = getMime(quoted)
-
-  if (!/^image\/(jpeg|jpg|png|webp)$/i.test(mime)) {
-    return null
-  }
-
-  const buffer = await quoted.download()
-
-  if (!buffer || !Buffer.isBuffer(buffer)) {
-    return null
-  }
-
-  return {
-    buffer,
-    mime
-  }
-}
+const processing = new Set()
 
 // ============================================================
 // 🚀 HANDLER
 // ============================================================
 
-let handler = async (m, { conn }) => {
-  try {
+const handler = async (m, {
+    conn,
+    args = []
+}) => {
 
-    // ========================================================
-    // 🖼️ BUSCAR IMAGEN
-    // ========================================================
+    if (!m.isGroup) return
 
-    const image = await getImage(m)
+    if (processing.has(m.sender)) return
 
-    if (!image) {
-      return m.reply(
-`🖼️ *MEJORADOR HD*
-
-❌ No encontré una imagen válida.
-
-📌 Respondé a una imagen con:
-
-> .hd
-
-También podés usar:
-
-> .remini
-> .enhance`
-      )
+    if (processing.size >= MAX_CONCURRENT) {
+        return m.reply('⏳ Intentá nuevamente en un momento.')
     }
 
-    // ========================================================
-    // 📤 CREAR FORMULARIO
-    // ========================================================
+    const quoted = m.quoted || m
 
-    const form = new FormData()
-
-    form.append(
-      'image',
-      image.buffer,
-      {
-        filename: `image_${Date.now()}.jpg`,
-        contentType: image.mime
-      }
+    const mime = String(
+        quoted.mimetype ||
+        quoted.msg?.mimetype ||
+        quoted.mediaType ||
+        ''
     )
 
-    // ========================================================
-    // 🚀 ENVIAR A REAL-ESRGAN
-    // ========================================================
+    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(mime)) {
 
-    const response = await fetch(
-      ESRGAN_URL,
-      {
-        method: 'POST',
-        headers: {
-          ...form.getHeaders()
-        },
-        body: form
-      }
-    )
-
-    // ========================================================
-    // ❌ ERROR
-    // ========================================================
-
-    if (!response.ok) {
-      const errorText =
-        await response.text().catch(() => '')
-
-      console.error(
-        'Real-ESRGAN:',
-        response.status,
-        errorText
-      )
-
-      throw new Error(
-        `Servidor Real-ESRGAN respondió ${response.status}`
-      )
-    }
-
-    // ========================================================
-    // 📥 RESULTADO
-    // ========================================================
-
-    const contentType =
-      response.headers.get('content-type') || ''
-
-    let resultBuffer
-
-    // ========================================================
-    // 🖼️ IMAGEN DIRECTA
-    // ========================================================
-
-    if (contentType.startsWith('image/')) {
-
-      resultBuffer =
-        Buffer.from(
-          await response.arrayBuffer()
+        return m.reply(
+            '🖼️ Respondé a una imagen con:\n\n' +
+            '• .hd — Mejorar x2\n' +
+            '• .hd 4 — Mejorar x4'
         )
 
     }
 
-    // ========================================================
-    // 📦 JSON
-    // ========================================================
+    const scale = ['4', 'x4'].includes(
+        String(args[0] || '').toLowerCase()
+    ) ? 4 : 2
 
-    else {
+    processing.add(m.sender)
 
-      const data =
-        await response.json()
+    try {
 
-      const result =
-        data?.url ||
-        data?.result_url ||
-        data?.image ||
-        data?.output
+        // ====================================================
+        // 📥 DESCARGAR IMAGEN
+        // ====================================================
 
-      if (!result) {
-        throw new Error(
-          'Real-ESRGAN no devolvió una imagen.'
-        )
-      }
+        const downloaded = await quoted.download()
 
-      // ------------------------------------------------------
-      // BASE64
-      // ------------------------------------------------------
-
-      if (
-        typeof result === 'string' &&
-        result.startsWith('data:image')
-      ) {
-
-        const base64 =
-          result.split(',')[1]
-
-        resultBuffer =
-          Buffer.from(
-            base64,
-            'base64'
-          )
-
-      }
-
-      // ------------------------------------------------------
-      // URL
-      // ------------------------------------------------------
-
-      else if (
-        typeof result === 'string' &&
-        /^https?:\/\//i.test(result)
-      ) {
-
-        const resultResponse =
-          await fetch(result)
-
-        if (!resultResponse.ok) {
-          throw new Error(
-            'No se pudo descargar la imagen mejorada.'
-          )
+        if (!downloaded?.length) {
+            throw new Error('Imagen vacía.')
         }
 
-        resultBuffer =
-          Buffer.from(
-            await resultResponse.arrayBuffer()
-          )
+        const buffer = Buffer.from(downloaded)
 
-      }
+        if (buffer.length > MAX_FILE_SIZE) {
+            return m.reply('⚠️ Máximo 15 MB por imagen.')
+        }
 
-      else {
-        throw new Error(
-          'Formato de respuesta desconocido.'
+        // ====================================================
+        // 🔎 LEER DIMENSIONES
+        // ====================================================
+
+        const metadata = await sharp(buffer, {
+            limitInputPixels: 25000000
+        }).metadata()
+
+        if (!metadata.width || !metadata.height) {
+            throw new Error('Dimensiones inválidas.')
+        }
+
+        const rotated = [5, 6, 7, 8].includes(
+            metadata.orientation
         )
-      }
+
+        const originalWidth = rotated
+            ? metadata.height
+            : metadata.width
+
+        const originalHeight = rotated
+            ? metadata.width
+            : metadata.height
+
+        // ====================================================
+        // 📐 CALCULAR NUEVA RESOLUCIÓN
+        // ====================================================
+
+        const factor = Math.min(
+            scale,
+            MAX_SIZE / originalWidth,
+            MAX_SIZE / originalHeight
+        )
+
+        const width = Math.max(
+            1,
+            Math.round(originalWidth * factor)
+        )
+
+        const height = Math.max(
+            1,
+            Math.round(originalHeight * factor)
+        )
+
+        // ====================================================
+        // ✨ MEJORAR IMAGEN LOCALMENTE
+        // ====================================================
+
+        const result = await sharp(buffer, {
+            limitInputPixels: 25000000
+        })
+
+            // Corregir orientación.
+            .rotate()
+
+            // Aumentar resolución.
+            .resize(width, height, {
+                fit: 'fill',
+                kernel: sharp.kernel.lanczos3
+            })
+
+            // Mejorar contraste local.
+            .clahe({
+                width: 8,
+                height: 8,
+                maxSlope: 2
+            })
+
+            // Mejorar colores.
+            .modulate({
+                brightness: 1.02,
+                saturation: 1.06
+            })
+
+            // Mejorar nitidez.
+            .sharpen({
+                sigma: 1.2,
+                m1: 0.5,
+                m2: 1.5
+            })
+
+            // Fondo para imágenes transparentes.
+            .flatten({
+                background: '#FFFFFF'
+            })
+
+            // Exportar en alta calidad.
+            .jpeg({
+                quality: 95,
+                mozjpeg: true,
+                chromaSubsampling: '4:4:4'
+            })
+
+            .toBuffer()
+
+        if (!result?.length) {
+            throw new Error('Resultado vacío.')
+        }
+
+        // ====================================================
+        // 📤 ENVIAR RESULTADO
+        // ====================================================
+
+        await conn.sendMessage(
+            m.chat,
+            {
+                image: result,
+                mimetype: 'image/jpeg',
+
+                caption: `╭━━〔 ✨ *MEJORADOR HD* 〕━━╮
+┃
+┃ 🖼️ Imagen procesada
+┃ 📥 Original: ${originalWidth} × ${originalHeight}
+┃ 📤 Resultado: ${width} × ${height}
+┃ 🔍 Escala: ×${factor.toFixed(1)}
+┃ ✨ Nitidez optimizada
+┃
+╰━━━━━━━━━━━━━━━━━━━━╯`
+            },
+            {
+                quoted: m
+            }
+        )
+
+        console.log(
+            `[HD] Procesado: ${originalWidth}x${originalHeight} → ${width}x${height}`
+        )
+
+    } catch (error) {
+
+        console.error('[HD] ERROR:', error)
+
+        await m.reply(
+            '❌ No se pudo mejorar la imagen.'
+        )
+
+    } finally {
+
+        processing.delete(m.sender)
+
     }
 
-    // ========================================================
-    // 🔎 VALIDAR
-    // ========================================================
-
-    if (
-      !resultBuffer ||
-      !resultBuffer.length
-    ) {
-      throw new Error(
-        'La imagen procesada está vacía.'
-      )
-    }
-
-    // ========================================================
-    // 📤 ENVIAR RESULTADO
-    // ========================================================
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        image: resultBuffer,
-        mimetype: 'image/jpeg',
-        fileName:
-          `FelixCat_HD_${Date.now()}.jpg`,
-        caption:
-`╭━━━〔 ✨ *FELIXCAT HD* 〕━━━╮
-┃
-┃ 🖼️ Imagen mejorada
-┃ 🔍 Resolución optimizada
-┃ 🚀 Real-ESRGAN
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━╯`
-      },
-      {
-        quoted: m
-      }
-    )
-
-  } catch (error) {
-
-    console.error(
-      '❌ Error en plugin HD:',
-      error
-    )
-
-    await m.reply(
-`❌ *NO SE PUDO MEJORAR LA IMAGEN*
-
-⚠️ El servidor Real-ESRGAN no está disponible.
-
-🔧 Servidor configurado:
-${ESRGAN_URL}`
-    )
-  }
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN
+// ⚙️ CONFIGURACIÓN DEL COMANDO
 // ============================================================
 
 handler.help = [
-  'hd',
-  'remini',
-  'enhance'
+    'hd',
+    'hd 4',
+    'remini',
+    'enhance'
 ]
 
-handler.tags = [
-  'tools'
-]
+handler.tags = ['tools']
 
-handler.command = [
-  'hd',
-  'remini',
-  'enhance'
-]
+handler.command =
+    /^(hd|remini|enhance|mejorar|upscale)$/i
 
-handler.group = false
+handler.group = true
+handler.register = false
 handler.limit = false
 
 export default handler

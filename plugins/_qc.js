@@ -1,21 +1,39 @@
 
 /**
  * 📂 plugins/_qc.js
- * 🤖 whatsapp-bot — QUOTE STICKER V2
+ * 🤖 whatsapp-bot — QUOTE STICKER V3
  *
- * 💬 Mensajes citados y escritos
- * 👤 Foto de perfil circular
- * 🎨 Burbuja estilo WhatsApp
- * 🖼️ WebP directo 512x512
- * 🌐 Sin APIs externas de generación
- * 👥 Solo grupos
+ * ✅ Fuente Roboto integrada
+ * ✅ Texto escrito y citado
+ * ✅ Foto de perfil circular
+ * ✅ Compatibilidad LID
+ * ✅ Fondo transparente
+ * ✅ WebP 512x512
+ * ✅ Sin APIs externas de generación
+ * ✅ Solo grupos
+ * ✅ Sin cooldown
  */
 
-import { createCanvas, loadImage } from '@napi-rs/canvas'
+import {
+    createCanvas,
+    loadImage,
+    GlobalFonts
+} from '@napi-rs/canvas'
+
 import sharp from 'sharp'
+import { createRequire } from 'node:module'
+import path from 'node:path'
+import fs from 'node:fs'
+
+const require = createRequire(import.meta.url)
+
+// ============================================================
+// ⚙️ CONFIGURACIÓN
+// ============================================================
 
 const MAX_LENGTH = 310
 const MAX_CONCURRENT = 3
+
 const processing = new Set()
 
 const COLORS = [
@@ -28,10 +46,87 @@ const COLORS = [
 ]
 
 // ============================================================
+// 🔤 REGISTRAR FUENTES ROBOTO
+// ============================================================
+
+let FONT_REGULAR = false
+let FONT_BOLD = false
+
+try {
+
+    const fontDirectory = path.join(
+        path.dirname(
+            require.resolve('@fontsource/roboto/package.json')
+        ),
+        'files'
+    )
+
+    const regularPath = path.join(
+        fontDirectory,
+        'roboto-latin-400-normal.woff'
+    )
+
+    const boldPath = path.join(
+        fontDirectory,
+        'roboto-latin-700-normal.woff'
+    )
+
+    if (fs.existsSync(regularPath)) {
+
+        FONT_REGULAR = GlobalFonts.registerFromPath(
+            regularPath,
+            'QCRobotoRegular'
+        )
+
+    }
+
+    if (fs.existsSync(boldPath)) {
+
+        FONT_BOLD = GlobalFonts.registerFromPath(
+            boldPath,
+            'QCRobotoBold'
+        )
+
+    }
+
+    console.log(
+        '[QC] Fuente regular:',
+        FONT_REGULAR ? 'OK' : 'ERROR'
+    )
+
+    console.log(
+        '[QC] Fuente negrita:',
+        FONT_BOLD ? 'OK' : 'ERROR'
+    )
+
+} catch (error) {
+
+    console.error(
+        '[QC] Error cargando fuentes:',
+        error.message
+    )
+
+}
+
+function setFont(ctx, size, bold = false) {
+
+    const family = bold && FONT_BOLD
+        ? 'QCRobotoBold'
+        : 'QCRobotoRegular'
+
+    ctx.font = `${size}px "${family}"`
+
+}
+
+// ============================================================
 // 🚀 COMANDO PRINCIPAL
 // ============================================================
 
-const handler = async (m, { conn, text = '' }) => {
+const handler = async (m, {
+    conn,
+    text = '',
+    args = []
+}) => {
 
     if (!m.isGroup) return
 
@@ -40,20 +135,24 @@ const handler = async (m, { conn, text = '' }) => {
     if (processing.has(sender)) return
 
     if (processing.size >= MAX_CONCURRENT) {
-        return m.reply('⏳ Esperá un momento.')
+        return react(conn, m, '⏳')
     }
 
     let quoteText = ''
     let quoteSender = ''
     let quoteName = ''
 
+    const input = String(
+        text || args.join(' ') || ''
+    ).trim()
+
     // ========================================================
     // 📝 TEXTO ESCRITO
     // ========================================================
 
-    if (String(text || '').trim()) {
+    if (input) {
 
-        quoteText = String(text).trim()
+        quoteText = input
         quoteSender = m.sender
 
         quoteName =
@@ -76,7 +175,13 @@ const handler = async (m, { conn, text = '' }) => {
             q.msg?.caption ||
             q.message?.conversation ||
             q.message?.extendedTextMessage?.text ||
-            ''
+            q.message?.imageMessage?.caption ||
+            q.message?.videoMessage?.caption ||
+            (
+                typeof q.msg === 'string'
+                    ? q.msg
+                    : ''
+            )
         ).trim()
 
         quoteSender =
@@ -95,23 +200,42 @@ const handler = async (m, { conn, text = '' }) => {
     if (!quoteText) {
 
         return m.reply(
-            '💬 *QUOTE STICKER*\n\n' +
-            '• .qc Hola mundo\n' +
-            '• Respondé a un mensaje con .qc'
+            '╭━━━〔 💬 *QUOTE STICKER* 〕━━━╮\n' +
+            '┃\n' +
+            '┃ 📝 .qc Hola mundo\n' +
+            '┃ 💬 O citá un mensaje con .qc\n' +
+            '┃\n' +
+            '╰━━━━━━━━━━━━━━━━━━━━╯'
         )
 
     }
 
     if (!quoteSender) {
+
         return m.reply(
-            '❌ No se pudo identificar al autor del mensaje.'
+            '❌ No se pudo identificar al autor.'
         )
+
     }
 
-    if (Array.from(quoteText).length > MAX_LENGTH) {
+    const length = Array.from(quoteText).length
+
+    if (length > MAX_LENGTH) {
 
         return m.reply(
             `⚠️ Máximo ${MAX_LENGTH} caracteres.`
+        )
+
+    }
+
+    if (!FONT_REGULAR) {
+
+        console.error(
+            '[QC] No se pudo registrar la fuente Roboto.'
+        )
+
+        return m.reply(
+            '❌ La fuente del QC no está disponible.'
         )
 
     }
@@ -123,7 +247,7 @@ const handler = async (m, { conn, text = '' }) => {
         await react(conn, m, '💬')
 
         // ====================================================
-        // 👤 IDENTIFICAR USUARIO
+        // 👤 IDENTIFICAR USUARIO Y LID
         // ====================================================
 
         if (typeof conn.decodeJid === 'function') {
@@ -135,8 +259,6 @@ const handler = async (m, { conn, text = '' }) => {
         }
 
         const candidates = new Set([quoteSender])
-
-        // Compatibilidad con números normales y LID.
 
         try {
 
@@ -162,17 +284,24 @@ const handler = async (m, { conn, text = '' }) => {
                     participant.jid
                 ]) {
 
-                    if (typeof id === 'string' && id.includes('@')) {
+                    if (
+                        typeof id === 'string' &&
+                        id.includes('@')
+                    ) {
+
                         candidates.add(id)
+
                     }
 
                 }
 
                 if (!quoteName) {
+
                     quoteName =
                         participant.notify ||
                         participant.name ||
                         ''
+
                 }
 
             }
@@ -180,7 +309,7 @@ const handler = async (m, { conn, text = '' }) => {
         } catch {}
 
         // ====================================================
-        // 📛 NOMBRE DEL USUARIO
+        // 📛 OBTENER NOMBRE
         // ====================================================
 
         if (!quoteName) {
@@ -201,8 +330,10 @@ const handler = async (m, { conn, text = '' }) => {
                         )
 
                     if (name) {
+
                         quoteName = String(name)
                         break
+
                     }
 
                 } catch {}
@@ -221,7 +352,7 @@ const handler = async (m, { conn, text = '' }) => {
         ).trim()
 
         // ====================================================
-        // 🖼️ FOTO DE PERFIL
+        // 🖼️ OBTENER FOTO DE PERFIL
         // ====================================================
 
         let avatar = null
@@ -230,10 +361,11 @@ const handler = async (m, { conn, text = '' }) => {
 
             try {
 
-                const url = await conn.profilePictureUrl(
-                    id,
-                    'image'
-                )
+                const url =
+                    await conn.profilePictureUrl(
+                        id,
+                        'image'
+                    )
 
                 if (!url) continue
 
@@ -263,12 +395,15 @@ const handler = async (m, { conn, text = '' }) => {
 
         }
 
-        if (!avatar) {
-            console.log('[QC] Usando avatar alternativo.')
-        }
+        console.log('[QC] Autor:', quoteName)
+        console.log('[QC] Caracteres:', length)
+        console.log(
+            '[QC] Foto:',
+            avatar ? 'OK' : 'Avatar alternativo'
+        )
 
         // ====================================================
-        // 🎨 GENERAR STICKER
+        // 🎨 GENERAR IMAGEN
         // ====================================================
 
         const png = generateQuote({
@@ -278,12 +413,15 @@ const handler = async (m, { conn, text = '' }) => {
             jid: quoteSender
         })
 
-        // Conversión directa a WebP.
-        // Sin lib/sticker.js ni doble redimensionamiento.
+        // ====================================================
+        // 🧩 CONVERTIR DIRECTAMENTE A WEBP
+        // ====================================================
 
-        let webp
+        let webp = null
 
-        for (const quality of [95, 85, 70, 50, 30]) {
+        for (const quality of [
+            95, 85, 70, 50, 30, 15
+        ]) {
 
             webp = await sharp(png)
                 .webp({
@@ -293,13 +431,27 @@ const handler = async (m, { conn, text = '' }) => {
                 })
                 .toBuffer()
 
-            if (webp.length <= 100 * 1024) break
+            if (webp.length <= 100 * 1024) {
+                break
+            }
 
         }
 
         if (!webp?.length) {
             throw new Error('WebP vacío.')
         }
+
+        if (webp.length > 100 * 1024) {
+            throw new Error('Sticker demasiado grande.')
+        }
+
+        const info = await sharp(webp).metadata()
+
+        console.log(
+            '[QC] Imagen:',
+            `${info.width}x${info.height}`,
+            info.format
+        )
 
         // ====================================================
         // 📤 ENVIAR STICKER
@@ -318,7 +470,7 @@ const handler = async (m, { conn, text = '' }) => {
         await react(conn, m, '✅')
 
         console.log(
-            '[QC] Sticker enviado:',
+            '[QC] Sticker enviado correctamente:',
             `${(webp.length / 1024).toFixed(1)} KB`
         )
 
@@ -341,10 +493,15 @@ const handler = async (m, { conn, text = '' }) => {
 }
 
 // ============================================================
-// 🎨 GENERADOR DE IMAGEN
+// 🎨 GENERADOR DE STICKERS
 // ============================================================
 
-function generateQuote({ name, text, avatar, jid }) {
+function generateQuote({
+    name,
+    text,
+    avatar,
+    jid
+}) {
 
     const SIZE = 512
 
@@ -358,6 +515,7 @@ function generateQuote({ name, text, avatar, jid }) {
     const PADDING = 22
 
     const MAX_BUBBLE_WIDTH = 386
+
     const MAX_TEXT_WIDTH =
         MAX_BUBBLE_WIDTH - PADDING * 2
 
@@ -367,12 +525,12 @@ function generateQuote({ name, text, avatar, jid }) {
     let bubbleHeight = 0
 
     // ========================================================
-    // 📐 AJUSTAR TAMAÑO DEL TEXTO
+    // 📐 AJUSTAR TEXTO AL STICKER
     // ========================================================
 
     while (fontSize >= 10) {
 
-        ctx.font = `${fontSize}px sans-serif`
+        setFont(ctx, fontSize)
 
         lines = wrapText(
             ctx,
@@ -380,7 +538,8 @@ function generateQuote({ name, text, avatar, jid }) {
             MAX_TEXT_WIDTH
         )
 
-        lineHeight = Math.ceil(fontSize * 1.25)
+        lineHeight =
+            Math.ceil(fontSize * 1.3)
 
         bubbleHeight =
             76 + lines.length * lineHeight
@@ -392,12 +551,14 @@ function generateQuote({ name, text, avatar, jid }) {
     }
 
     if (bubbleHeight > 480) {
+
         throw new Error(
             'El mensaje contiene demasiadas líneas.'
         )
+
     }
 
-    ctx.font = `${fontSize}px sans-serif`
+    setFont(ctx, fontSize)
 
     const longestLine = Math.max(
         ...lines.map(
@@ -406,11 +567,24 @@ function generateQuote({ name, text, avatar, jid }) {
         0
     )
 
+    // Comprobar que la fuente mida correctamente.
+
+    const testWidth =
+        ctx.measureText('Hola mundo').width
+
+    if (!Number.isFinite(testWidth) || testWidth <= 0) {
+
+        throw new Error(
+            'La fuente no está renderizando correctamente.'
+        )
+
+    }
+
     // ========================================================
     // 📛 AJUSTAR NOMBRE
     // ========================================================
 
-    ctx.font = 'bold 27px sans-serif'
+    setFont(ctx, 27, true)
 
     const displayName = truncateText(
         ctx,
@@ -431,14 +605,14 @@ function generateQuote({ name, text, avatar, jid }) {
     )
 
     // ========================================================
-    // 📍 CENTRAR TODO EL STICKER
+    // 📍 CENTRAR IMAGEN
     // ========================================================
 
     const totalWidth =
         AVATAR + GAP + bubbleWidth
 
     const totalHeight =
-        Math.max(AVATAR, bubbleHeight)
+        Math.max(AVATAR + 4, bubbleHeight)
 
     const startX =
         Math.round((SIZE - totalWidth) / 2)
@@ -457,7 +631,7 @@ function generateQuote({ name, text, avatar, jid }) {
     const color = getColor(jid || name)
 
     // ========================================================
-    // 💬 BURBUJA OSCURA
+    // 💬 BURBUJA ESTILO WHATSAPP
     // ========================================================
 
     ctx.fillStyle = '#202C33'
@@ -472,8 +646,6 @@ function generateQuote({ name, text, avatar, jid }) {
     )
 
     ctx.fill()
-
-    // Punta de la burbuja.
 
     ctx.beginPath()
 
@@ -525,7 +697,7 @@ function generateQuote({ name, text, avatar, jid }) {
 
     } else {
 
-        // Avatar genérico local.
+        // Avatar alternativo local.
 
         ctx.fillStyle = '#667781'
 
@@ -569,29 +741,33 @@ function generateQuote({ name, text, avatar, jid }) {
     ctx.restore()
 
     // ========================================================
-    // 📛 NOMBRE
+    // 📛 DIBUJAR NOMBRE CON ROBOTO
     // ========================================================
 
+    ctx.globalAlpha = 1
     ctx.textAlign = 'left'
-    ctx.textBaseline = 'top'
+    ctx.textBaseline = 'alphabetic'
 
-    ctx.font = 'bold 27px sans-serif'
+    setFont(ctx, 27, true)
+
     ctx.fillStyle = color
 
     ctx.fillText(
         displayName,
         bubbleX + PADDING,
-        bubbleY + 16
+        bubbleY + 40
     )
 
     // ========================================================
-    // 📝 MENSAJE
+    // 📝 DIBUJAR MENSAJE CON ROBOTO
     // ========================================================
 
-    ctx.font = `${fontSize}px sans-serif`
+    setFont(ctx, fontSize)
+
     ctx.fillStyle = '#FFFFFF'
 
-    let y = bubbleY + 56
+    let y =
+        bubbleY + 54 + fontSize
 
     for (const line of lines) {
 
@@ -610,7 +786,7 @@ function generateQuote({ name, text, avatar, jid }) {
 }
 
 // ============================================================
-// 📝 DIVIDIR TEXTO SIN CORTAR PALABRAS
+// 📝 DIVIDIR TEXTO AUTOMÁTICAMENTE
 // ============================================================
 
 function wrapText(ctx, text, maxWidth) {
@@ -619,12 +795,16 @@ function wrapText(ctx, text, maxWidth) {
 
     const segmenter = new Intl.Segmenter(
         'es',
-        { granularity: 'grapheme' }
+        {
+            granularity: 'grapheme'
+        }
     )
 
-    for (const paragraph of String(text)
+    const paragraphs = String(text)
         .replace(/\r/g, '')
-        .split('\n')) {
+        .split('\n')
+
+    for (const paragraph of paragraphs) {
 
         if (!paragraph.trim()) {
 
@@ -641,7 +821,9 @@ function wrapText(ctx, text, maxWidth) {
                 ? `${line} ${word}`
                 : word
 
-            if (ctx.measureText(test).width <= maxWidth) {
+            if (
+                ctx.measureText(test).width <= maxWidth
+            ) {
 
                 line = test
                 continue
@@ -655,7 +837,9 @@ function wrapText(ctx, text, maxWidth) {
 
             }
 
-            if (ctx.measureText(word).width <= maxWidth) {
+            if (
+                ctx.measureText(word).width <= maxWidth
+            ) {
 
                 line = word
                 continue
@@ -690,15 +874,19 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 // ============================================================
-// ✂️ NOMBRES LARGOS
+// ✂️ ACORTAR NOMBRES
 // ============================================================
 
 function truncateText(ctx, text, maxWidth) {
 
     const chars = Array.from(String(text))
 
-    if (ctx.measureText(chars.join('')).width <= maxWidth) {
+    if (
+        ctx.measureText(chars.join('')).width <= maxWidth
+    ) {
+
         return chars.join('')
+
     }
 
     while (
@@ -716,7 +904,7 @@ function truncateText(ctx, text, maxWidth) {
 }
 
 // ============================================================
-// 🎨 COLOR DEL NOMBRE
+// 🎨 COLOR INDIVIDUAL
 // ============================================================
 
 function getColor(value) {
@@ -746,15 +934,36 @@ function roundedRect(ctx, x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2)
 
     ctx.beginPath()
+
     ctx.moveTo(x + r, y)
     ctx.lineTo(x + w - r, y)
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+
+    ctx.quadraticCurveTo(
+        x + w, y,
+        x + w, y + r
+    )
+
     ctx.lineTo(x + w, y + h - r)
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+
+    ctx.quadraticCurveTo(
+        x + w, y + h,
+        x + w - r, y + h
+    )
+
     ctx.lineTo(x + r, y + h)
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+
+    ctx.quadraticCurveTo(
+        x, y + h,
+        x, y + h - r
+    )
+
     ctx.lineTo(x, y + r)
-    ctx.quadraticCurveTo(x, y, x + r, y)
+
+    ctx.quadraticCurveTo(
+        x, y,
+        x + r, y
+    )
+
     ctx.closePath()
 
 }
@@ -768,10 +977,12 @@ async function react(conn, m, emoji) {
     try {
 
         await conn.sendMessage(m.chat, {
+
             react: {
                 text: emoji,
                 key: m.key
             }
+
         })
 
     } catch {}
@@ -779,14 +990,18 @@ async function react(conn, m, emoji) {
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN
+// ⚙️ CONFIGURACIÓN DEL HANDLER
 // ============================================================
 
-handler.help = ['qc <texto>', 'qc']
+handler.help = [
+    'qc <texto>',
+    'qc'
+]
 
 handler.tags = ['sticker']
 
-handler.command = /^(qc|quote|quotesticker)$/i
+handler.command =
+    /^(qc|quote|quotesticker)$/i
 
 handler.group = true
 handler.register = false

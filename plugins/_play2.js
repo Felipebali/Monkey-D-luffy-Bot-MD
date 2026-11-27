@@ -1,174 +1,161 @@
 
 /**
  * 📂 plugins/_play2.js
- * 🤖 WHATSAPP-BOT — PLAY MULTIMEDIA
+ * 🤖 whatsapp-bot — PLAY VIDEO
  *
- * 🎵 .musica / .audio
- * 🎬 .play2 / .video
- * 📁 .play3 / .playdoc
- * 📹 .play4 / .playdoc2
- *
- * ✅ Sin dependencias locales de /lib
- * ✅ Node.js 18+
- * ✅ Búsqueda por nombre o URL
- * ✅ API alternativas
- * ✅ Control de solicitudes
- * ✅ Errores controlados
- * ✅ Sin failureHandler ni global.dfail
+ * 🎬 Videos MP4
+ * 📁 Videos como documento
+ * 🔎 Búsqueda por nombre o enlace
+ * 🚀 Descarga mediante yt-dlp
+ * 🎥 Conversión mediante FFmpeg
+ * 🔍 Validación mediante FFprobe
+ * ⏳ Cooldown de 5 minutos
+ * 👑 Owners y admins exentos del cooldown
+ * 👥 Solo grupos
+ * 🔇 Sin spam
+ * 🧹 Limpieza automática de archivos
  */
 
 import yts from 'yt-search'
+import ytdlp from 'youtube-dl-exec'
+import ffmpeg from 'ffmpeg-static'
+import ffprobe from 'ffprobe-static'
+
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import os from 'node:os'
+
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
+const exec = promisify(execFile)
 
 // ============================================================
 // ⚙️ CONFIGURACIÓN
 // ============================================================
 
 const CONFIG = {
-  apiTimeout: 20000,
-  maxAudio: 100 * 1024 * 1024,
-  maxVideo: 200 * 1024 * 1024,
-  maxDuration: 7 * 60,
-  cooldown: 5 * 60 * 1000
+    maxDuration: 7 * 60,
+
+    cooldown: 5 * 60 * 1000,
+
+    maxConcurrent: 2,
+
+    maxVideo: 50 * 1024 * 1024,
+
+    maxDocument: 100 * 1024 * 1024,
+
+    maxDownload: 150 * 1024 * 1024,
+
+    downloadTimeout: 180000,
+
+    conversionTimeout: 180000,
+
+    quality: 720
 }
 
-const solicitudes = new Set()
+const processing = new Set()
 const cooldowns = new Map()
 
-const AUDIO = new Set([
-  'musica', 'audio',
-  'play3', 'playdoc'
-])
-
 const DOCUMENTOS = new Set([
-  'play3', 'playdoc',
-  'play4', 'playdoc2'
+    'play4',
+    'playdoc2',
+    'videodoc'
 ])
 
 // ============================================================
 // 🛠️ FUNCIONES AUXILIARES
 // ============================================================
 
-function urlValida(value) {
-  if (typeof value !== 'string') return false
+function limpiarNombre(value) {
 
-  try {
-    const url = new URL(value)
-    return ['https:', 'http:'].includes(url.protocol)
-  } catch {
-    return false
-  }
-}
+    return String(value || 'video')
+        .replace(/[\\/:*?"<>|\x00-\x1F]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 100) || 'video'
 
-function normalizarURL(value, base) {
-  if (typeof value !== 'string' || !value.trim()) {
-    return null
-  }
-
-  try {
-    const url = new URL(value, base)
-
-    return urlValida(url.href)
-      ? url.href
-      : null
-  } catch {
-    return null
-  }
-}
-
-function extraerURL(data) {
-  if (typeof data === 'string') {
-    return normalizarURL(data)
-  }
-
-  if (!data || typeof data !== 'object') {
-    return null
-  }
-
-  const candidates = [
-    data.download_url_full,
-    data.stream_url_full,
-    data.download_url,
-    data.downloadUrl,
-    data.dl_url,
-    data.dl,
-    data.url,
-    data.link,
-    data.download,
-    data.result?.download,
-    data.result?.url,
-    data.result?.dl_url,
-    data.data?.audio?.url,
-    data.data?.video?.url,
-    data.data?.media?.dl_download,
-    data.data?.download?.url,
-    data.data?.download,
-    data.data?.url
-  ]
-
-  for (const item of candidates) {
-    const url = normalizarURL(item)
-    if (url) return url
-  }
-
-  return null
-}
-
-function limpiarNombre(texto) {
-  return String(texto || 'archivo')
-    .replace(/[\\/:*?"<>|]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 100)
 }
 
 function duracion(seconds) {
-  const n = Number(seconds) || 0
 
-  const min = Math.floor(n / 60)
-  const sec = Math.floor(n % 60)
+    const total = Math.floor(Number(seconds) || 0)
 
-  return `${min}:${String(sec).padStart(2, '0')}`
+    const min = Math.floor(total / 60)
+    const sec = total % 60
+
+    return `${min}:${String(sec).padStart(2, '0')}`
+
 }
 
-function espera(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+function megabytes(bytes) {
+
+    return (bytes / 1024 / 1024).toFixed(2)
+
 }
 
-async function reaccionar(m, emoji) {
-  try {
-    await m.react(emoji)
-  } catch {}
-}
+function obtenerVideoId(value) {
 
-// ============================================================
-// 🌐 PETICIONES HTTP
-// ============================================================
+    try {
 
-async function fetchJSON(url) {
-  const controller = new AbortController()
+        const url = new URL(value)
 
-  const timer = setTimeout(
-    () => controller.abort(),
-    CONFIG.apiTimeout
-  )
+        if (!['https:', 'http:'].includes(url.protocol)) {
+            return null
+        }
 
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'Mozilla/5.0'
-      }
-    })
+        const host = url.hostname.toLowerCase()
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
+        let id = null
+
+        if (host === 'youtu.be') {
+
+            id = url.pathname.split('/')[1]
+
+        } else if ([
+            'youtube.com',
+            'www.youtube.com',
+            'm.youtube.com',
+            'music.youtube.com'
+        ].includes(host)) {
+
+            id =
+                url.searchParams.get('v') ||
+                url.pathname.match(
+                    /^\/(?:shorts|live|embed)\/([^/]+)/
+                )?.[1]
+
+        }
+
+        return /^[a-zA-Z0-9_-]{11}$/.test(id || '')
+            ? id
+            : null
+
+    } catch {
+
+        return null
+
     }
 
-    return await response.json()
-  } finally {
-    clearTimeout(timer)
-  }
+}
+
+// ============================================================
+// 🎭 REACCIONES
+// ============================================================
+
+async function react(conn, m, emoji) {
+
+    try {
+
+        await conn.sendMessage(m.chat, {
+            react: {
+                text: emoji,
+                key: m.key
+            }
+        })
+
+    } catch {}
+
 }
 
 // ============================================================
@@ -176,531 +163,839 @@ async function fetchJSON(url) {
 // ============================================================
 
 async function buscarVideo(query) {
-  const match = query.match(
-    /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/|embed\/))([a-zA-Z0-9_-]{11})/i
-  )
 
-  if (match) {
-    const url =
-      `https://www.youtube.com/watch?v=${match[1]}`
+    const id = obtenerVideoId(query)
 
-    const resultado = await yts(url)
+    if (id) {
 
-    const video = resultado.videos?.find(
-      v => v.videoId === match[1]
-    )
+        return {
+            videoId: id,
+            url: `https://www.youtube.com/watch?v=${id}`
+        }
 
-    return video || {
-      title: `YouTube ${match[1]}`,
-      url,
-      seconds: 0,
-      thumbnail:
-        `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`
     }
-  }
 
-  const resultado = await yts.search(query)
+    if (/^https?:\/\//i.test(query)) {
 
-  if (!resultado.videos?.length) {
-    throw new Error(
-      'No encontré resultados para esa búsqueda.'
-    )
-  }
-
-  return resultado.videos[0]
-}
-
-// ============================================================
-// 🎵 PROVEEDORES DE AUDIO
-// ============================================================
-
-function proveedoresAudio(video) {
-  const url = encodeURIComponent(video.url)
-  const titulo = encodeURIComponent(video.title)
-  const key = encodeURIComponent(
-    process.env.API_KEY || ''
-  )
-
-  const proveedores = [
-    {
-      nombre: 'Mitzuki',
-      url:
-        `https://api.mitzuki.xyz/download/youtube?url=${url}&type=audio&format=mp3&apikey=${key}`
-    },
-    {
-      nombre: 'Mitzuki 2',
-      url:
-        `https://api.mitzuki.xyz/download/youtube2?url=${url}&apikey=${key}`
-    },
-    {
-      nombre: 'DV Yer',
-      url:
-        `https://dv-yer-api.online/ytmp3?mode=link&url=${url}`,
-      base: 'https://dv-yer-api.online'
-    },
-    {
-      nombre: 'Zenkey',
-      url:
-        `https://api.zenkey.my.id/api/download/ytmp3?apikey=zenkey&url=${url}`
-    },
-    {
-      nombre: 'Exonity',
-      url:
-        `https://exonity.tech/api/dl/playmp3?query=${titulo}`
-    }
-  ]
-
-  if (global.info?.apis) {
-    proveedores.push({
-      nombre: 'Info API',
-      url:
-        `${global.info.apis}/download/ytmp3?url=${url}`
-    })
-  }
-
-  return proveedores
-}
-
-// ============================================================
-// 🎬 PROVEEDORES DE VIDEO
-// ============================================================
-
-function proveedoresVideo(video) {
-  const url = encodeURIComponent(video.url)
-  const titulo = encodeURIComponent(video.title)
-
-  const proveedores = [
-    {
-      nombre: 'Siputzx',
-      url:
-        `https://api.siputzx.my.id/api/d/ytmp4?url=${url}`
-    },
-    {
-      nombre: 'Neoxr',
-      url:
-        `https://api.neoxr.eu/api/youtube?url=${url}&type=video&quality=720p&apikey=GataDios`
-    },
-    {
-      nombre: 'FGMods',
-      url:
-        `https://api.fgmods.xyz/api/downloader/ytmp4?url=${url}&apikey=elrebelde21`
-    },
-    {
-      nombre: 'Exonity',
-      url:
-        `https://exonity.tech/api/dl/playmp4?query=${titulo}`
-    }
-  ]
-
-  if (global.info?.apis) {
-    proveedores.push({
-      nombre: 'Info API Video',
-      url:
-        `${global.info.apis}/download/ytmp4?url=${url}`
-    })
-  }
-
-  return proveedores
-}
-
-// ============================================================
-// 🔄 OBTENER ENLACE
-// ============================================================
-
-async function obtenerEnlace(proveedor) {
-  const data = await fetchJSON(proveedor.url)
-
-  if (proveedor.nombre === 'DV Yer') {
-    const enlace =
-      data?.download_url_full ||
-      data?.stream_url_full ||
-      data?.url
-
-    return normalizarURL(
-      enlace,
-      proveedor.base
-    )
-  }
-
-  if (
-    proveedor.nombre === 'Mitzuki 2'
-  ) {
-    return extraerURL(
-      data?.data?.audio?.url || data
-    )
-  }
-
-  return extraerURL(data)
-}
-
-// ============================================================
-// 📏 CONSULTAR TAMAÑO
-// ============================================================
-
-async function obtenerTamaño(url) {
-  const controller = new AbortController()
-
-  const timer = setTimeout(
-    () => controller.abort(),
-    CONFIG.apiTimeout
-  )
-
-  try {
-    const response = await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal
-    })
-
-    if (!response.ok) return null
-
-    const size = Number(
-      response.headers.get('content-length')
-    )
-
-    return Number.isFinite(size) && size > 0
-      ? size
-      : null
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-// ============================================================
-// 📤 ENVIAR MULTIMEDIA
-// ============================================================
-
-async function enviarMultimedia(
-  conn,
-  m,
-  video,
-  enlace,
-  tipo,
-  documento
-) {
-  const audio = tipo === 'audio'
-
-  const maximo = audio
-    ? CONFIG.maxAudio
-    : CONFIG.maxVideo
-
-  const size = await obtenerTamaño(enlace)
-
-  if (size !== null && size > maximo) {
-    throw new Error(
-      'El archivo supera el tamaño permitido.'
-    )
-  }
-
-  const extension = audio ? 'mp3' : 'mp4'
-
-  const mimetype = audio
-    ? 'audio/mpeg'
-    : 'video/mp4'
-
-  const fileName =
-    `${limpiarNombre(video.title)}.${extension}`
-
-  let mensaje
-
-  if (documento) {
-    mensaje = {
-      document: { url: enlace },
-      mimetype,
-      fileName
-    }
-  } else if (audio) {
-    mensaje = {
-      audio: { url: enlace },
-      mimetype,
-      ptt: false
-    }
-  } else {
-    mensaje = {
-      video: { url: enlace },
-      mimetype,
-      caption: `🎬 *${video.title}*`
-    }
-  }
-
-  await conn.sendMessage(
-    m.chat,
-    mensaje,
-    { quoted: m }
-  )
-}
-
-// ============================================================
-// 📥 DESCARGA CON RESPALDO
-// ============================================================
-
-async function descargar(
-  conn,
-  m,
-  video,
-  tipo,
-  documento
-) {
-  const proveedores = tipo === 'audio'
-    ? proveedoresAudio(video)
-    : proveedoresVideo(video)
-
-  for (const proveedor of proveedores) {
-    try {
-      console.log(
-        `[PLAY] Probando ${proveedor.nombre}`
-      )
-
-      const enlace = await obtenerEnlace(
-        proveedor
-      )
-
-      if (!urlValida(enlace)) {
         throw new Error(
-          'La API no devolvió un enlace válido.'
+            'Ingresá un enlace válido de YouTube.'
         )
-      }
 
-      console.log(
-        `[PLAY] Enlace obtenido: ${proveedor.nombre}`
-      )
-
-      await enviarMultimedia(
-        conn,
-        m,
-        video,
-        enlace,
-        tipo,
-        documento
-      )
-
-      console.log(
-        `[PLAY] Enviado con ${proveedor.nombre}`
-      )
-
-      return true
-
-    } catch (error) {
-      console.error(
-        `[PLAY] ${proveedor.nombre}:`,
-        error?.message || error
-      )
-
-      await espera(300)
     }
-  }
 
-  return false
+    const resultado = await yts(query)
+
+    const video = resultado.videos?.[0]
+
+    if (!video?.videoId) {
+
+        throw new Error(
+            'No encontré videos para esa búsqueda.'
+        )
+
+    }
+
+    return {
+        videoId: video.videoId,
+        url: `https://www.youtube.com/watch?v=${video.videoId}`
+    }
+
 }
 
 // ============================================================
-// 🤖 HANDLER
+// 📋 OBTENER INFORMACIÓN REAL DEL VIDEO
 // ============================================================
 
-const handler = async (
-  m,
-  {
-    conn,
-    command,
-    args = [],
-    text = '',
-    usedPrefix = '.',
-    isAdmin,
-    isOwner,
-    isROwner
-  }
-) => {
-  const cmd = String(command).toLowerCase()
+async function obtenerInformacion(video) {
 
-  const query = String(
-    text || args.join(' ')
-  ).trim()
+    const data = await ytdlp(
+        video.url,
+        {
+            dumpSingleJson: true,
+            skipDownload: true,
+            noPlaylist: true,
+            noWarnings: true,
 
-  if (!query) {
-    return m.reply(
-      `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
-      `🎬 ${usedPrefix}play2 video\n` +
-      `📁 ${usedPrefix}play3 canción\n` +
-      `📹 ${usedPrefix}play4 video`
+            jsRuntimes: `node:${process.execPath}`,
+
+            socketTimeout: 20,
+            retries: 2
+        },
+        {
+            timeout: 60000
+        }
     )
-  }
 
-  const exento = Boolean(
-    isAdmin || isOwner || isROwner
-  )
+    const info = typeof data === 'string'
+        ? JSON.parse(data)
+        : data
 
-  // ========================================================
-  // ⏳ COOLDOWN DE 5 MINUTOS
-  // ========================================================
+    if (!info) {
 
-  if (!exento) {
-    const ultimo = cooldowns.get(m.sender) || 0
-    const restante =
-      CONFIG.cooldown - (Date.now() - ultimo)
+        throw new Error(
+            'No se pudo obtener información del video.'
+        )
 
-    if (restante > 0) {
-      const minutos = Math.ceil(
-        restante / 60000
-      )
-
-      return m.reply(
-        `⏳ Esperá ${minutos} minuto(s) para volver a usar PLAY.`
-      )
     }
-  }
 
-  if (solicitudes.has(m.sender)) {
-    return m.reply(
-      '⏳ Ya tenés una descarga en proceso.'
+    if (
+        info.is_live ||
+        info.live_status === 'is_live' ||
+        info.live_status === 'is_upcoming'
+    ) {
+
+        throw new Error(
+            'No se permiten transmisiones en vivo.'
+        )
+
+    }
+
+    const seconds = Number(info.duration)
+
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+
+        throw new Error(
+            'No se pudo verificar la duración.'
+        )
+
+    }
+
+    if (seconds > CONFIG.maxDuration) {
+
+        throw new Error(
+            'Solo se permiten videos de hasta 7 minutos.'
+        )
+
+    }
+
+    return {
+        ...video,
+
+        title: info.title || 'Video',
+
+        seconds,
+
+        thumbnail: info.thumbnail || '',
+
+        author: info.uploader || info.channel || ''
+    }
+
+}
+
+// ============================================================
+// 📥 DESCARGAR VIDEO CON YT-DLP
+// ============================================================
+
+async function descargarVideo(video, folder) {
+
+    const output = path.join(
+        folder,
+        'source.%(ext)s'
     )
-  }
 
-  solicitudes.add(m.sender)
+    console.log('[PLAY2] Descargando:', video.title)
 
-  try {
-    const tipo = AUDIO.has(cmd)
-      ? 'audio'
-      : 'video'
+    await ytdlp(
+        video.url,
+        {
+            format:
+                'bv*[height<=720][ext=mp4]+ba[ext=m4a]' +
+                '/b[height<=720][ext=mp4]' +
+                '/bv*[height<=720]+ba' +
+                '/b[height<=720]',
+
+            mergeOutputFormat: 'mp4',
+
+            ffmpegLocation: ffmpeg,
+
+            jsRuntimes: `node:${process.execPath}`,
+
+            output,
+
+            noPlaylist: true,
+
+            noWarnings: true,
+
+            noProgress: true,
+
+            noCacheDir: true,
+
+            socketTimeout: 20,
+
+            retries: 2,
+
+            fragmentRetries: 2,
+
+            concurrentFragments: 2,
+
+            maxFilesize: '150M',
+
+            matchFilter: 'duration <= 420 & !is_live'
+        },
+        {
+            timeout: CONFIG.downloadTimeout
+        }
+    )
+
+    const files = await fs.readdir(folder)
+
+    const source = files.find(file =>
+        /^source\.(mp4|webm|mkv|mov)$/i.test(file)
+    )
+
+    if (!source) {
+
+        throw new Error(
+            'yt-dlp no generó un archivo de video.'
+        )
+
+    }
+
+    const sourcePath = path.join(folder, source)
+
+    const stats = await fs.stat(sourcePath)
+
+    if (!stats.size) {
+
+        throw new Error(
+            'El video descargado está vacío.'
+        )
+
+    }
+
+    if (stats.size > CONFIG.maxDownload) {
+
+        throw new Error(
+            'El archivo descargado supera los 150 MB.'
+        )
+
+    }
+
+    console.log(
+        '[PLAY2] Descarga completa:',
+        `${megabytes(stats.size)} MB`
+    )
+
+    return sourcePath
+
+}
+
+// ============================================================
+// 🔍 ANALIZAR VIDEO CON FFPROBE
+// ============================================================
+
+async function analizarVideo(file) {
+
+    const { stdout } = await exec(
+        ffprobe.path,
+        [
+            '-v', 'error',
+
+            '-show_format',
+
+            '-show_streams',
+
+            '-of', 'json',
+
+            file
+        ],
+        {
+            timeout: 20000,
+
+            maxBuffer: 4 * 1024 * 1024
+        }
+    )
+
+    const info = JSON.parse(stdout)
+
+    const video = info.streams?.find(
+        stream => stream.codec_type === 'video'
+    )
+
+    const audio = info.streams?.find(
+        stream => stream.codec_type === 'audio'
+    )
+
+    if (!video) {
+
+        throw new Error(
+            'El archivo no contiene video válido.'
+        )
+
+    }
+
+    return {
+        width: video.width,
+
+        height: video.height,
+
+        videoCodec: video.codec_name,
+
+        audioCodec: audio?.codec_name || null,
+
+        pixelFormat: video.pix_fmt,
+
+        duration: Number(info.format?.duration || 0),
+
+        size: Number(info.format?.size || 0)
+    }
+
+}
+
+// ============================================================
+// 🎥 CONVERTIR VIDEO PARA WHATSAPP
+// ============================================================
+
+async function convertirVideo(
+    source,
+    folder,
+    documento
+) {
+
+    const output = path.join(
+        folder,
+        'whatsapp-video.mp4'
+    )
+
+    const original = await analizarVideo(source)
+
+    if (
+        !Number.isFinite(original.duration) ||
+        original.duration <= 0 ||
+        original.duration > CONFIG.maxDuration + 1
+    ) {
+
+        throw new Error(
+            'Duración del archivo inválida.'
+        )
+
+    }
+
+    const maxSize = documento
+        ? CONFIG.maxDocument
+        : CONFIG.maxVideo
+
+    // Calcular bitrate para respetar el tamaño máximo.
+
+    const totalBitrate = Math.floor(
+        maxSize * 8 * 0.90 /
+        original.duration /
+        1000
+    )
+
+    const videoBitrate = Math.max(
+        150,
+        Math.min(
+            2200,
+            totalBitrate - 128
+        )
+    )
+
+    console.log(
+        '[PLAY2] Convirtiendo a H264 + AAC.'
+    )
+
+    await exec(
+        ffmpeg,
+        [
+            '-hide_banner',
+
+            '-loglevel', 'error',
+
+            '-y',
+
+            '-i', source,
+
+            // Seleccionar video y audio.
+
+            '-map', '0:v:0',
+
+            '-map', '0:a:0?',
+
+            // Mantener proporciones y dimensiones pares.
+
+            '-vf',
+            "scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+
+            // Codec compatible con WhatsApp.
+
+            '-c:v', 'libx264',
+
+            '-preset', 'veryfast',
+
+            '-profile:v', 'main',
+
+            '-level:v', '4.0',
+
+            '-pix_fmt', 'yuv420p',
+
+            '-r', '30',
+
+            '-b:v', `${videoBitrate}k`,
+
+            '-maxrate', `${videoBitrate}k`,
+
+            '-bufsize', `${videoBitrate * 2}k`,
+
+            // Audio AAC.
+
+            '-c:a', 'aac',
+
+            '-b:a', '128k',
+
+            '-ar', '44100',
+
+            '-ac', '2',
+
+            // Optimizar reproducción.
+
+            '-movflags', '+faststart',
+
+            '-threads', '2',
+
+            '-f', 'mp4',
+
+            output
+        ],
+        {
+            timeout: CONFIG.conversionTimeout,
+
+            maxBuffer: 4 * 1024 * 1024
+        }
+    )
+
+    // ========================================================
+    // 🔍 VALIDAR RESULTADO FINAL
+    // ========================================================
+
+    const info = await analizarVideo(output)
+
+    const stats = await fs.stat(output)
+
+    if (!stats.size) {
+
+        throw new Error(
+            'FFmpeg generó un archivo vacío.'
+        )
+
+    }
+
+    if (stats.size > maxSize) {
+
+        throw new Error(
+            'El video supera el tamaño permitido.'
+        )
+
+    }
+
+    if (info.videoCodec !== 'h264') {
+
+        throw new Error(
+            'El codec del video no es compatible.'
+        )
+
+    }
+
+    if (
+        info.audioCodec &&
+        info.audioCodec !== 'aac'
+    ) {
+
+        throw new Error(
+            'El codec del audio no es compatible.'
+        )
+
+    }
+
+    if (
+        original.audioCodec &&
+        !info.audioCodec
+    ) {
+
+        throw new Error(
+            'El video perdió su pista de audio.'
+        )
+
+    }
+
+    console.log(
+        '[PLAY2] Video validado:',
+        `${info.width}x${info.height}`,
+        info.videoCodec,
+        info.audioCodec,
+        `${megabytes(stats.size)} MB`
+    )
+
+    return {
+        file: output,
+
+        size: stats.size,
+
+        ...info
+    }
+
+}
+
+// ============================================================
+// 📤 ENVIAR VIDEO
+// ============================================================
+
+async function enviarVideo(
+    conn,
+    m,
+    video,
+    resultado,
+    documento
+) {
+
+    const fileName =
+        `${limpiarNombre(video.title)}.mp4`
+
+    if (documento) {
+
+        await conn.sendMessage(
+            m.chat,
+            {
+                document: {
+                    url: resultado.file
+                },
+
+                mimetype: 'video/mp4',
+
+                fileName,
+
+                caption: `🎬 *${video.title}*`
+            },
+            {
+                quoted: m
+            }
+        )
+
+        return
+
+    }
+
+    await conn.sendMessage(
+        m.chat,
+        {
+            video: {
+                url: resultado.file
+            },
+
+            mimetype: 'video/mp4',
+
+            gifPlayback: false,
+
+            caption: `╭━━〔 🎬 *PLAY VIDEO* 〕━━╮
+┃
+┃ 📌 *${video.title}*
+┃ ⏰ Duración: ${duracion(video.seconds)}
+┃ 📐 Calidad: ${resultado.width} × ${resultado.height}
+┃ 📦 Peso: ${megabytes(resultado.size)} MB
+┃
+╰━━━━━━━━━━━━━━━━━━╯`
+        },
+        {
+            quoted: m
+        }
+    )
+
+}
+
+// ============================================================
+// 🚀 HANDLER PRINCIPAL
+// ============================================================
+
+const handler = async (m, {
+    conn,
+
+    command,
+
+    text = '',
+
+    args = [],
+
+    usedPrefix = '.',
+
+    isAdmin,
+
+    isOwner,
+
+    isROwner
+}) => {
+
+    if (!m.isGroup) return
+
+    const sender = m.sender
+
+    const cmd = String(command).toLowerCase()
+
+    const query = String(
+        text || args.join(' ') || ''
+    ).trim()
 
     const documento = DOCUMENTOS.has(cmd)
 
-    await reaccionar(m, '🔎')
-
-    // ======================================================
-    // 🔎 BUSCAR
-    // ======================================================
-
-    const video = await buscarVideo(query)
-
-    if (!video?.url) {
-      throw new Error(
-        'No se encontró el contenido.'
-      )
-    }
-
-    // ======================================================
-    // ⏰ LÍMITE DE 7 MINUTOS
-    // ======================================================
-
-    const segundos = Number(
-      video.seconds ||
-      video.duration?.seconds ||
-      0
+    const exento = Boolean(
+        isAdmin ||
+        isOwner ||
+        isROwner ||
+        m.fromMe
     )
 
-    if (
-      segundos > 0 &&
-      segundos > CONFIG.maxDuration
-    ) {
-      return m.reply(
-        '⛔ Solo se permiten canciones o videos de hasta 7 minutos.'
-      )
+    // ========================================================
+    // 📝 VALIDAR BÚSQUEDA
+    // ========================================================
+
+    if (!query) {
+
+        return m.reply(
+            `🎬 *PLAY VIDEO*\n\n` +
+            `• ${usedPrefix}play2 nombre o enlace\n` +
+            `• ${usedPrefix}play4 nombre o enlace`
+        )
+
     }
 
-    // ======================================================
-    // 📋 INFORMACIÓN
-    // ======================================================
+    // ========================================================
+    // 🧹 LIMPIAR COOLDOWNS VENCIDOS
+    // ========================================================
 
-    const info =
-      `🎵 *WHATSAPP-BOT — PLAY*\n\n` +
-      `📌 *${video.title}*\n` +
-      `⏰ Duración: ${duracion(segundos)}\n` +
-      `📁 Formato: ${tipo}${documento ? ' (documento)' : ''}\n\n` +
-      `⏳ Buscando descarga...`
+    const now = Date.now()
 
-    try {
-      await conn.sendMessage(
-        m.chat,
-        {
-          text: info,
-          contextInfo: {
-            externalAdReply: {
-              title: video.title,
-              body: 'WHATSAPP-BOT',
-              thumbnailUrl: video.thumbnail,
-              sourceUrl: video.url,
-              mediaType: 1,
-              showAdAttribution: false
-            }
-          }
-        },
-        { quoted: m }
-      )
-    } catch {
-      await m.reply(info)
+    for (const [id, time] of cooldowns) {
+
+        if (now - time >= CONFIG.cooldown) {
+
+            cooldowns.delete(id)
+
+        }
+
     }
 
-    await reaccionar(m, '⏳')
-
-    // ======================================================
-    // 📥 DESCARGAR Y ENVIAR
-    // ======================================================
-
-    const enviado = await descargar(
-      conn,
-      m,
-      video,
-      tipo,
-      documento
-    )
-
-    if (!enviado) {
-      await reaccionar(m, '❌')
-
-      return m.reply(
-        '❌ No se pudo descargar el archivo. Todas las API disponibles fallaron.'
-      )
-    }
+    // ========================================================
+    // ⏳ COOLDOWN DE 5 MINUTOS
+    // ========================================================
 
     if (!exento) {
-      cooldowns.set(
-        m.sender,
-        Date.now()
-      )
+
+        const ultimo = cooldowns.get(sender) || 0
+
+        const restante =
+            CONFIG.cooldown - (now - ultimo)
+
+        if (restante > 0) {
+
+            const segundos = Math.ceil(
+                restante / 1000
+            )
+
+            return m.reply(
+                `⏳ Esperá ${duracion(segundos)} para volver a descargar videos.`
+            )
+
+        }
+
     }
 
-    await reaccionar(m, '✅')
+    // ========================================================
+    // 🛡️ PROTEGER EL SERVIDOR
+    // ========================================================
 
-  } catch (error) {
-    console.error(
-      '[PLAY] Error:',
-      error
-    )
+    if (processing.has(sender)) return
 
-    await reaccionar(m, '❌')
+    if (processing.size >= CONFIG.maxConcurrent) {
 
-    return m.reply(
-      `❌ Error: ${error?.message || 'Error desconocido'}`
-    )
+        return m.reply(
+            '⏳ Hay videos en proceso. Intentá más tarde.'
+        )
 
-  } finally {
-    solicitudes.delete(m.sender)
-  }
+    }
+
+    processing.add(sender)
+
+    let folder = null
+
+    try {
+
+        if (!ffmpeg || !ffprobe.path) {
+
+            throw new Error(
+                'FFmpeg o FFprobe no están disponibles.'
+            )
+
+        }
+
+        await react(conn, m, '⏳')
+
+        // ====================================================
+        // 🔎 BUSCAR VIDEO
+        // ====================================================
+
+        const encontrado = await buscarVideo(query)
+
+        const video = await obtenerInformacion(
+            encontrado
+        )
+
+        console.log(
+            '[PLAY2] Video:',
+            video.title
+        )
+
+        console.log(
+            '[PLAY2] Duración:',
+            duracion(video.seconds)
+        )
+
+        // ====================================================
+        // 📂 CREAR CARPETA TEMPORAL
+        // ====================================================
+
+        folder = await fs.mkdtemp(
+            path.join(
+                os.tmpdir(),
+                'whatsapp-play2-'
+            )
+        )
+
+        // ====================================================
+        // 📥 DESCARGAR
+        // ====================================================
+
+        const source = await descargarVideo(
+            video,
+            folder
+        )
+
+        // ====================================================
+        // 🎥 CONVERTIR
+        // ====================================================
+
+        const resultado = await convertirVideo(
+            source,
+            folder,
+            documento
+        )
+
+        // ====================================================
+        // 📤 ENVIAR RESULTADO
+        // ====================================================
+
+        await enviarVideo(
+            conn,
+            m,
+            video,
+            resultado,
+            documento
+        )
+
+        // Cooldown únicamente si se envió correctamente.
+
+        if (!exento) {
+
+            cooldowns.set(
+                sender,
+                Date.now()
+            )
+
+        }
+
+        await react(conn, m, '✅')
+
+        console.log(
+            '[PLAY2] Video enviado correctamente.'
+        )
+
+    } catch (error) {
+
+        console.error(
+            '[PLAY2] ERROR:',
+            error?.stderr ||
+            error?.message ||
+            error
+        )
+
+        await react(conn, m, '❌')
+
+        const mensaje = String(
+            error?.stderr ||
+            error?.message ||
+            ''
+        )
+
+        if (
+            /sign in|confirm you.re not a bot|cookies/i
+                .test(mensaje)
+        ) {
+
+            return m.reply(
+                '❌ YouTube bloqueó temporalmente la descarga.'
+            )
+
+        }
+
+        if (
+            /7 minutos|transmisiones|duración|Duración|enlace válido|No encontré/i
+                .test(mensaje)
+        ) {
+
+            return m.reply(
+                `⚠️ ${error.message}`
+            )
+
+        }
+
+        await m.reply(
+            '❌ No se pudo descargar o procesar el video.'
+        )
+
+    } finally {
+
+        processing.delete(sender)
+
+        // Eliminar todos los archivos temporales.
+
+        if (folder) {
+
+            await fs.rm(folder, {
+                recursive: true,
+                force: true
+            }).catch(error => {
+
+                console.error(
+                    '[PLAY2] Error de limpieza:',
+                    error.message
+                )
+
+            })
+
+        }
+
+    }
+
 }
 
 // ============================================================
-// ⚙️ REGISTRO
+// ⚙️ CONFIGURACIÓN DEL HANDLER
 // ============================================================
 
 handler.help = [
-  'musica',
-  'audio',
-  'play2',
-  'video',
-  'play3',
-  'playdoc',
-  'play4',
-  'playdoc2'
+    'play2 <nombre o enlace>',
+    'video <nombre o enlace>',
+    'ytmp4 <enlace>',
+    'play4 <nombre o enlace>',
+    'playdoc2 <nombre o enlace>',
+    'videodoc <nombre o enlace>'
 ]
 
 handler.tags = ['downloader']
 
 handler.command =
-  /^(musica|audio|play2|video|play3|playdoc|play4|playdoc2)$/i
+    /^(play2|video|ytmp4|play4|playdoc2|videodoc)$/i
 
-// No se exige registro para evitar que el handler
-// invoque global.dfail('unreg') por este plugin.
+handler.group = true
 handler.register = false
+handler.limit = false
 
 export default handler

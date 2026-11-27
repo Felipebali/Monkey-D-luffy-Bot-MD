@@ -1,42 +1,34 @@
 
 /**
  * 📂 plugins/_qc.js
- * 🤖 whatsapp-bot — QUOTE STICKER
+ * 🤖 whatsapp-bot — QUOTE STICKER V2
  *
- * 💬 Sticker con mensaje citado o escrito
- * 👤 Foto de perfil y nombre del usuario
+ * 💬 Mensajes citados y escritos
+ * 👤 Foto de perfil circular
  * 🎨 Burbuja estilo WhatsApp
+ * 🖼️ WebP directo 512x512
  * 🌐 Sin APIs externas de generación
- * 🖼️ Avatar alternativo local
- * 📏 Máximo 310 caracteres
- * 👥 Exclusivo para grupos
+ * 👥 Solo grupos
  */
 
 import { createCanvas, loadImage } from '@napi-rs/canvas'
 import sharp from 'sharp'
-import { sticker } from '../lib/sticker.js'
-
-// ============================================================
-// ⚙️ CONFIGURACIÓN
-// ============================================================
 
 const MAX_LENGTH = 310
 const MAX_CONCURRENT = 3
-
 const processing = new Set()
 
 const COLORS = [
-    '#FF7B7B',
-    '#72D5FF',
-    '#FFCB6B',
-    '#C792EA',
+    '#53BDEB',
     '#82E0AA',
-    '#F78C6C',
-    '#F48FB1'
+    '#FFCB6B',
+    '#F48FB1',
+    '#C792EA',
+    '#FF7B7B'
 ]
 
 // ============================================================
-// 🚀 HANDLER PRINCIPAL
+// 🚀 COMANDO PRINCIPAL
 // ============================================================
 
 const handler = async (m, { conn, text = '' }) => {
@@ -48,9 +40,7 @@ const handler = async (m, { conn, text = '' }) => {
     if (processing.has(sender)) return
 
     if (processing.size >= MAX_CONCURRENT) {
-        return m.reply(
-            '⏳ Hay stickers en proceso. Intentá en un momento.'
-        )
+        return m.reply('⏳ Esperá un momento.')
     }
 
     let quoteText = ''
@@ -58,36 +48,12 @@ const handler = async (m, { conn, text = '' }) => {
     let quoteName = ''
 
     // ========================================================
-    // 📝 OBTENER MENSAJE
+    // 📝 TEXTO ESCRITO
     // ========================================================
 
-    if (m.quoted) {
+    if (String(text || '').trim()) {
 
-        quoteText = String(
-            m.quoted.text ||
-            m.quoted.caption ||
-            m.quoted.msg?.text ||
-            m.quoted.msg?.caption ||
-            ''
-        ).trim()
-
-        if (quoteText) {
-
-            quoteSender =
-                m.quoted.sender || m.sender
-
-            quoteName =
-                m.quoted.pushName ||
-                m.quoted.name ||
-                ''
-
-        }
-
-    }
-
-    if (!quoteText && text.trim()) {
-
-        quoteText = text.trim()
+        quoteText = String(text).trim()
         quoteSender = m.sender
 
         quoteName =
@@ -95,36 +61,57 @@ const handler = async (m, { conn, text = '' }) => {
             m.name ||
             ''
 
+    // ========================================================
+    // 💬 MENSAJE CITADO
+    // ========================================================
+
+    } else if (m.quoted) {
+
+        const q = m.quoted
+
+        quoteText = String(
+            q.text ||
+            q.caption ||
+            q.msg?.text ||
+            q.msg?.caption ||
+            q.message?.conversation ||
+            q.message?.extendedTextMessage?.text ||
+            ''
+        ).trim()
+
+        quoteSender =
+            q.sender ||
+            q.participant ||
+            q.key?.participant ||
+            ''
+
+        quoteName =
+            q.pushName ||
+            q.name ||
+            ''
+
     }
 
     if (!quoteText) {
 
         return m.reply(
-            '╭━━━〔 💬 *STICKER QC* 〕━━━╮\n' +
-            '┃\n' +
-            '┃ 📝 Escribí:\n' +
-            '┃ • .qc Hola mundo\n' +
-            '┃\n' +
-            '┃ 💬 O respondé a un mensaje:\n' +
-            '┃ • .qc\n' +
-            '┃\n' +
-            '╰━━━━━━━━━━━━━━━━━━━━╯'
+            '💬 *QUOTE STICKER*\n\n' +
+            '• .qc Hola mundo\n' +
+            '• Respondé a un mensaje con .qc'
         )
 
     }
 
-    // ========================================================
-    // 📏 LÍMITE DE CARACTERES
-    // ========================================================
+    if (!quoteSender) {
+        return m.reply(
+            '❌ No se pudo identificar al autor del mensaje.'
+        )
+    }
 
-    const length = Array.from(quoteText).length
-
-    if (length > MAX_LENGTH) {
+    if (Array.from(quoteText).length > MAX_LENGTH) {
 
         return m.reply(
-            '⚠️ *Texto demasiado largo.*\n\n' +
-            `📏 Máximo: *${MAX_LENGTH} caracteres*\n` +
-            `📝 Tu texto: *${length} caracteres*`
+            `⚠️ Máximo ${MAX_LENGTH} caracteres.`
         )
 
     }
@@ -136,125 +123,182 @@ const handler = async (m, { conn, text = '' }) => {
         await react(conn, m, '💬')
 
         // ====================================================
-        // 👤 OBTENER NOMBRE
+        // 👤 IDENTIFICAR USUARIO
         // ====================================================
 
         if (typeof conn.decodeJid === 'function') {
+
             quoteSender =
-                conn.decodeJid(quoteSender) || quoteSender
+                conn.decodeJid(quoteSender) ||
+                quoteSender
+
         }
+
+        const candidates = new Set([quoteSender])
+
+        // Compatibilidad con números normales y LID.
+
+        try {
+
+            const metadata =
+                await conn.groupMetadata(m.chat)
+
+            const participant =
+                metadata.participants?.find(p =>
+                    [
+                        p.id,
+                        p.lid,
+                        p.phoneNumber,
+                        p.jid
+                    ].includes(quoteSender)
+                )
+
+            if (participant) {
+
+                for (const id of [
+                    participant.id,
+                    participant.lid,
+                    participant.phoneNumber,
+                    participant.jid
+                ]) {
+
+                    if (typeof id === 'string' && id.includes('@')) {
+                        candidates.add(id)
+                    }
+
+                }
+
+                if (!quoteName) {
+                    quoteName =
+                        participant.notify ||
+                        participant.name ||
+                        ''
+                }
+
+            }
+
+        } catch {}
+
+        // ====================================================
+        // 📛 NOMBRE DEL USUARIO
+        // ====================================================
 
         if (!quoteName) {
 
-            try {
+            for (const id of candidates) {
 
-                if (typeof conn.getName === 'function') {
-                    quoteName = await conn.getName(quoteSender)
-                }
+                try {
 
-            } catch {}
+                    const contact = conn.contacts?.[id]
+
+                    const name =
+                        contact?.notify ||
+                        contact?.name ||
+                        (
+                            typeof conn.getName === 'function'
+                                ? await conn.getName(id)
+                                : ''
+                        )
+
+                    if (name) {
+                        quoteName = String(name)
+                        break
+                    }
+
+                } catch {}
+
+            }
 
         }
 
         quoteName = String(
             quoteName ||
-            quoteSender.split('@')[0] ||
-            'Usuario'
+            (
+                quoteSender.endsWith('@lid')
+                    ? 'Usuario'
+                    : quoteSender.split('@')[0]
+            )
         ).trim()
 
         // ====================================================
-        // 🖼️ OBTENER FOTO DE PERFIL
+        // 🖼️ FOTO DE PERFIL
         // ====================================================
 
         let avatar = null
 
-        try {
+        for (const id of candidates) {
 
-            const pp = await conn.profilePictureUrl(
-                quoteSender,
-                'image'
-            )
+            try {
 
-            if (pp) {
+                const url = await conn.profilePictureUrl(
+                    id,
+                    'image'
+                )
 
-                const response = await fetch(pp, {
-                    signal: AbortSignal.timeout(10000)
+                if (!url) continue
+
+                const response = await fetch(url, {
+                    signal: AbortSignal.timeout(8000)
                 })
 
-                if (response.ok) {
+                if (!response.ok) continue
 
-                    const buffer = Buffer.from(
-                        await response.arrayBuffer()
-                    )
+                const buffer = Buffer.from(
+                    await response.arrayBuffer()
+                )
 
-                    const image = await sharp(buffer)
-                        .resize(128, 128, {
-                            fit: 'cover'
-                        })
-                        .png()
-                        .toBuffer()
+                const image = await sharp(buffer)
+                    .rotate()
+                    .resize(256, 256, {
+                        fit: 'cover'
+                    })
+                    .png()
+                    .toBuffer()
 
-                    avatar = await loadImage(image)
+                avatar = await loadImage(image)
 
-                }
+                break
 
-            }
-
-        } catch (error) {
-
-            console.log(
-                '[QC] Foto no disponible. Usando avatar local.'
-            )
+            } catch {}
 
         }
 
+        if (!avatar) {
+            console.log('[QC] Usando avatar alternativo.')
+        }
+
         // ====================================================
-        // 🎨 GENERAR IMAGEN LOCAL
+        // 🎨 GENERAR STICKER
         // ====================================================
 
-        console.log('[QC] Generando sticker local.')
-
-        const image = generateQuote({
+        const png = generateQuote({
             name: quoteName,
             text: quoteText,
             avatar,
             jid: quoteSender
         })
 
-        // ====================================================
-        // 🧩 PREPARAR IMAGEN PARA STICKER
-        // ====================================================
+        // Conversión directa a WebP.
+        // Sin lib/sticker.js ni doble redimensionamiento.
 
-        const png = await sharp(image)
-            .resize(512, 512, {
-                fit: 'contain',
-                background: {
-                    r: 0,
-                    g: 0,
-                    b: 0,
-                    alpha: 0
-                }
-            })
-            .png()
-            .toBuffer()
+        let webp
 
-        // ====================================================
-        // 🎨 CONVERTIR A STICKER CON PACK Y AUTOR
-        // ====================================================
+        for (const quality of [95, 85, 70, 50, 30]) {
 
-        const stiker = await sticker(
-            png,
-            false,
-            global.packname || 'whatsapp-bot',
-            global.author || ''
-        )
+            webp = await sharp(png)
+                .webp({
+                    quality,
+                    alphaQuality: 100,
+                    effort: 6
+                })
+                .toBuffer()
 
-        if (!stiker?.length) {
+            if (webp.length <= 100 * 1024) break
 
-            throw new Error(
-                'No se pudo convertir la imagen a WebP.'
-            )
+        }
 
+        if (!webp?.length) {
+            throw new Error('WebP vacío.')
         }
 
         // ====================================================
@@ -264,7 +308,7 @@ const handler = async (m, { conn, text = '' }) => {
         await conn.sendMessage(
             m.chat,
             {
-                sticker: stiker
+                sticker: webp
             },
             {
                 quoted: m
@@ -274,7 +318,8 @@ const handler = async (m, { conn, text = '' }) => {
         await react(conn, m, '✅')
 
         console.log(
-            '[QC] Sticker enviado correctamente.'
+            '[QC] Sticker enviado:',
+            `${(webp.length / 1024).toFixed(1)} KB`
         )
 
     } catch (error) {
@@ -283,7 +328,7 @@ const handler = async (m, { conn, text = '' }) => {
 
         await react(conn, m, '❌')
 
-        return m.reply(
+        await m.reply(
             '❌ No se pudo generar el sticker QC.'
         )
 
@@ -296,96 +341,134 @@ const handler = async (m, { conn, text = '' }) => {
 }
 
 // ============================================================
-// 🎨 GENERADOR DE STICKERS
+// 🎨 GENERADOR DE IMAGEN
 // ============================================================
 
 function generateQuote({ name, text, avatar, jid }) {
 
-    const WIDTH = 512
-    const PADDING = 18
-    const AVATAR_SIZE = 68
+    const SIZE = 512
 
-    const BUBBLE_X = 102
-    const MAX_BUBBLE_WIDTH = 392
-    const INNER_PADDING = 22
-    const TEXT_WIDTH =
-        MAX_BUBBLE_WIDTH - INNER_PADDING * 2
+    const canvas = createCanvas(SIZE, SIZE)
+    const ctx = canvas.getContext('2d')
 
-    const FONT_SIZE = 30
-    const LINE_HEIGHT = 39
+    ctx.clearRect(0, 0, SIZE, SIZE)
 
-    // Canvas auxiliar para medir el texto.
+    const AVATAR = 82
+    const GAP = 16
+    const PADDING = 22
 
-    const measure = createCanvas(1, 1)
-    const measureCtx = measure.getContext('2d')
+    const MAX_BUBBLE_WIDTH = 386
+    const MAX_TEXT_WIDTH =
+        MAX_BUBBLE_WIDTH - PADDING * 2
 
-    measureCtx.font = `${FONT_SIZE}px sans-serif`
+    let fontSize = 34
+    let lines = []
+    let lineHeight = 42
+    let bubbleHeight = 0
 
-    const lines = wrapText(
-        measureCtx,
-        text,
-        TEXT_WIDTH
-    )
+    // ========================================================
+    // 📐 AJUSTAR TAMAÑO DEL TEXTO
+    // ========================================================
+
+    while (fontSize >= 10) {
+
+        ctx.font = `${fontSize}px sans-serif`
+
+        lines = wrapText(
+            ctx,
+            text,
+            MAX_TEXT_WIDTH
+        )
+
+        lineHeight = Math.ceil(fontSize * 1.25)
+
+        bubbleHeight =
+            76 + lines.length * lineHeight
+
+        if (bubbleHeight <= 480) break
+
+        fontSize--
+
+    }
+
+    if (bubbleHeight > 480) {
+        throw new Error(
+            'El mensaje contiene demasiadas líneas.'
+        )
+    }
+
+    ctx.font = `${fontSize}px sans-serif`
 
     const longestLine = Math.max(
-        ...lines.map(line =>
-            measureCtx.measureText(line).width
+        ...lines.map(
+            line => ctx.measureText(line).width
         ),
         0
     )
 
-    measureCtx.font = 'bold 25px sans-serif'
+    // ========================================================
+    // 📛 AJUSTAR NOMBRE
+    // ========================================================
+
+    ctx.font = 'bold 27px sans-serif'
 
     const displayName = truncateText(
-        measureCtx,
+        ctx,
         name,
-        TEXT_WIDTH
+        MAX_TEXT_WIDTH
     )
 
     const nameWidth =
-        measureCtx.measureText(displayName).width
+        ctx.measureText(displayName).width
 
     const bubbleWidth = Math.min(
         MAX_BUBBLE_WIDTH,
         Math.max(
-            150,
-            longestLine + INNER_PADDING * 2,
-            nameWidth + INNER_PADDING * 2
+            160,
+            longestLine + PADDING * 2,
+            nameWidth + PADDING * 2
         )
     )
 
-    const bubbleHeight =
-        70 + lines.length * LINE_HEIGHT
-
-    const HEIGHT = Math.max(
-        120,
-        bubbleHeight + PADDING * 2
-    )
-
-    const canvas = createCanvas(WIDTH, HEIGHT)
-    const ctx = canvas.getContext('2d')
-
     // ========================================================
-    // 🖤 FONDO TRANSPARENTE
+    // 📍 CENTRAR TODO EL STICKER
     // ========================================================
 
-    ctx.clearRect(0, 0, WIDTH, HEIGHT)
+    const totalWidth =
+        AVATAR + GAP + bubbleWidth
+
+    const totalHeight =
+        Math.max(AVATAR, bubbleHeight)
+
+    const startX =
+        Math.round((SIZE - totalWidth) / 2)
+
+    const startY =
+        Math.round((SIZE - totalHeight) / 2)
+
+    const avatarX = startX
+    const avatarY = startY + 4
+
+    const bubbleX =
+        startX + AVATAR + GAP
+
+    const bubbleY = startY
 
     const color = getColor(jid || name)
 
     // ========================================================
-    // 💬 BURBUJA DEL MENSAJE
+    // 💬 BURBUJA OSCURA
     // ========================================================
 
     ctx.fillStyle = '#202C33'
 
     roundedRect(
         ctx,
-        BUBBLE_X,
-        PADDING,
+        bubbleX,
+        bubbleY,
         bubbleWidth,
         bubbleHeight,
-        23
+        25
     )
 
     ctx.fill()
@@ -394,33 +477,40 @@ function generateQuote({ name, text, avatar, jid }) {
 
     ctx.beginPath()
 
-    ctx.moveTo(BUBBLE_X + 9, PADDING + 10)
-    ctx.lineTo(BUBBLE_X - 12, PADDING + 10)
-    ctx.lineTo(BUBBLE_X + 9, PADDING + 32)
+    ctx.moveTo(
+        bubbleX + 12,
+        bubbleY + 12
+    )
+
+    ctx.lineTo(
+        bubbleX - 12,
+        bubbleY + 12
+    )
+
+    ctx.lineTo(
+        bubbleX + 12,
+        bubbleY + 38
+    )
 
     ctx.closePath()
     ctx.fill()
 
     // ========================================================
-    // 👤 FOTO DE PERFIL CIRCULAR
+    // 👤 FOTO CIRCULAR
     // ========================================================
-
-    const avatarX = PADDING
-    const avatarY = PADDING + 2
 
     ctx.save()
 
     ctx.beginPath()
 
     ctx.arc(
-        avatarX + AVATAR_SIZE / 2,
-        avatarY + AVATAR_SIZE / 2,
-        AVATAR_SIZE / 2,
+        avatarX + AVATAR / 2,
+        avatarY + AVATAR / 2,
+        AVATAR / 2,
         0,
         Math.PI * 2
     )
 
-    ctx.closePath()
     ctx.clip()
 
     if (avatar) {
@@ -429,76 +519,89 @@ function generateQuote({ name, text, avatar, jid }) {
             avatar,
             avatarX,
             avatarY,
-            AVATAR_SIZE,
-            AVATAR_SIZE
+            AVATAR,
+            AVATAR
         )
 
     } else {
 
-        // Avatar local con inicial del nombre.
+        // Avatar genérico local.
 
-        ctx.fillStyle = color
+        ctx.fillStyle = '#667781'
 
         ctx.fillRect(
             avatarX,
             avatarY,
-            AVATAR_SIZE,
-            AVATAR_SIZE
+            AVATAR,
+            AVATAR
         )
 
-        ctx.fillStyle = '#FFFFFF'
-        ctx.font = 'bold 35px sans-serif'
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#CFD8DC'
 
-        const initial =
-            Array.from(name.trim())[0]?.toUpperCase() ||
-            '?'
+        ctx.beginPath()
 
-        ctx.fillText(
-            initial,
-            avatarX + AVATAR_SIZE / 2,
-            avatarY + AVATAR_SIZE / 2
+        ctx.arc(
+            avatarX + AVATAR / 2,
+            avatarY + 28,
+            15,
+            0,
+            Math.PI * 2
         )
+
+        ctx.fill()
+
+        ctx.beginPath()
+
+        ctx.ellipse(
+            avatarX + AVATAR / 2,
+            avatarY + 76,
+            32,
+            28,
+            0,
+            0,
+            Math.PI * 2
+        )
+
+        ctx.fill()
 
     }
 
     ctx.restore()
 
     // ========================================================
-    // ✍️ NOMBRE DEL USUARIO
+    // 📛 NOMBRE
     // ========================================================
 
     ctx.textAlign = 'left'
     ctx.textBaseline = 'top'
 
-    ctx.font = 'bold 25px sans-serif'
+    ctx.font = 'bold 27px sans-serif'
     ctx.fillStyle = color
 
     ctx.fillText(
         displayName,
-        BUBBLE_X + INNER_PADDING,
-        PADDING + 16
+        bubbleX + PADDING,
+        bubbleY + 16
     )
 
     // ========================================================
-    // 📝 TEXTO DEL MENSAJE
+    // 📝 MENSAJE
     // ========================================================
 
-    ctx.font = `${FONT_SIZE}px sans-serif`
-    ctx.fillStyle = '#E9EDEF'
+    ctx.font = `${fontSize}px sans-serif`
+    ctx.fillStyle = '#FFFFFF'
 
-    let y = PADDING + 55
+    let y = bubbleY + 56
 
     for (const line of lines) {
 
         ctx.fillText(
             line,
-            BUBBLE_X + INNER_PADDING,
+            bubbleX + PADDING,
             y
         )
 
-        y += LINE_HEIGHT
+        y += lineHeight
 
     }
 
@@ -507,18 +610,21 @@ function generateQuote({ name, text, avatar, jid }) {
 }
 
 // ============================================================
-// 📝 AJUSTAR TEXTO AUTOMÁTICAMENTE
+// 📝 DIVIDIR TEXTO SIN CORTAR PALABRAS
 // ============================================================
 
 function wrapText(ctx, text, maxWidth) {
 
     const lines = []
 
-    const paragraphs = String(text)
-        .replace(/\r/g, '')
-        .split('\n')
+    const segmenter = new Intl.Segmenter(
+        'es',
+        { granularity: 'grapheme' }
+    )
 
-    for (const paragraph of paragraphs) {
+    for (const paragraph of String(text)
+        .replace(/\r/g, '')
+        .split('\n')) {
 
         if (!paragraph.trim()) {
 
@@ -527,21 +633,17 @@ function wrapText(ctx, text, maxWidth) {
 
         }
 
-        const words = paragraph.split(/\s+/)
-
         let line = ''
 
-        for (const word of words) {
+        for (const word of paragraph.trim().split(/\s+/)) {
 
-            const testLine = line
+            const test = line
                 ? `${line} ${word}`
                 : word
 
-            if (
-                ctx.measureText(testLine).width <= maxWidth
-            ) {
+            if (ctx.measureText(test).width <= maxWidth) {
 
-                line = testLine
+                line = test
                 continue
 
             }
@@ -553,36 +655,27 @@ function wrapText(ctx, text, maxWidth) {
 
             }
 
-            if (
-                ctx.measureText(word).width <= maxWidth
-            ) {
+            if (ctx.measureText(word).width <= maxWidth) {
 
                 line = word
+                continue
 
-            } else {
+            }
 
-                // Dividir palabras demasiado largas.
+            for (const { segment } of segmenter.segment(word)) {
 
-                let chunk = ''
+                if (
+                    line &&
+                    ctx.measureText(line + segment).width >
+                    maxWidth
+                ) {
 
-                for (const char of Array.from(word)) {
-
-                    if (
-                        chunk &&
-                        ctx.measureText(chunk + char).width >
-                        maxWidth
-                    ) {
-
-                        lines.push(chunk)
-                        chunk = ''
-
-                    }
-
-                    chunk += char
+                    lines.push(line)
+                    line = ''
 
                 }
 
-                line = chunk
+                line += segment
 
             }
 
@@ -597,25 +690,25 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 // ============================================================
-// ✂️ ACORTAR NOMBRES LARGOS
+// ✂️ NOMBRES LARGOS
 // ============================================================
 
 function truncateText(ctx, text, maxWidth) {
 
-    const value = String(text)
+    const chars = Array.from(String(text))
 
-    if (ctx.measureText(value).width <= maxWidth) {
-        return value
+    if (ctx.measureText(chars.join('')).width <= maxWidth) {
+        return chars.join('')
     }
-
-    const chars = Array.from(value)
 
     while (
         chars.length &&
         ctx.measureText(chars.join('') + '…').width >
         maxWidth
     ) {
+
         chars.pop()
+
     }
 
     return chars.join('') + '…'
@@ -623,14 +716,14 @@ function truncateText(ctx, text, maxWidth) {
 }
 
 // ============================================================
-// 🎨 COLOR DEL USUARIO
+// 🎨 COLOR DEL NOMBRE
 // ============================================================
 
-function getColor(value = '') {
+function getColor(value) {
 
     let hash = 0
 
-    for (const char of String(value)) {
+    for (const char of String(value || '')) {
 
         hash = (
             hash * 31 + char.codePointAt(0)
@@ -645,7 +738,7 @@ function getColor(value = '') {
 }
 
 // ============================================================
-// 🔲 RECTÁNGULO REDONDEADO
+// 🔲 BORDES REDONDEADOS
 // ============================================================
 
 function roundedRect(ctx, x, y, w, h, r) {
@@ -653,36 +746,15 @@ function roundedRect(ctx, x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2)
 
     ctx.beginPath()
-
     ctx.moveTo(x + r, y)
     ctx.lineTo(x + w - r, y)
-
-    ctx.quadraticCurveTo(
-        x + w, y,
-        x + w, y + r
-    )
-
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
     ctx.lineTo(x + w, y + h - r)
-
-    ctx.quadraticCurveTo(
-        x + w, y + h,
-        x + w - r, y + h
-    )
-
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
     ctx.lineTo(x + r, y + h)
-
-    ctx.quadraticCurveTo(
-        x, y + h,
-        x, y + h - r
-    )
-
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
     ctx.lineTo(x, y + r)
-
-    ctx.quadraticCurveTo(
-        x, y,
-        x + r, y
-    )
-
+    ctx.quadraticCurveTo(x, y, x + r, y)
     ctx.closePath()
 
 }
@@ -696,12 +768,10 @@ async function react(conn, m, emoji) {
     try {
 
         await conn.sendMessage(m.chat, {
-
             react: {
                 text: emoji,
                 key: m.key
             }
-
         })
 
     } catch {}
@@ -709,18 +779,14 @@ async function react(conn, m, emoji) {
 }
 
 // ============================================================
-// ⚙️ CONFIGURACIÓN DEL HANDLER
+// ⚙️ CONFIGURACIÓN
 // ============================================================
 
-handler.help = [
-    'qc <texto>',
-    'qc respondiendo a un mensaje'
-]
+handler.help = ['qc <texto>', 'qc']
 
 handler.tags = ['sticker']
 
-handler.command =
-    /^(qc|quote|quotesticker)$/i
+handler.command = /^(qc|quote|quotesticker)$/i
 
 handler.group = true
 handler.register = false

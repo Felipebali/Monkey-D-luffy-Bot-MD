@@ -222,8 +222,6 @@ const handler = async (m, {
 
       noCacheDir: true,
 
-      noCheckCertificates: false,
-
       socketTimeout: 20,
 
       retries: 2,
@@ -353,6 +351,7 @@ const handler = async (m, {
 > 🤖 WHATSAPP-BOT`
 
     try {
+
       await conn.sendMessage(m.chat, {
         image: {
           url: thumbnail
@@ -361,8 +360,11 @@ const handler = async (m, {
       }, {
         quoted: m
       })
+
     } catch {
+
       await m.reply(caption)
+
     }
 
     // ========================================================
@@ -437,26 +439,31 @@ const handler = async (m, {
     if (
       /sign in|not a bot|captcha/i.test(detail)
     ) {
+
       message =
         '❌ YouTube está bloqueando las descargas del servidor.'
 
     } else if (
       /ENOENT|ffmpeg|ffprobe|python/i.test(detail)
     ) {
+
       message =
         '❌ Faltan dependencias de descarga en el servidor.'
 
     } else if (
       /timeout|ETIMEDOUT|timed out/i.test(detail)
     ) {
+
       message =
         '❌ La descarga tardó demasiado.'
 
     } else if (
       /403|429|too many requests/i.test(detail)
     ) {
+
       message =
         '❌ YouTube limitó las solicitudes del servidor.'
+
     }
 
     await m.reply(message)
@@ -468,10 +475,12 @@ const handler = async (m, {
     // ========================================================
 
     if (tempDir) {
+
       await fs.rm(tempDir, {
         recursive: true,
         force: true
       }).catch(() => {})
+
     }
 
     processing.delete(sender)
@@ -486,12 +495,14 @@ const handler = async (m, {
 async function react(conn, m, emoji) {
 
   try {
+
     await conn.sendMessage(m.chat, {
       react: {
         text: emoji,
         key: m.key
       }
     })
+
   } catch {}
 
 }
